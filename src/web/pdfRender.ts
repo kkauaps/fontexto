@@ -1,26 +1,17 @@
 import * as pdfjs from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { findPhrase } from '../core/textsearch';
+import { createWorker } from './trustedWorker';
 
-/**
- * The worker is started here (same-origin file only) through a Trusted Types policy, so the page can run under
- * `require-trusted-types-for 'script'`. pdf.js keeps running in a Web Worker and never evaluates PDF content as code.
- */
-const trustedTypes = (window as unknown as { trustedTypes?: { createPolicy: (name: string, rules: { createScriptURL: (url: string) => string }) => { createScriptURL: (url: string) => unknown } } }).trustedTypes;
-const workerPolicy = trustedTypes?.createPolicy('fontexto-pdfjs', {
-  createScriptURL: (url: string) => {
-    const u = new URL(url, window.location.href);
-    if (u.origin !== window.location.origin) throw new TypeError('Worker bloqueado: origem diferente');
-    return u.href;
-  },
-});
-pdfjs.GlobalWorkerOptions.workerPort = new Worker((workerPolicy ? workerPolicy.createScriptURL(workerUrl) : workerUrl) as string, { type: 'module' });
+pdfjs.GlobalWorkerOptions.workerPort = createWorker(workerUrl, 'pdfjs');
 
 export type PdfDoc = Awaited<ReturnType<typeof pdfjs.getDocument>['promise']>;
 
-export function openPdf(url: string) {
+/** A document URL (server edition) or the bytes themselves (browser edition: the file never leaves the device). */
+export function openPdf(source: string | Uint8Array) {
+  const input = typeof source === 'string' ? { url: source } : { data: source };
   return pdfjs.getDocument({
-    url,
+    ...input,
     isEvalSupported: false,
     enableXfa: false,
     // Self-hosted decoders and fonts (copied to /pdfjs at build time); nothing is fetched from another origin.
@@ -29,7 +20,7 @@ export function openPdf(url: string) {
     cMapUrl: '/pdfjs/cmaps/',
     cMapPacked: true,
     iccUrl: '/pdfjs/iccs/',
-  } as Parameters<typeof pdfjs.getDocument>[0]);
+  } as unknown as Parameters<typeof pdfjs.getDocument>[0]);
 }
 
 export interface RenderedPage {

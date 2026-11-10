@@ -141,11 +141,21 @@ export function pairCurated(graph: CitationGraph, report: Pick<EvidenceReport, '
   }
   const itemsByKey = new Map<string, CuratedItem[]>();
   for (const it of curated.items) itemsByKey.set(it.key, [...(itemsByKey.get(it.key) ?? []), it]);
+  // The review may use other BibTeX keys than this project's .bib ("oquab2024dinov2" vs "oquab2024"): map each
+  // curated key to the project's key with the same author+year stem, when that is unambiguous.
+  const stem = (k: string) => /^[a-z]+\d{4}/.exec(k.toLowerCase())?.[0];
+  const aliasOf = new Map<string, string>();
+  for (const key of itemsByKey.keys()) {
+    if (occByKey.has(key)) continue;
+    const st = stem(key);
+    const cands = st ? [...occByKey.keys()].filter((k) => stem(k) === st && !itemsByKey.has(k)) : [];
+    if (cands.length === 1) aliasOf.set(key, cands[0]);
+  }
   const pairs = new Map<string, CuratedItem>();
   const differing: string[] = [];
   let low = 0;
   for (const [key, items] of itemsByKey) {
-    const occs = occByKey.get(key) ?? [];
+    const occs = occByKey.get(aliasOf.get(key) ?? key) ?? [];
     if (occs.length === items.length) {
       occs.forEach((o, i) => {
         pairs.set(o.id, items[i]);
@@ -166,6 +176,22 @@ export function pairCurated(graph: CitationGraph, report: Pick<EvidenceReport, '
       usedI.add(c.it);
       pairs.set(c.o.id, c.it);
     }
+  }
+  // Items still unpaired (different keys, e.g. "cvatdocs" vs "cvatai2026"): pair by sentence similarity across all
+  // unpaired occurrences of resolved references.
+  const usedO = new Set(pairs.keys());
+  const usedI = new Set(pairs.values());
+  const rest: { o: CitationOccurrence; it: CuratedItem; s: number }[] = [];
+  for (const it of curated.items) {
+    if (usedI.has(it) || !it.sentence) continue;
+    for (const o of report.occurrences) if (o.resolution === 'resolved' && !usedO.has(o.id)) rest.push({ o, it, s: jaccard(it.sentence, o.sentence) });
+  }
+  rest.sort((a, b) => b.s - a.s);
+  for (const c of rest) {
+    if (c.s < 0.5 || usedO.has(c.o.id) || usedI.has(c.it)) continue;
+    usedO.add(c.o.id);
+    usedI.add(c.it);
+    pairs.set(c.o.id, c.it);
   }
   return { pairs, differing, low };
 }

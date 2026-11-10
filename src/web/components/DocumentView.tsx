@@ -1,3 +1,4 @@
+import { SemanticNotice } from './SemanticNotice';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EvidenceReport } from '../../core/evidence';
 import type { CitationGraph } from '../../core/model';
@@ -182,9 +183,13 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
     }
     let cancelled = false;
     setDocError(undefined);
-    const task = openPdf(api.pdfUrl(projectId, mainFileId));
-    task.promise
-      .then(async (d) => {
+    let task: ReturnType<typeof openPdf> | undefined;
+    api
+      .pdfSource(projectId, mainFileId)
+      .then(async (source) => {
+        if (cancelled) return;
+        task = openPdf(source);
+        const d = await task.promise;
         const p1 = await d.getPage(1);
         const vp = p1.getViewport({ scale });
         if (cancelled) return;
@@ -194,7 +199,7 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
       .catch((e: Error) => !cancelled && setDocError(e.message));
     return () => {
       cancelled = true;
-      task.destroy().catch(() => undefined);
+      task?.destroy().catch(() => undefined);
     };
   }, [projectId, mainFileId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -330,6 +335,7 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
             </UploadButton>
           </div>
         )}
+        {hasBib && evidence.summary.occurrences > 0 && <SemanticNotice projectId={projectId} method={evidence.method} onGraph={onGraph} />}
         {docError && <div className="notice error">{docError}</div>}
         <div className="doc-pages" ref={scrollerRef}>
           {doc ? (

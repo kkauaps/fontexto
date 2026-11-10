@@ -1610,3 +1610,28 @@ table.files select {
   text-transform: none;
   letter-spacing: 0;
 }
+
+/* Splash shown by index.html until the app mounts. */
+.boot {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--muted, #5b6b66);
+  font-size: 14px;
+}
+.boot img {
+  animation: boot-pulse 1.4s ease-in-out infinite;
+}
+@keyframes boot-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .boot img {
+    animation: none;
+  }
+}

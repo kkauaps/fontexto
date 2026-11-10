@@ -341,15 +341,15 @@ export function ProjectPanel({ projectId, graph, externalAvailable, onGraph, onO
       <section>
         <h3>Exportar</h3>
         <div className="row">
-          <a className="button" href={api.exportUrl(projectId, 'graphml')}>
+          <button onClick={() => void api.download(projectId, 'graphml')}>
             GraphML
-          </a>
-          <a className="button" href={api.exportUrl(projectId, 'json')}>
+          </button>
+          <button onClick={() => void api.download(projectId, 'json')}>
             JSON (compartilhável, sem texto privado)
-          </a>
-          <a className="button" href={api.exportUrl(projectId, 'evidence')}>
+          </button>
+          <button onClick={() => void api.download(projectId, 'evidence')}>
             Citações e evidências (JSON, sem texto privado)
-          </a>
+          </button>
         </div>
       </section>
 

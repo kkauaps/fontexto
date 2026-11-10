@@ -14,3 +14,6 @@ data/
 dist/win/
 dist/package/
 *.exe
+# Embedding model files (npm run fetch-model). Never commit.
+models/
+models-eval/

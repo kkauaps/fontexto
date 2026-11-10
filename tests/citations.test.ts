@@ -84,3 +84,25 @@ describe('ambiguous citations', () => {
     expect(q.provenance.find((p) => p.method === 'in_text_marker')?.citationAnchors?.[0]).toMatchObject({ fileId: main.id, page: 1 });
   });
 });
+
+describe('markers that are not unidentified references', () => {
+  it('ignores "Autor (2026)" self-citations of table sources, but keeps real ones', () => {
+    const text = 'Fonte: Autor (2026), com base em Ravikandar et al. (2022) e (Ronneberger; Fischer; Brox, 2015).';
+    expect(extractMarkersFromText(text).map((m) => m.authors[0])).toEqual(['Ravikandar', 'Ronneberger']);
+    expect(extractMarkersFromText(text, { includeSelf: true }).some((m) => m.authors[0] === 'Autor')).toBe(true);
+    expect(extractMarkersFromText('Elaboração própria (2024) e (Author, 2021).')).toEqual([]);
+  });
+  it('reads ABNT semicolon co-authors as one reference and et al. variants', () => {
+    expect(parseParenthetical('Ronneberger; Fischer; Brox, 2015')).toEqual([expect.objectContaining({ authors: ['Ronneberger', 'Fischer', 'Brox'], year: 2015, etAl: false })]);
+    expect(parseParenthetical('Odrany et al., 2024')).toEqual([expect.objectContaining({ authors: ['Odrany'], etAl: true })]);
+    expect(parseParenthetical('Xie et al, 2021; Cheng e Schwing, 2022')).toHaveLength(2);
+  });
+  it('resolves multi-author and et al. markers against the bibliography', () => {
+    const pub = (id: string, family: string[], year: number) => ({ id, kind: 'publication', year, yearLabel: String(year), authors: family.map((f) => ({ family: f })) }) as never;
+    const pubs = [pub('r', ['Ronneberger', 'Fischer', 'Brox'], 2015), pub('o', ['Odrany', 'Darvel', 'Moutharel', 'Vo'], 2024)];
+    const [m] = parseParenthetical('Ronneberger; Fischer; Brox, 2015');
+    expect(resolveMarker(m, pubs)).toEqual({ status: 'resolved', publicationId: 'r' });
+    const [o] = parseParenthetical('Odrany et al., 2024');
+    expect(resolveMarker(o, pubs)).toEqual({ status: 'resolved', publicationId: 'o' });
+  });
+});
