@@ -4,6 +4,8 @@ import { categoryOf, type CategoryRule } from '../core/categories';
 import type { CitationGraph, ReviewAction } from '../core/model';
 import { buildView, DEFAULT_FILTERS, type GraphMode, type ViewFilters } from '../core/view';
 import { api, type ProjectSummary } from './api';
+import { BRAND, pageTitle } from './brand';
+import { SetupChecklist } from './components/SetupChecklist';
 import { occurrencesByPublication } from '../core/evidenceView';
 import type { EvidenceReport } from '../core/evidence';
 import { DocumentView, type DocumentFocus } from './components/DocumentView';
@@ -76,6 +78,10 @@ export function App() {
     setDocMode(true);
   }, []);
 
+  useEffect(() => {
+    document.title = pageTitle(projectId ? (projects.find((p) => p.id === projectId)?.name ?? undefined) : undefined);
+  }, [projectId, projects]);
+
   const view = useMemo(() => (graph ? buildView(graph, filters, collapsed) : undefined), [graph, filters, collapsed]);
   const categories = useMemo(() => {
     if (!graph) return [];
@@ -126,8 +132,9 @@ export function App() {
   if (!projectId) {
     return (
       <div className="welcome">
-        <h1>CitationTrace</h1>
-        <p className="muted">Grafo de citações e evidências — processamento local, sem envio de documentos a serviços externos.</p>
+        <h1>{BRAND.name}</h1>
+        <p className="lead">{BRAND.tagline}. Veja cada citação do seu texto, a frase que cita e o trecho correspondente na referência.</p>
+        <p className="muted small">{BRAND.privacyNote}</p>
         {error && <div className="notice error">{error}</div>}
         <section>
           <h3>Projetos</h3>
@@ -170,7 +177,7 @@ export function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <strong className="brand">CitationTrace</strong>
+        <strong className="brand">{BRAND.name}</strong>
         <select value={projectId} onChange={(e) => setProjectId(e.target.value || undefined)} aria-label="Projeto">
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
@@ -179,7 +186,7 @@ export function App() {
           ))}
           <option value="">+ Projetos…</option>
         </select>
-        <div className="segmented" role="tablist">
+        <nav className="tabs" role="tablist" aria-label="Visões">
           <button role="tab" aria-selected={!docMode && filters.mode === 'bibliographic'} className={!docMode && filters.mode === 'bibliographic' ? 'on' : ''} onClick={() => setMode('bibliographic')}>
             A · Bibliográfico
           </button>
@@ -189,7 +196,8 @@ export function App() {
           <button role="tab" aria-selected={docMode} className={docMode ? 'on' : ''} onClick={() => setDocMode(true)}>
             C · Documento{evidence && evidence.summary.occurrences > 0 ? ` (${evidence.summary.occurrences})` : ''}
           </button>
-        </div>
+        </nav>
+        {!docMode && (
         <input
           className="search"
           type="search"
@@ -197,13 +205,14 @@ export function App() {
           value={filters.search ?? ''}
           onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
         />
+        )}
         {stats && (
           <span className="stats small">
             {stats.pubs} publicações · {stats.confirmed} citações confirmadas · {stats.unverified} a verificar
             {stats.pending > 0 && <span className="badge warn"> {stats.pending} pendência(s)</span>}
           </span>
         )}
-        <button onClick={() => setLayoutNonce((n) => n + 1)}>Reorganizar</button>
+        {!docMode && <button onClick={() => setLayoutNonce((n) => n + 1)}>Reorganizar</button>}
         <button className="primary" onClick={() => setPanelOpen(true)}>
           Arquivos e revisão
         </button>
@@ -213,7 +222,11 @@ export function App() {
           {error}
         </div>
       )}
-      {docMode && !graph && <div className="loading">Carregando…</div>}
+      {docMode && !graph && (
+        <div className="loading">
+          <span className="spinner" /> Carregando projeto…
+        </div>
+      )}
       {docMode && graph && (
         <div className="main">
           <DocumentView
@@ -227,6 +240,7 @@ export function App() {
               setSelection({ type: 'node', id: pubId });
             }}
             onOpenFiles={() => setPanelOpen(true)}
+            onGraph={setGraph}
           />
         </div>
       )}
@@ -263,12 +277,15 @@ export function App() {
               />
             </ReactFlowProvider>
           ) : (
-            <div className="loading">Carregando grafo…</div>
+            <div className="loading">
+              <span className="spinner" /> Montando o grafo…
+            </div>
           )}
           {graph && Object.keys(graph.files).length === 0 && (
-            <div className="mode-note">
-              Projeto vazio. Abra <button className="linklike" onClick={() => setPanelOpen(true)}>Arquivos e revisão</button> para enviar o .bib, o PDF
-              principal e os PDFs das referências.
+            <div className="empty-card">
+              <h2>Comece enviando seus arquivos</h2>
+              <p className="muted">Com o PDF do documento e a bibliografia, o grafo e a aba “C · Documento” são montados automaticamente.</p>
+              <SetupChecklist projectId={projectId} graph={graph} onGraph={setGraph} />
             </div>
           )}
         </div>
@@ -289,7 +306,7 @@ export function App() {
         )}
       </div>
       )}
-      {viewer && <PdfViewer projectId={projectId} request={viewer} onClose={() => setViewer(undefined)} />}
+      {viewer && <PdfViewer projectId={projectId} request={viewer} backLabel={panelOpen ? 'Voltar aos arquivos' : docMode ? 'Voltar ao documento' : 'Voltar ao grafo'} onClose={() => setViewer(undefined)} />}
       {panelOpen && graph && (
         <ProjectPanel
           projectId={projectId}

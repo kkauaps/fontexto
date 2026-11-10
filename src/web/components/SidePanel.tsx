@@ -12,6 +12,12 @@ export interface OpenRequest {
   context?: string;
   /** Text to find and highlight on the opened page (via the pdf.js text layer). */
   phrase?: string;
+  /** The citing sentence from the main document, shown while reading the reference. */
+  citing?: string;
+  /** All passages found for the same citation (this request included), to switch between them in the viewer. */
+  alternatives?: { label: string; request: OpenRequest }[];
+  /** Index of this request inside `alternatives`. */
+  altIndex?: number;
 }
 
 interface Props {

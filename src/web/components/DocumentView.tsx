@@ -5,6 +5,7 @@ import { countByStatus, filterGroups, groupOccurrences, neighbourGroup, occurren
 import { api } from '../api';
 import { locatePhraseBoxes, openPdf, renderPage, type BoxRect, type PdfDoc } from '../pdfRender';
 import { CitationList, CitationPanel } from './CitationPanel';
+import { SetupChecklist, UploadButton } from './SetupChecklist';
 import type { OpenRequest } from './SidePanel';
 
 export interface DocumentFocus {
@@ -21,6 +22,7 @@ interface Props {
   onOpenReference: (r: OpenRequest) => void;
   onShowInGraph: (pubId: string) => void;
   onOpenFiles: () => void;
+  onGraph: (g: CitationGraph) => void;
 }
 
 interface Mark {
@@ -132,7 +134,7 @@ function PageView({ doc, n, scale, size, marks, selected, onMark, scroller }: { 
   );
 }
 
-export function DocumentView({ projectId, graph, evidence, focus, onOpenReference, onShowInGraph, onOpenFiles }: Props) {
+export function DocumentView({ projectId, graph, evidence, focus, onOpenReference, onShowInGraph, onOpenFiles, onGraph }: Props) {
   const [doc, setDoc] = useState<PdfDoc | undefined>();
   const [docError, setDocError] = useState<string | undefined>();
   const [size, setSize] = useState<{ w: number; h: number }>({ w: 612 * 1.2, h: 792 * 1.2 });
@@ -237,24 +239,38 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
     return () => cancelAnimationFrame(raf);
   }, [scrollNonce, !!doc, scroller]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || document.querySelector('.viewer, .drawer')) return;
+      if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
+      setSelected(undefined);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const selectedGroup = selected ? groups.find((g) => g.spanId === selected) : undefined;
   const step = (dir: 1 | -1) => {
     const g = neighbourGroup(filtered, selected, dir);
     if (g) select(g.spanId, true);
   };
 
-  if (!evidence) return <div className="loading">Carregando citações do documento…</div>;
+  if (!evidence)
+    return (
+      <div className="loading">
+        <span className="spinner" /> Localizando as citações do documento…
+      </div>
+    );
   if (!mainFileId) {
     return (
       <div className="doc-empty">
-        <h3>Documento principal não enviado</h3>
-        <p className="muted">Envie o PDF do documento principal (e o .bib) para ver cada citação no texto, a frase que cita e a passagem encontrada na referência.</p>
-        <button className="primary" onClick={onOpenFiles}>
-          Arquivos e revisão
-        </button>
+        <h2>Abra o seu documento</h2>
+        <p className="muted">Envie o PDF do trabalho e a bibliografia. Cada citação do texto fica marcada; ao clicar nela você vê a frase, a referência e o trecho encontrado no artigo citado.</p>
+        <SetupChecklist projectId={projectId} graph={graph} onGraph={onGraph} />
       </div>
     );
   }
+  const hasBib = Object.values(graph.files).some((f) => f.role === 'bibtex');
   const refsWithoutPdf = evidence.summary.semPdf;
 
   return (
@@ -268,6 +284,11 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
               </button>
             ))}
           </div>
+          {counts && counts.all > 0 && (
+            <div className="statbar" title="Proporção de cada status entre as citações">
+              {(['localizado', 'ressalva', 'nao_localizado', 'unresolved'] as const).map((k) => (counts[k] > 0 ? <span key={k} className={`seg st-${k}`} style={{ flexGrow: counts[k] }} /> : null))}
+            </div>
+          )}
           <select value={pubFilter ?? ''} onChange={(e) => setPubFilter(e.target.value || undefined)} aria-label="Filtrar por referência">
             <option value="">Todas as referências</option>
             {pubOptions.map((p) => (
@@ -293,9 +314,20 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
             </button>
           </span>
         </div>
-        {refsWithoutPdf > 0 && (
+        {!hasBib && (
           <div className="notice">
-            {refsWithoutPdf} citação(ões) sem PDF da referência. Envie-os em <button className="linklike" onClick={onOpenFiles}>PDFs das referências</button> para localizar os trechos.
+            Sem bibliografia (.bib), as citações não podem ser ligadas às referências.{' '}
+            <UploadButton projectId={projectId} role="reference" accept=".bib,text/plain" primary onGraph={onGraph}>
+              Enviar .bib
+            </UploadButton>
+          </div>
+        )}
+        {hasBib && refsWithoutPdf > 0 && (
+          <div className="notice">
+            {refsWithoutPdf} citação(ões) sem o PDF da referência; sem ele não há trecho para mostrar.{' '}
+            <UploadButton projectId={projectId} role="reference" accept="application/pdf,.pdf" multiple onGraph={onGraph}>
+              Enviar PDFs das referências
+            </UploadButton>
           </div>
         )}
         {docError && <div className="notice error">{docError}</div>}
@@ -305,7 +337,9 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
               <PageView key={n} doc={doc} n={n} scale={scale} size={size} marks={marksByPage.get(n) ?? []} selected={selected} onMark={(id) => select(id)} scroller={scroller} />
             ))
           ) : (
-            <div className="loading">Abrindo o PDF…</div>
+            <div className="loading doc-loading">
+              <span className="spinner" /> Abrindo o PDF…
+            </div>
           )}
         </div>
       </div>

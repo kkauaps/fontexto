@@ -7,6 +7,8 @@ import type { OpenRequest } from './SidePanel';
 interface Props {
   projectId: string;
   request: OpenRequest;
+  /** Where "back" leads, e.g. "Voltar ao documento". */
+  backLabel?: string;
   onClose: () => void;
 }
 
@@ -16,7 +18,9 @@ interface Props {
  * only when the server validated the extractor rectangles; otherwise it opens
  * the page and says that an exact highlight is unavailable.
  */
-export function PdfViewer({ projectId, request, onClose }: Props) {
+export function PdfViewer({ projectId, request: initial, backLabel = 'Voltar', onClose }: Props) {
+  const [request, setRequest] = useState<OpenRequest>(initial);
+  useEffect(() => setRequest(initial), [initial]);
   const [target, setTarget] = useState<ViewerTarget | undefined>();
   const [doc, setDoc] = useState<PdfDoc | undefined>();
   const [page, setPage] = useState(1);
@@ -96,7 +100,7 @@ export function PdfViewer({ projectId, request, onClose }: Props) {
     <div className="viewer" role="dialog" aria-label="Visualizador de PDF">
       <header className="viewer-bar">
         <button className="primary" onClick={onClose}>
-          ← Voltar
+          ← {backLabel}
         </button>
         <div className="viewer-title">
           <strong>{request.title}</strong>
@@ -132,14 +136,30 @@ export function PdfViewer({ projectId, request, onClose }: Props) {
           {ok && page !== ok.page && <button onClick={() => setPage(ok.page)}>Ir para p. {ok.page}</button>}
         </div>
       </header>
+      {request.citing && (
+        <div className="cite-ctx">
+          <span className="small muted">Frase que cita esta referência</span>
+          <div>{request.citing}</div>
+        </div>
+      )}
+      {request.alternatives && request.alternatives.length > 1 && (
+        <div className="alt-bar">
+          <span className="small muted">Passagens encontradas:</span>
+          {request.alternatives.map((a, i) => (
+            <button key={i} className={i === (request.altIndex ?? 0) ? 'chip-filter on' : 'chip-filter'} onClick={() => setRequest({ ...a.request, alternatives: request.alternatives, altIndex: i })}>
+              {a.label}
+            </button>
+          ))}
+        </div>
+      )}
       {ok?.notice && request.anchor.text && !request.phrase && <div className="notice">{ok.notice}</div>}
       {request.phrase && phraseBoxes && phraseBoxes.boxes.length > 0 && (
         <div className="notice ok">{phraseBoxes.exact ? 'Passagem destacada no texto da página.' : 'Início da passagem destacado (o resto do trecho foi extraído de forma diferente do texto da página).'}</div>
       )}
       {request.phrase && phraseBoxes && phraseBoxes.boxes.length === 0 && (
-        <div className="notice">Não foi possível marcar a passagem no texto desta página (provável diferença de extração). A página correta está aberta; procure o trecho acima.</div>
+        <div className="notice">Não foi possível marcar a passagem no texto desta página (provável diferença de extração). A página correta está aberta; a passagem procurada é: “{request.phrase}”</div>
       )}
-      {request.context && request.phrase && <div className="notice phrase-ctx">{request.phrase}</div>}
+      
       {ok?.exactHighlight && <div className="notice ok">Trecho destacado a partir das coordenadas extraídas do PDF (nível de linha).</div>}
       {error && <div className="notice error">{error}</div>}
       <div className="viewer-body">

@@ -35,6 +35,17 @@ interface PanelProps {
 function OccurrenceCard({ o, graph, props }: { o: CitationOccurrence; graph: CitationGraph; props: PanelProps }) {
   const pub = o.publicationId ? (graph.nodes[o.publicationId] as PublicationNode | undefined) : undefined;
   const label = pub?.label ?? 'Referência não identificada';
+  const alternatives = o.passages.map((p, i) => ({
+    label: `${i + 1} · p. ${p.page} · ${Math.round(p.score * 100)}%`,
+    request: {
+      anchor: { fileId: p.fileId, page: p.page, text: p.text },
+      phrase: p.text,
+      title: label,
+      context: `Passagem ${i + 1} de ${o.passages.length}, na página ${p.page}. Candidata a sustentar a frase citada; confira no texto.`,
+      citing: o.sentence,
+    } as OpenRequest,
+  }));
+  const requests: OpenRequest[] = alternatives.map((a, i) => ({ ...a.request, alternatives: alternatives.map((x) => ({ label: x.label, request: x.request })), altIndex: i }));
   return (
     <section className="occ">
       <header>
@@ -74,18 +85,8 @@ function OccurrenceCard({ o, graph, props }: { o: CitationOccurrence; graph: Cit
                 {p.region === 'resumo' && <span className="tag">resumo/início</span>}
               </div>
               <blockquote>{p.text}</blockquote>
-              <button
-                className="primary small"
-                onClick={() =>
-                  props.onOpenReference({
-                    anchor: { fileId: p.fileId, page: p.page, text: p.text },
-                    phrase: p.text,
-                    title: label,
-                    context: `Passagem da página ${p.page} possivelmente relacionada à frase citada.`,
-                  })
-                }
-              >
-                Abrir PDF na p. {p.page} com a passagem destacada
+              <button className="primary small" onClick={() => props.onOpenReference(requests[i])}>
+                Abrir no artigo · p. {p.page}
               </button>
             </div>
           ))}
@@ -105,7 +106,7 @@ export function CitationPanel(props: PanelProps) {
   return (
     <div className="cit-panel">
       <button className="linklike" onClick={props.onBack}>
-        ← Lista de citações
+        ← Todas as citações
       </button>
       <h3>
         {group.marker} <span className="small muted">· p. {group.page}</span>
