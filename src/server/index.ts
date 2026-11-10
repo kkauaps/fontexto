@@ -54,8 +54,9 @@ function configurePackagedAssets(): void {
   configurePdfJs({
     moduleUrl: pathToFileURL(modulePath).href,
     workerSrc: pathToFileURL(workerPath).href,
-    standardFontDataUrl: fontsDir.endsWith(path.sep) ? fontsDir : fontsDir + path.sep,
-    ...(existsSync(wasmDir) ? { wasmUrl: (wasmDir.endsWith(path.sep) ? wasmDir : wasmDir + path.sep) } : {}),
+    // pdf.js requires factory URLs to end with "/" (not "\\"); configurePdfJs normalises them.
+    standardFontDataUrl: fontsDir,
+    ...(existsSync(wasmDir) ? { wasmUrl: wasmDir } : {}),
   });
 }
 

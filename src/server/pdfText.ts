@@ -8,17 +8,20 @@
  * `resources/pdfjs` folder next to the exe.
  */
 import { createRequire } from 'node:module';
+import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { existsSync } from 'node:fs';
 import type { PdfText, TextLine } from '../core/text.js';
+import { toPdfJsFactoryUrl } from './pdfPaths.js';
 
 export interface PdfJsPaths {
   /** File URL or package specifier of the pdf.js API module. */
   moduleUrl: string;
   /** File URL of pdf.worker.mjs. */
   workerSrc: string;
-  /** Directory of standard fonts, with a trailing separator. */
+  /** Directory of standard fonts. Normalised with toPdfJsFactoryUrl (pdf.js needs a trailing "/"). */
   standardFontDataUrl: string;
-  /** Directory of pdf.js WASM files, with a trailing separator. */
+  /** Directory of pdf.js WASM files. Normalised with toPdfJsFactoryUrl. */
   wasmUrl?: string;
 }
 
@@ -27,7 +30,17 @@ let pdfjsPromise: Promise<PdfJs> | undefined;
 let configured: PdfJsPaths | undefined;
 
 export function configurePdfJs(paths: PdfJsPaths): void {
-  configured = paths;
+  configured = {
+    ...paths,
+    standardFontDataUrl: toPdfJsFactoryUrl(paths.standardFontDataUrl),
+    ...(paths.wasmUrl ? { wasmUrl: toPdfJsFactoryUrl(paths.wasmUrl) } : {}),
+  };
+  pdfjsPromise = undefined;
+}
+
+/** Restores the default (unpackaged) pdf.js resolution. Used by tests. */
+export function resetPdfJsConfig(): void {
+  configured = undefined;
   pdfjsPromise = undefined;
 }
 
@@ -48,10 +61,20 @@ async function loadPdfJs(): Promise<PdfJs> {
   return pdfjsPromise;
 }
 
+function pdfjsPackageDir(): string {
+  const require = createRequire(import.meta.url);
+  return path.dirname(require.resolve('pdfjs-dist/package.json'));
+}
+
 function standardFontDataUrl(): string {
   if (configured?.standardFontDataUrl) return configured.standardFontDataUrl;
-  const require = createRequire(import.meta.url);
-  return require.resolve('pdfjs-dist/package.json').replace(/package\.json$/, 'standard_fonts/');
+  return toPdfJsFactoryUrl(path.join(pdfjsPackageDir(), 'standard_fonts'));
+}
+
+function wasmUrl(): string | undefined {
+  if (configured) return configured.wasmUrl;
+  const dir = path.join(pdfjsPackageDir(), 'wasm');
+  return existsSync(dir) ? toPdfJsFactoryUrl(dir) : undefined;
 }
 
 interface RawItem {
@@ -65,13 +88,14 @@ interface RawItem {
 export async function extractPdfText(data: Uint8Array): Promise<PdfText> {
   const pdfjs = await loadPdfJs();
   const fontsDir = standardFontDataUrl();
+  const wasmDir = wasmUrl();
   const task = pdfjs.getDocument({
     data: new Uint8Array(data),
     verbosity: 0,
     useSystemFonts: false,
     standardFontDataUrl: fontsDir,
     disableFontFace: true,
-    ...(configured?.wasmUrl ? { wasmUrl: configured.wasmUrl } : {}),
+    ...(wasmDir ? { wasmUrl: wasmDir } : {}),
   });
   const doc = await task.promise;
   try {
