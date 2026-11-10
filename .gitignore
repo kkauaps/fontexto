@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+# Local project data (uploaded PDFs, extraction caches, graphs). Never commit.
+data/
+*.pdf
+*.PDF
+.env
+.env.*
+!.env.example
+.local/
+*.log
