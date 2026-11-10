@@ -23,6 +23,9 @@ import path from 'node:path';
 import { parseBibtex } from '../core/bibtex.js';
 import type { CategoryRule } from '../core/categories.js';
 import { emptyDecisions, type CitationGraph, type FileRecord, type FileRole, type UserDecisions, type Visibility } from '../core/model.js';
+import { extractReferenceEntries } from '../core/references.js';
+import { parseReferences, toBibtex, type ParsedReference } from '../core/refparse.js';
+import { applyCurated, type CuratedApplyResult, type CuratedFile } from '../core/curated.js';
 import { computeEvidence, type EvidenceReport, type ReferenceIndex } from '../core/evidence.js';
 import { buildGraph, type ExternalMetadata } from '../core/pipeline.js';
 import type { PdfText } from '../core/text.js';
@@ -35,6 +38,8 @@ export interface ProjectMeta {
   createdAt: string;
   files: Record<string, FileRecord>;
 }
+
+export const GENERATED_BIB = 'referencias-extraidas.bib';
 
 export class NotFoundError extends Error {}
 export class ValidationError extends Error {}
@@ -343,10 +348,49 @@ export class ProjectStore {
       graph.warnings.unshift(...warnings);
       await writeJsonAtomic(this.file(projectId, 'graph.json'), graph);
       // Citation occurrences and lexical evidence; derived only from the files of this project, stored locally.
-      const evidence = computeEvidence({ projectId, now: graph.builtAt, graph, texts, cache: this.refIndexCache });
+      let evidence = computeEvidence({ projectId, now: graph.builtAt, graph, texts, cache: this.refIndexCache });
+      const curated = await this.getCurated(projectId);
+      if (curated) evidence = applyCurated(graph, evidence, curated).report;
       await writeJsonAtomic(this.file(projectId, 'evidence.json'), evidence);
       return graph;
     });
+  }
+
+  /**
+   * Projects without a .bib: reads the reference list printed in the main PDF and registers it as a generated
+   * "referencias-extraidas.bib", so markers resolve and the reference PDFs can be linked as usual.
+   */
+  async extractReferencesFromMain(projectId: string): Promise<{ references: ParsedReference[]; usable: number; numbered: boolean }> {
+    await this.ensureExtracted(projectId);
+    const meta = await this.getProject(projectId);
+    const main = Object.values(meta.files).find((f) => f.role === 'main');
+    if (!main) throw new ValidationError('Envie primeiro o PDF do artigo.');
+    const user = Object.values(meta.files).find((f) => f.role === 'bibtex' && f.originalName !== GENERATED_BIB);
+    if (user) throw new ValidationError('Este projeto já tem um arquivo .bib; a lista de referências não será extraída do artigo.');
+    const text = await this.getText(projectId, main.id);
+    if (!text) throw new ValidationError('Não foi possível ler o texto do PDF do artigo.');
+    const entries = extractReferenceEntries(text);
+    if (entries.length === 0) throw new ValidationError('Não encontrei a seção "Referências" no PDF do artigo.');
+    const references = parseReferences(entries);
+    for (const f of Object.values(meta.files)) if (f.role === 'bibtex' && f.originalName === GENERATED_BIB) await this.removeFile(projectId, f.id);
+    await this.addFile(projectId, { data: Buffer.from(toBibtex(references), 'utf8'), originalName: GENERATED_BIB, visibility: 'private' });
+    await this.rebuild(projectId);
+    return { references, usable: references.filter((r) => r.authors.length && r.year).length, numbered: entries.some((e) => Boolean(e.label)) };
+  }
+
+  async getCurated(projectId: string): Promise<CuratedFile | undefined> {
+    return readJson<CuratedFile | undefined>(this.file(projectId, 'curated.json'), undefined);
+  }
+
+  /** Imports (or removes, with `undefined`) curated evidence and rebuilds. Returns how many occurrences it was applied to. */
+  async setCurated(projectId: string, curated: CuratedFile | undefined): Promise<{ result?: CuratedApplyResult; graph: CitationGraph }> {
+    await this.getProject(projectId);
+    if (curated) await writeJsonAtomic(this.file(projectId, 'curated.json'), curated);
+    else await fs.rm(this.file(projectId, 'curated.json'), { force: true });
+    const graph = await this.rebuild(projectId);
+    if (!curated) return { graph };
+    const ev = await this.getEvidence(projectId);
+    return { graph, result: { items: curated.items.length, applied: ev.occurrences.filter((o) => o.curated).length, unmatchedItems: 0, keysWithDifferentCounts: [], lowSimilarity: 0 } };
   }
 
   /** Evidence report of the last build; computed on demand for projects built before it existed. */

@@ -175,8 +175,8 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
           type: 'default',
           label: e.count > 1 ? `×${e.count}` : undefined,
           interactionWidth: 14,
-          style: { stroke: sel ? '#0b63ce' : st.stroke, strokeWidth: sel ? st.width + 1.4 : st.width, strokeDasharray: st.dash, opacity: dim ? 0.12 : 1 },
-          markerEnd: st.arrow ? { type: MarkerType.ArrowClosed, color: sel ? '#0b63ce' : st.stroke, width: 16, height: 16 } : undefined,
+          style: { stroke: sel ? '#10b981' : st.stroke, strokeWidth: sel ? st.width + 1.4 : st.width, strokeDasharray: st.dash, opacity: dim ? 0.12 : 1 },
+          markerEnd: st.arrow ? { type: MarkerType.ArrowClosed, color: sel ? '#10b981' : st.stroke, width: 16, height: 16 } : undefined,
           zIndex: sel ? 10 : 0,
         };
       }),
@@ -244,7 +244,7 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
       onlyRenderVisibleElements={view.nodes.length > 300}
       proOptions={{ hideAttribution: true }}
     >
-      <Background gap={24} size={1} color="#e3e6ec" />
+      <Background gap={24} size={1} color="#e0ece6" />
       <Controls showInteractive={false} position="bottom-left" />
       <MiniMap pannable zoomable nodeColor={(n) => (n.data as NodeData).color} position="bottom-right" />
       <Panel position="top-right" className="canvas-actions">

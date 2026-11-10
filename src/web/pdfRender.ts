@@ -2,12 +2,34 @@ import * as pdfjs from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { findPhrase } from '../core/textsearch';
 
-pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+/**
+ * The worker is started here (same-origin file only) through a Trusted Types policy, so the page can run under
+ * `require-trusted-types-for 'script'`. pdf.js keeps running in a Web Worker and never evaluates PDF content as code.
+ */
+const trustedTypes = (window as unknown as { trustedTypes?: { createPolicy: (name: string, rules: { createScriptURL: (url: string) => string }) => { createScriptURL: (url: string) => unknown } } }).trustedTypes;
+const workerPolicy = trustedTypes?.createPolicy('fontexto-pdfjs', {
+  createScriptURL: (url: string) => {
+    const u = new URL(url, window.location.href);
+    if (u.origin !== window.location.origin) throw new TypeError('Worker bloqueado: origem diferente');
+    return u.href;
+  },
+});
+pdfjs.GlobalWorkerOptions.workerPort = new Worker((workerPolicy ? workerPolicy.createScriptURL(workerUrl) : workerUrl) as string, { type: 'module' });
 
 export type PdfDoc = Awaited<ReturnType<typeof pdfjs.getDocument>['promise']>;
 
 export function openPdf(url: string) {
-  return pdfjs.getDocument({ url, isEvalSupported: false } as Parameters<typeof pdfjs.getDocument>[0]);
+  return pdfjs.getDocument({
+    url,
+    isEvalSupported: false,
+    enableXfa: false,
+    // Self-hosted decoders and fonts (copied to /pdfjs at build time); nothing is fetched from another origin.
+    standardFontDataUrl: '/pdfjs/standard_fonts/',
+    wasmUrl: '/pdfjs/wasm/',
+    cMapUrl: '/pdfjs/cmaps/',
+    cMapPacked: true,
+    iccUrl: '/pdfjs/iccs/',
+  } as Parameters<typeof pdfjs.getDocument>[0]);
 }
 
 export interface RenderedPage {

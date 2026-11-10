@@ -5,6 +5,9 @@ import type { CitationGraph, ReviewAction } from '../core/model';
 import { buildView, DEFAULT_FILTERS, type GraphMode, type ViewFilters } from '../core/view';
 import { api, type ProjectSummary } from './api';
 import { BRAND, pageTitle } from './brand';
+import { Landing, type FlowMode } from './components/Landing';
+import { UploadFlow } from './components/UploadFlow';
+import lockup from './assets/fontexto-lockup.svg';
 import { SetupChecklist } from './components/SetupChecklist';
 import { occurrencesByPublication } from '../core/evidenceView';
 import type { EvidenceReport } from '../core/evidence';
@@ -15,12 +18,12 @@ import { PdfViewer } from './components/PdfViewer';
 import { ProjectPanel } from './components/ProjectPanel';
 import { SidePanel, type OpenRequest } from './components/SidePanel';
 
-const LAST_PROJECT = 'citationtrace:lastProject';
+const LAST_PROJECT = 'fontexto:lastProject';
 
 export function App() {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [projectId, setProjectId] = useState<string | undefined>(
-    () => new URLSearchParams(window.location.search).get('project') ?? localStorage.getItem(LAST_PROJECT) ?? undefined,
+    () => new URLSearchParams(window.location.search).get('project') ?? undefined,
   );
   const [graph, setGraph] = useState<CitationGraph | undefined>();
   const [rules, setRules] = useState<CategoryRule[]>([]);
@@ -35,7 +38,7 @@ export function App() {
   const [layoutNonce, setLayoutNonce] = useState(0);
   const [error, setError] = useState<string | undefined>();
   const [externalAvailable, setExternalAvailable] = useState(false);
-  const [newName, setNewName] = useState('');
+  const [flow, setFlow] = useState<FlowMode | undefined>();
 
   useEffect(() => {
     api.health().then((h) => setExternalAvailable(h.externalMetadataAvailable), () => setError('API indisponível. Inicie o servidor (npm run dev).'));
@@ -43,8 +46,11 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (!projectId) return;
-    localStorage.setItem(LAST_PROJECT, projectId);
+    if (!projectId) {
+      if (window.location.search) history.replaceState(null, '', window.location.pathname);
+      return;
+    }
+    history.replaceState(null, '', `?project=${encodeURIComponent(projectId)}`);
     setGraph(undefined);
     setEvidence(undefined);
     setSelection(undefined);
@@ -130,54 +136,29 @@ export function App() {
   const evidenceCount = graph ? Object.values(graph.nodes).filter((n) => n.kind === 'claim' || n.kind === 'evidence').length : 0;
 
   if (!projectId) {
-    return (
-      <div className="welcome">
-        <h1>{BRAND.name}</h1>
-        <p className="lead">{BRAND.tagline}. Veja cada citação do seu texto, a frase que cita e o trecho correspondente na referência.</p>
-        <p className="muted small">{BRAND.privacyNote}</p>
-        {error && <div className="notice error">{error}</div>}
-        <section>
-          <h3>Projetos</h3>
-          {projects.length === 0 && <p className="muted small">Nenhum projeto ainda.</p>}
-          <ul className="list">
-            {projects.map((p) => (
-              <li key={p.id}>
-                <button className="linklike" onClick={() => setProjectId(p.id)}>
-                  {p.name}
-                </button>{' '}
-                <span className="small muted">{new Date(p.createdAt).toLocaleDateString()}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-        <section>
-          <h3>Novo projeto</h3>
-          <form
-            className="row"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!newName.trim()) return;
-              api.createProject(newName.trim()).then((p) => {
-                setProjects((ps) => [...ps, p]);
-                setProjectId(p.id);
-                setPanelOpen(true);
-              }, (err: Error) => setError(err.message));
-            }}
-          >
-            <input placeholder="Nome (ex.: TCC 2026)" value={newName} onChange={(e) => setNewName(e.target.value)} />
-            <button className="primary" type="submit">
-              Criar
-            </button>
-          </form>
-        </section>
-      </div>
-    );
+    if (flow) {
+      return (
+        <UploadFlow
+          mode={flow}
+          onBack={() => setFlow(undefined)}
+          onDone={(id, p) => {
+            setProjects((ps) => (ps.some((x) => x.id === id) ? ps : [...ps, p]));
+            setFlow(undefined);
+            setDocMode(true);
+            setProjectId(id);
+          }}
+        />
+      );
+    }
+    return <Landing projects={projects} error={error} onStart={setFlow} onOpen={setProjectId} />;
   }
 
   return (
     <div className="app">
       <header className="topbar">
-        <strong className="brand">{BRAND.name}</strong>
+        <button className="brand-btn" onClick={() => setProjectId(undefined)} aria-label={`${BRAND.name}: voltar ao início`} title="Voltar ao início">
+          <img src={lockup} alt={BRAND.name} height={26} />
+        </button>
         <select value={projectId} onChange={(e) => setProjectId(e.target.value || undefined)} aria-label="Projeto">
           {projects.map((p) => (
             <option key={p.id} value={p.id}>

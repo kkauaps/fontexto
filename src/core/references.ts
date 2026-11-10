@@ -47,6 +47,8 @@ const AUTHOR_START_RE = new RegExp(
     String.raw`^\p{Lu}[\p{L}'’\-]+(?:\s\p{Lu}[\p{L}'’\-]+)?\s+\p{Lu}{1,3}[,.](?:\s|$)`,
     // ABNT: "SILVA, J." / "KESSEL-BRANDT, L."
     String.raw`^\p{Lu}{2,}[\p{Lu}'’\-]*(?:\s\p{Lu}{2,}[\p{Lu}'’\-]*)?,\s`,
+    // ABNT corporate author: "CVAT.AI. CVAT documentation.", "OMS. Relatório ..."
+    String.raw`^\p{Lu}{2,}(?:\.\p{Lu}{1,3})?\.\s+\p{Lu}`,
   ].join('|'),
   'u',
 );

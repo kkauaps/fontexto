@@ -8,9 +8,11 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { viewerTarget } from '../core/anchors.js';
 import type { CategoryRule } from '../core/categories.js';
+import { parseCuratedUpload } from '../core/curated.js';
 import { redactEvidenceForSharing } from '../core/evidence.js';
 import { redactForSharing, toGraphML } from '../core/export.js';
 import type { Anchor, FileRole, ReviewAction, Visibility } from '../core/model.js';
+import { securityHeaders } from './securityHeaders.js';
 import { lookupMany } from './metadata.js';
 import { NotFoundError, ProjectStore, ValidationError } from './store.js';
 
@@ -35,6 +37,14 @@ export function createApp(cfg: AppConfig) {
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '2mb' }));
+  // Same policy as the public site (minus HTTPS-only parts) whenever the UI is served from here.
+  if (cfg.webDir) {
+    const headers = securityHeaders({ https: false });
+    app.use((_req, res, next) => {
+      for (const [k, v] of Object.entries(headers)) res.setHeader(k, v);
+      next();
+    });
+  }
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 300 * 1024 * 1024, files: 200 } });
 
   const pid = (req: Request) => String(req.params.projectId);
@@ -74,6 +84,38 @@ export function createApp(cfg: AppConfig) {
 
   /** Citation occurrences of the main PDF with the evidence found in the reference PDFs (local data, includes text). */
   app.get('/api/projects/:projectId/evidence', h(async (req, res) => res.json(await store.getEvidence(pid(req)))));
+
+  /** Curated evidence (index.html of a previous run, or JSON): replaces the automatic verdict where it pairs up. */
+  app.get('/api/projects/:projectId/curated', h(async (req, res) => {
+    const c = await store.getCurated(pid(req));
+    res.json(c ? { source: c.source, importedAt: c.importedAt, items: c.items.length } : null);
+  }));
+  app.post(
+    '/api/projects/:projectId/curated',
+    upload.single('file'),
+    h(async (req, res) => {
+      const f = req.file;
+      if (!f) throw new ValidationError('Nenhum arquivo recebido');
+      const name = Buffer.from(f.originalname, 'latin1').toString('utf8');
+      let curated;
+      try {
+        curated = parseCuratedUpload(f.buffer.toString('utf8'), name);
+      } catch (err) {
+        throw new ValidationError((err as Error).message);
+      }
+      const out = await store.setCurated(pid(req), curated);
+      res.status(201).json({ source: curated.source, items: curated.items.length, applied: out.result?.applied ?? 0, graph: out.graph });
+    }),
+  );
+  app.delete('/api/projects/:projectId/curated', h(async (req, res) => {
+    res.json(await store.setCurated(pid(req), undefined).then((o) => o.graph));
+  }));
+
+  /** No .bib: build the bibliography from the reference list printed in the article. */
+  app.post('/api/projects/:projectId/references/extract', h(async (req, res) => {
+    const out = await store.extractReferencesFromMain(pid(req));
+    res.json({ ...out, references: out.references.map(({ key, authors, etAl, year, title, doi, style, text }) => ({ key, authors, etAl, year, title, doi, style, text })), graph: await store.getGraph(pid(req)) });
+  }));
 
   app.post('/api/projects/:projectId/rebuild', h(async (req, res) => {
     await store.ensureExtracted(pid(req));

@@ -221,7 +221,11 @@ function linkFile(file: FileRecord, text: PdfText | undefined, records: PubRecor
   const normHead = ` ${normalizeTitle(head)} `;
   const authorInHead = (r: PubRecord) => {
     const fam = r.authors[0] ? normalizeTitle(r.authors[0].family) : '';
-    return Boolean(fam) && normHead.includes(` ${fam} `);
+    if (!fam) return false;
+    if (normHead.includes(` ${fam} `)) return true;
+    // Corporate authors ("CVAT.ai") are often printed without the suffix ("CVAT").
+    const first = fam.split(' ')[0];
+    return r.authors[0]?.organization === true && first.length >= 3 && normHead.includes(` ${first} `);
   };
   const byTitle = (byDoi.length > 1 ? byDoi : records).filter((r) => {
     const nt = normalizeTitle(r.title);

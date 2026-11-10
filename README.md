@@ -1,6 +1,6 @@
-# citation-tracer
+# Fontexto
 
-CitationTrace lets researchers upload an academic document (TCC, dissertation, article) together with its `.bib` and the PDFs of its references. It then lets them navigate citations down to the exact place in the original sources.
+Fontexto lets researchers upload an academic document (TCC, dissertation, article) together with its `.bib` and the PDFs of its references. It then lets them navigate citations down to the exact place in the original sources.
 
 This branch adds the **Citation Graph**, Phase 1 (bibliographic graph). The graph is interactive and directed: confirmed citations are kept apart from suggestions, every edge records its provenance, and clicking through opens the PDF at the right page. Everything runs locally and offline.
 
@@ -69,17 +69,17 @@ npm test
 npm run package:win
 ```
 
-This writes a portable folder to `dist/win/CitationTrace/`:
+This writes a portable folder to `dist/win/Fontexto/`:
 
-- `CitationTrace.exe` — double-click to start the local server and open the UI in your default browser
+- `Fontexto.exe` — double-click to start the local server and open the UI in your default browser
 - `resources/` — the web UI and pdf.js assets (keep this folder next to the exe)
 
-No Node.js install is required at runtime. The server always binds to `127.0.0.1`, uses port `5174` when it is free, and otherwise picks the next free port. Project data is stored in `%APPDATA%\CitationTrace`.
+No Node.js install is required at runtime. The server always binds to `127.0.0.1`, uses port `5174` when it is free, and otherwise picks the next free port. Project data is stored in `%APPDATA%\CitationTrace` (the folder keeps the product's former name so existing projects stay in place).
 
 To start the server without opening a browser (for example in a script):
 
 ```bash
-CitationTrace.exe --no-browser
+Fontexto.exe --no-browser
 ```
 
 The same thing can be done with the environment variable `CITATION_GRAPH_NO_BROWSER=1`. The last bound URL is written to `%APPDATA%\CitationTrace\last-url.txt`.

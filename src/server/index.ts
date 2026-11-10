@@ -42,11 +42,11 @@ function configurePackagedAssets(): void {
   const workerPath = path.join(pdfjsDir, 'pdf.worker.mjs');
   const webDir = packagedWebDir();
   if (!existsSync(modulePath) || !existsSync(workerPath)) {
-    console.error(`CitationTrace could not find pdf.js assets in:\n  ${pdfjsDir}\nKeep the resources folder next to CitationTrace.exe.`);
+    console.error(`Fontexto could not find pdf.js assets in:\n  ${pdfjsDir}\nKeep the resources folder next to Fontexto.exe.`);
     process.exit(1);
   }
   if (!existsSync(webDir)) {
-    console.error(`CitationTrace could not find the web UI in:\n  ${webDir}\nKeep the resources folder next to CitationTrace.exe.`);
+    console.error(`Fontexto could not find the web UI in:\n  ${webDir}\nKeep the resources folder next to Fontexto.exe.`);
     process.exit(1);
   }
   const fontsDir = path.join(pdfjsDir, 'standard_fonts');
@@ -74,7 +74,7 @@ async function main(): Promise<void> {
   const { app } = createApp({ dataDir, externalMetadata: externalMetadataEnabledByEnv(), webDir });
   const { server, port } = await listenOnFreePort(app, host, portHint);
   const url = `http://${host}:${port}`;
-  console.log(`CitationTrace listening on ${url} (data: ${dataDir})`);
+  console.log(`Fontexto listening on ${url} (data: ${dataDir})`);
   console.log(`External metadata lookups: ${externalMetadataEnabledByEnv() ? 'available (opt-in per request)' : 'disabled'}`);
   if (port !== portHint) {
     console.log(`Port ${portHint} was in use; using ${port} instead.`);
