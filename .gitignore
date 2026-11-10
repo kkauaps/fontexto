@@ -10,3 +10,7 @@ data/
 !.env.example
 .local/
 *.log
+# Packaged executables and SEA intermediate files. Never commit.
+dist/win/
+dist/package/
+*.exe

@@ -18,7 +18,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "ingest": "tsx src/server/cli.ts",
-    "demo:seed": "tsx src/server/devtools/seedDemo.ts"
+    "demo:seed": "tsx src/server/devtools/seedDemo.ts",
+    "package:win": "npm run build && node scripts/package-win.mjs"
   },
   "dependencies": {
     "@xyflow/react": "^12.12.1",
@@ -38,6 +39,8 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.3.0",
     "concurrently": "^10.0.7",
+    "esbuild": "^0.28.2",
+    "postject": "^1.0.0-alpha.6",
     "tsx": "^4.23.15",
     "typescript": "~5.9.3",
     "vite": "^8.3.7",

@@ -62,3 +62,26 @@ npm test
 - Thematic relations (`related_to`) are `suggested` only and never imply a citation.
 - Colors and categories are presentation only.
 - Automatic methods can never mark evidence as `validated`.
+
+## Windows executable
+
+```bash
+npm run package:win
+```
+
+This writes a portable folder to `dist/win/CitationTrace/`:
+
+- `CitationTrace.exe` — double-click to start the local server and open the UI in your default browser
+- `resources/` — the web UI and pdf.js assets (keep this folder next to the exe)
+
+No Node.js install is required at runtime. The server always binds to `127.0.0.1`, uses port `5174` when it is free, and otherwise picks the next free port. Project data is stored in `%APPDATA%\CitationTrace`.
+
+To start the server without opening a browser (for example in a script):
+
+```bash
+CitationTrace.exe --no-browser
+```
+
+The same thing can be done with the environment variable `CITATION_GRAPH_NO_BROWSER=1`. The last bound URL is written to `%APPDATA%\CitationTrace\last-url.txt`.
+
+The executable is unsigned, so Windows SmartScreen may show a warning on first launch.

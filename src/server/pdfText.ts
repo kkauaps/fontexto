@@ -2,24 +2,56 @@
  * Local PDF text extraction with pdf.js (no network, no external service).
  * Produces lines with their bounding boxes as reported by pdf.js, converted to
  * top-left page coordinates in PDF points.
+ *
+ * Paths to the pdf.js module, worker, standard fonts and WASM can be set with
+ * `configurePdfJs` so the packaged Windows executable can load them from the
+ * `resources/pdfjs` folder next to the exe.
  */
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import type { PdfText, TextLine } from '../core/text.js';
 
+export interface PdfJsPaths {
+  /** File URL or package specifier of the pdf.js API module. */
+  moduleUrl: string;
+  /** File URL of pdf.worker.mjs. */
+  workerSrc: string;
+  /** Directory of standard fonts, with a trailing separator. */
+  standardFontDataUrl: string;
+  /** Directory of pdf.js WASM files, with a trailing separator. */
+  wasmUrl?: string;
+}
+
 type PdfJs = typeof import('pdfjs-dist/legacy/build/pdf.mjs');
 let pdfjsPromise: Promise<PdfJs> | undefined;
+let configured: PdfJsPaths | undefined;
+
+export function configurePdfJs(paths: PdfJsPaths): void {
+  configured = paths;
+  pdfjsPromise = undefined;
+}
 
 async function loadPdfJs(): Promise<PdfJs> {
   if (!pdfjsPromise) {
     pdfjsPromise = (async () => {
-      const lib = (await import('pdfjs-dist/legacy/build/pdf.mjs')) as PdfJs;
-      const require = createRequire(import.meta.url);
-      lib.GlobalWorkerOptions.workerSrc = pathToFileURL(require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')).href;
+      const moduleUrl = configured?.moduleUrl ?? 'pdfjs-dist/legacy/build/pdf.mjs';
+      const lib = (await import(moduleUrl)) as PdfJs;
+      if (configured?.workerSrc) {
+        lib.GlobalWorkerOptions.workerSrc = configured.workerSrc;
+      } else {
+        const require = createRequire(import.meta.url);
+        lib.GlobalWorkerOptions.workerSrc = pathToFileURL(require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')).href;
+      }
       return lib;
     })();
   }
   return pdfjsPromise;
+}
+
+function standardFontDataUrl(): string {
+  if (configured?.standardFontDataUrl) return configured.standardFontDataUrl;
+  const require = createRequire(import.meta.url);
+  return require.resolve('pdfjs-dist/package.json').replace(/package\.json$/, 'standard_fonts/');
 }
 
 interface RawItem {
@@ -32,14 +64,14 @@ interface RawItem {
 
 export async function extractPdfText(data: Uint8Array): Promise<PdfText> {
   const pdfjs = await loadPdfJs();
-  const require = createRequire(import.meta.url);
-  const fontsDir = require.resolve('pdfjs-dist/package.json').replace(/package\.json$/, 'standard_fonts/');
+  const fontsDir = standardFontDataUrl();
   const task = pdfjs.getDocument({
     data: new Uint8Array(data),
     verbosity: 0,
     useSystemFonts: false,
     standardFontDataUrl: fontsDir,
     disableFontFace: true,
+    ...(configured?.wasmUrl ? { wasmUrl: configured.wasmUrl } : {}),
   });
   const doc = await task.promise;
   try {
