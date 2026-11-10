@@ -1,6 +1,6 @@
 /**
  * In-text citation markers ("(Silva et al., 2025)", "(SILVA; SOUZA, 2020)",
- * "Kettavainen et al. (2026)") and their resolution to bibliography records.
+ * "Quintana et al. (2020)") and their resolution to bibliography records.
  *
  * A marker is resolved only when exactly one publication matches. Several
  * matches (e.g. two "Silva 2025" works) produce an `ambiguous` result that must
