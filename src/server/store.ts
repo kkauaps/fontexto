@@ -7,6 +7,7 @@
  *     categories.json   category rules (editable)
  *     external.json     opt-in external metadata cache (keyed by DOI)
  *     graph.json        last built graph (avoids re-processing on open)
+ *     evidence.json     citation occurrences + lexical evidence (recomputed on every rebuild)
  *     files/            uploaded files (managed storage)
  *     derived/          extracted text cache, one JSON per file
  *
@@ -22,6 +23,7 @@ import path from 'node:path';
 import { parseBibtex } from '../core/bibtex.js';
 import type { CategoryRule } from '../core/categories.js';
 import { emptyDecisions, type CitationGraph, type FileRecord, type FileRole, type UserDecisions, type Visibility } from '../core/model.js';
+import { computeEvidence, type EvidenceReport, type ReferenceIndex } from '../core/evidence.js';
 import { buildGraph, type ExternalMetadata } from '../core/pipeline.js';
 import type { PdfText } from '../core/text.js';
 import { DEFAULT_CATEGORY_RULES } from './defaults.js';
@@ -79,6 +81,8 @@ function roleForName(name: string): 'pdf' | 'bib' | undefined {
 export class ProjectStore {
   readonly root: string;
   private locks = new Map<string, Promise<unknown>>();
+  /** Sentence indexes of reference PDFs, keyed by `fileId:sha256` (memory only). */
+  private refIndexCache = new Map<string, ReferenceIndex>();
 
   constructor(dataDir: string) {
     this.root = path.resolve(dataDir, 'projects');
@@ -338,8 +342,20 @@ export class ProjectStore {
       });
       graph.warnings.unshift(...warnings);
       await writeJsonAtomic(this.file(projectId, 'graph.json'), graph);
+      // Citation occurrences and lexical evidence; derived only from the files of this project, stored locally.
+      const evidence = computeEvidence({ projectId, now: graph.builtAt, graph, texts, cache: this.refIndexCache });
+      await writeJsonAtomic(this.file(projectId, 'evidence.json'), evidence);
       return graph;
     });
+  }
+
+  /** Evidence report of the last build; computed on demand for projects built before it existed. */
+  async getEvidence(projectId: string): Promise<EvidenceReport> {
+    await this.getProject(projectId);
+    const e = await readJson<EvidenceReport | undefined>(this.file(projectId, 'evidence.json'), undefined);
+    if (e) return e;
+    await this.rebuild(projectId);
+    return (await readJson<EvidenceReport | undefined>(this.file(projectId, 'evidence.json'), undefined))!;
   }
 
   async getGraph(projectId: string): Promise<CitationGraph> {

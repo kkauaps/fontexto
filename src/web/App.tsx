@@ -4,6 +4,9 @@ import { categoryOf, type CategoryRule } from '../core/categories';
 import type { CitationGraph, ReviewAction } from '../core/model';
 import { buildView, DEFAULT_FILTERS, type GraphMode, type ViewFilters } from '../core/view';
 import { api, type ProjectSummary } from './api';
+import { occurrencesByPublication } from '../core/evidenceView';
+import type { EvidenceReport } from '../core/evidence';
+import { DocumentView, type DocumentFocus } from './components/DocumentView';
 import { FiltersPanel } from './components/FiltersPanel';
 import { GraphCanvas, type Selection } from './components/GraphCanvas';
 import { PdfViewer } from './components/PdfViewer';
@@ -23,6 +26,9 @@ export function App() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selection, setSelection] = useState<Selection>();
   const [viewer, setViewer] = useState<OpenRequest | undefined>();
+  const [docMode, setDocMode] = useState(false);
+  const [docFocus, setDocFocus] = useState<DocumentFocus | undefined>();
+  const [evidence, setEvidence] = useState<EvidenceReport | undefined>();
   const [panelOpen, setPanelOpen] = useState(false);
   const [layoutNonce, setLayoutNonce] = useState(0);
   const [error, setError] = useState<string | undefined>();
@@ -38,6 +44,7 @@ export function App() {
     if (!projectId) return;
     localStorage.setItem(LAST_PROJECT, projectId);
     setGraph(undefined);
+    setEvidence(undefined);
     setSelection(undefined);
     api.graph(projectId).then(setGraph, (e: Error) => {
       setError(e.message);
@@ -50,6 +57,24 @@ export function App() {
   useEffect(() => {
     if (projectId && graph) api.categories(projectId).then(setRules, () => undefined);
   }, [projectId, graph?.builtAt]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!projectId || !graph) return;
+    let cancelled = false;
+    api.evidence(projectId).then(
+      (r) => !cancelled && setEvidence(r),
+      () => !cancelled && setEvidence(undefined),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, graph?.builtAt]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const docCitations = useMemo(() => (evidence ? occurrencesByPublication(evidence) : undefined), [evidence]);
+  const showInDocument = useCallback((pubId?: string) => {
+    setDocFocus((f) => ({ pubId, nonce: (f?.nonce ?? 0) + 1 }));
+    setDocMode(true);
+  }, []);
 
   const view = useMemo(() => (graph ? buildView(graph, filters, collapsed) : undefined), [graph, filters, collapsed]);
   const categories = useMemo(() => {
@@ -92,6 +117,7 @@ export function App() {
     setGraph(await api.category(projectId, pubId, value));
   };
   const setMode = (mode: GraphMode) => {
+    setDocMode(false);
     setFilters((f) => ({ ...f, mode }));
     setSelection(undefined);
   };
@@ -154,11 +180,14 @@ export function App() {
           <option value="">+ Projetos…</option>
         </select>
         <div className="segmented" role="tablist">
-          <button role="tab" aria-selected={filters.mode === 'bibliographic'} className={filters.mode === 'bibliographic' ? 'on' : ''} onClick={() => setMode('bibliographic')}>
+          <button role="tab" aria-selected={!docMode && filters.mode === 'bibliographic'} className={!docMode && filters.mode === 'bibliographic' ? 'on' : ''} onClick={() => setMode('bibliographic')}>
             A · Bibliográfico
           </button>
-          <button role="tab" aria-selected={filters.mode === 'evidence'} className={filters.mode === 'evidence' ? 'on' : ''} onClick={() => setMode('evidence')}>
+          <button role="tab" aria-selected={!docMode && filters.mode === 'evidence'} className={!docMode && filters.mode === 'evidence' ? 'on' : ''} onClick={() => setMode('evidence')}>
             B · Evidências
+          </button>
+          <button role="tab" aria-selected={docMode} className={docMode ? 'on' : ''} onClick={() => setDocMode(true)}>
+            C · Documento{evidence && evidence.summary.occurrences > 0 ? ` (${evidence.summary.occurrences})` : ''}
           </button>
         </div>
         <input
@@ -184,6 +213,24 @@ export function App() {
           {error}
         </div>
       )}
+      {docMode && !graph && <div className="loading">Carregando…</div>}
+      {docMode && graph && (
+        <div className="main">
+          <DocumentView
+            projectId={projectId}
+            graph={graph}
+            evidence={evidence}
+            focus={docFocus}
+            onOpenReference={setViewer}
+            onShowInGraph={(pubId) => {
+              setDocMode(false);
+              setSelection({ type: 'node', id: pubId });
+            }}
+            onOpenFiles={() => setPanelOpen(true)}
+          />
+        </div>
+      )}
+      {!docMode && (
       <div className="main">
         <FiltersPanel
           filters={filters}
@@ -234,11 +281,14 @@ export function App() {
             onClose={() => setSelection(undefined)}
             onSelect={setSelection}
             onOpen={setViewer}
+            docCitations={docCitations}
+            onShowInDocument={showInDocument}
             onReview={onReview}
             onCategory={onCategory}
           />
         )}
       </div>
+      )}
       {viewer && <PdfViewer projectId={projectId} request={viewer} onClose={() => setViewer(undefined)} />}
       {panelOpen && graph && (
         <ProjectPanel

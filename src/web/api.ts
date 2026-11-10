@@ -1,5 +1,6 @@
 import type { ViewerTarget } from '../core/anchors';
 import type { CategoryRule } from '../core/categories';
+import type { EvidenceReport } from '../core/evidence';
 import type { Anchor, CitationGraph, ReviewAction } from '../core/model';
 
 export interface ProjectSummary {
@@ -69,5 +70,6 @@ export const api = {
   categories: (p: string) => req<CategoryRule[]>(`${base(p)}/categories`),
   setCategories: (p: string, rules: CategoryRule[]) => req<CitationGraph>(`${base(p)}/categories`, json(rules, 'PUT')),
   enrich: (p: string) => req<{ looked_up: number; found: number; graph: CitationGraph }>(`${base(p)}/metadata/enrich`, json({ consent: true })),
-  exportUrl: (p: string, kind: 'graphml' | 'json') => `${base(p)}/export/${kind}`,
+  evidence: (p: string) => req<EvidenceReport>(`${base(p)}/evidence`),
+  exportUrl: (p: string, kind: 'graphml' | 'json' | 'evidence') => `${base(p)}/export/${kind}`,
 };

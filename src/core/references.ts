@@ -54,12 +54,12 @@ const AUTHOR_START_RE = new RegExp(
 const YEAR_RE = /\b(1[89]\d{2}|20\d{2})[a-z]?\b/g;
 const HAS_YEAR_RE = /\b(1[89]\d{2}|20\d{2})[a-z]?\b/;
 
-function isPageNumber(text: string) {
+export function isPageNumber(text: string) {
   return /^(?:page\s*)?\d{1,4}(?:\s*(?:of|\/|de)\s*\d{1,4})?$/i.test(text.trim());
 }
 
 /** Lines repeated on many pages (running headers/footers), with digits masked. */
-function repeatedLines(pdf: PdfText): Set<string> {
+export function repeatedLines(pdf: PdfText): Set<string> {
   const counts = new Map<string, number>();
   for (const p of pdf.pages) {
     const seen = new Set<string>();
@@ -84,6 +84,30 @@ export function findReferenceHeading(pdf: PdfText): { page: number; line: number
     });
   }
   return found;
+}
+
+/**
+ * Location of the bibliography inside a PDF: from its heading up to the next
+ * section that clearly follows it (appendix, acknowledgements, ...), if any.
+ * `end` is exclusive and undefined when the list runs to the end of the file.
+ */
+export function referenceSectionBounds(pdf: PdfText): { start: { page: number; line: number }; end?: { page: number; line: number } } | undefined {
+  const start = findReferenceHeading(pdf);
+  if (!start) return undefined;
+  const repeated = repeatedLines(pdf);
+  let seen = false;
+  for (const p of pdf.pages) {
+    if (p.page < start.page) continue;
+    const from = p.page === start.page ? start.line + 1 : 0;
+    for (let i = from; i < p.lines.length; i++) {
+      const t = p.lines[i].text.trim();
+      if (!t || isPageNumber(t)) continue;
+      if (repeated.has(t.replace(/\d+/g, '#').toLowerCase())) continue;
+      if (t.length < 80 && STOP_RE.test(t) && seen) return { start, end: { page: p.page, line: i } };
+      seen = true;
+    }
+  }
+  return { start };
 }
 
 interface SectionLine extends TextLine {

@@ -10,6 +10,8 @@ export interface OpenRequest {
   anchor: Anchor;
   title: string;
   context?: string;
+  /** Text to find and highlight on the opened page (via the pdf.js text layer). */
+  phrase?: string;
 }
 
 interface Props {
@@ -20,6 +22,9 @@ interface Props {
   onClose: () => void;
   onSelect: (s: Selection) => void;
   onOpen: (r: OpenRequest) => void;
+  /** Citations of the main document per publication id (from the evidence report). */
+  docCitations?: Map<string, number>;
+  onShowInDocument: (pubId: string) => void;
   onReview: (edgeId: string, action: ReviewAction) => Promise<void>;
   onCategory: (pubId: string, value: string | null | undefined) => Promise<void>;
 }
@@ -171,6 +176,11 @@ function PublicationDetails({ g, pub, props }: { g: CitationGraph; pub: Publicat
       ) : (
         <p className="muted small">Afirmações ainda não extraídas (Fase 2: grafo de evidências).</p>
       )}
+      {(props.docCitations?.get(pub.id) ?? 0) > 0 && (
+        <button className="primary" onClick={() => props.onShowInDocument(pub.id)}>
+          Ver {props.docCitations!.get(pub.id)} citação(ões) no documento
+        </button>
+      )}
       {markers.length > 0 ? (
         <>
           <p className="small">Citado no texto em {new Set(markers.map((m) => m.page)).size} página(s):</p>
@@ -206,11 +216,17 @@ function EdgeDetails({ g, edge, props }: { g: CitationGraph; edge: GraphEdge; pr
     }
   };
   const isCites = edge.kind === 'cites';
+  const docCount = isCites && edge.source === MAIN_DOCUMENT_ID ? (props.docCitations?.get(edge.target) ?? 0) : 0;
   return (
     <>
       <h2>
         {isCites ? 'Citação' : edge.kind === 'related_to' ? 'Relação temática' : edge.kind}
       </h2>
+      {docCount > 0 && (
+        <button className="primary" onClick={() => props.onShowInDocument(edge.target)}>
+          Ver {docCount} citação(ões) no documento
+        </button>
+      )}
       <p className="edge-ends">
         <button className="linklike" onClick={() => props.onSelect({ type: 'node', id: edge.source })}>
           {label(g, edge.source)}
