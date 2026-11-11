@@ -20,7 +20,8 @@
  *  - Deterministic: the same inputs always produce the same report.
  */
 import { DEFAULT_GLOSSARY } from './glossary.js';
-import { extractMarkersFromText, resolveMarker, type MarkerReference } from './citations.js';
+import { buildQuery, lexicalCandidates, MATCH_PARAMS, type Candidate, type ClaimParts, type MatchParams } from './matching.js';
+import { extractMarkersFromText, isSelfCitation, resolveMarker, type MarkerReference } from './citations.js';
 import type { CitationGraph, FileRecord, PublicationNode, Rect } from './model.js';
 import { stripDiacritics } from './normalize.js';
 import { isPageNumber, referenceSectionBounds, repeatedLines } from './references.js';
@@ -47,6 +48,20 @@ export interface EvidenceParams {
   lengthPenalty: number;
   /** Credit the next sentence's terms too (claims often span two sentences in the source). */
   windowNext: boolean;
+  /** `v1`: single-sentence weighted overlap; `v2`: claim clauses + BM25 windows + fuzzy matching (+ optional embeddings). */
+  matcher: 'v1' | 'v2';
+  /**
+   * Thresholds on the v2 final score: `strong`/`weak` for lexical coverage alone, `strongSem`/`weakSem` for the
+   * lexical/semantic blend. Calibrated on the internal gold set (see docs/matcher-evaluation.md).
+   */
+  v2: { strong: number; weak: number; strongSem: number; weakSem: number };
+  /** Lexical stage parameters of the v2 matcher. */
+  match: MatchParams;
+  /**
+   * Candidates are ranked by `(1-lambdaRank)*z(lex) + lambdaRank*z(cos)` (z-scores inside one occurrence) and labelled
+   * by the absolute score `(1-lambda)*lex + lambda*clamp((cos-semFloor)/(semCeil-semFloor))` of the top candidate.
+   */
+  fusion: { lambdaRank: number; lambda: number; semFloor: number; semCeil: number };
 }
 
 export const EVIDENCE_PARAMS: EvidenceParams = {
@@ -59,6 +74,10 @@ export const EVIDENCE_PARAMS: EvidenceParams = {
   absentWeight: 0.3,
   lengthPenalty: 0,
   windowNext: false,
+  matcher: 'v2',
+  v2: { strong: 0.18, weak: 0.1, strongSem: 0.3, weakSem: 0.14 },
+  match: MATCH_PARAMS,
+  fusion: { lambdaRank: 0.5, lambda: 0.5, semFloor: 0.3, semCeil: 0.8 },
 };
 
 export type EvidenceStatus = 'localizado' | 'ressalva' | 'nao_localizado';
@@ -115,6 +134,10 @@ export interface CitationOccurrence {
   sentence: string;
   /** Text actually searched: sentence without markers (plus the next sentence for narrative citations). */
   claim: string;
+  /** Clause around the marker (the part of the sentence the citation supports); absent for older reports. */
+  localClaim?: string;
+  /** Neighbouring sentences (without markers), used as weak extra context. */
+  context?: string;
   referenceFileId?: string;
   status?: EvidenceStatus;
   reason?: EvidenceReason;
@@ -467,6 +490,28 @@ function cleanClaim(raw: string, removals: Span[]): string {
     .trim();
 }
 
+/** The part of the sentence a citation supports: the clause before the marker (after it, for narrative citations). */
+function localClause(text: string, sent: Span, spansInSentence: { start: number; end: number }[], first: { start: number; end: number; narrative?: boolean }): string {
+  const spans = [...new Map(spansInSentence.map((m) => [m.start, m])).values()].sort((a, b) => a.start - b.start);
+  const narrative = Boolean(first.narrative) && first.start - sent.start < 60;
+  const inner = (from: number, to: number) => cleanClaim(text.slice(from, to), spans.filter((m) => m.start >= from && m.end <= to).map((m) => ({ start: m.start - from, end: m.end - from })));
+  let from: number;
+  let to: number;
+  if (narrative) {
+    from = first.end;
+    to = spans.find((m) => m.start >= first.end)?.start ?? sent.end;
+    const semi = text.indexOf(';', from);
+    if (semi >= 0 && semi < to) to = semi;
+    return inner(from, to);
+  }
+  to = first.start;
+  from = [...spans].reverse().find((m) => m.end <= first.start)?.end ?? sent.start;
+  const semi = text.lastIndexOf(';', to);
+  if (semi >= from) from = semi + 1;
+  const clause = inner(from, to);
+  return clause.split(/\s+/).filter((w) => w.length > 2).length >= 3 ? clause : inner(sent.start, sent.end);
+}
+
 const displaySentence = (s: string) => s.replace(/\s+/g, ' ').trim();
 
 export interface ComputeEvidenceInput {
@@ -478,6 +523,8 @@ export interface ComputeEvidenceInput {
   /** Optional cache of reference indexes keyed by `fileId:sha256`. */
   cache?: Map<string, ReferenceIndex>;
   params?: Partial<EvidenceParams>;
+  /** Receives the v2 candidates of every occurrence that has a reference text (used by the semantic re-rank). */
+  onPending?: (pm: PendingMatch) => void;
 }
 
 /** The PDF of a publication: file links first, then the files merged into the node. */
@@ -535,7 +582,8 @@ export function computeEvidence(input: ComputeEvidenceInput): EvidenceReport {
       return after && before;
     });
     const sentences = segmentSentences(flow.text);
-    const markers = extractMarkersFromText(flow.text);
+    // self markers ("Fonte: Autor (2026)") stay in the list so they are cut out of claims, but never become occurrences
+    const markers = extractMarkersFromText(flow.text, { includeSelf: true });
     const pageSize = new Map(mainText.pages.map((p) => [p.page, { width: p.width, height: p.height }]));
     const claimTermsCache = new Map<string, Set<string>>();
 
@@ -558,7 +606,8 @@ export function computeEvidence(input: ComputeEvidenceInput): EvidenceReport {
     };
 
     for (const start of [...bySpan.keys()].sort((a, b) => a - b)) {
-      const group = bySpan.get(start)!;
+      const group = bySpan.get(start)!.filter((m) => !isSelfCitation(m));
+      if (group.length === 0) continue;
       const first = group[0];
       const page = pageAt(flow, first.start);
       const rawKey = `${page}|${first.raw}`;
@@ -580,6 +629,17 @@ export function computeEvidence(input: ComputeEvidenceInput): EvidenceReport {
         const nx = sentences[si + 1];
         claim = `${claim} ${cleanClaim(flow.text.slice(nx.start, nx.end), markers.filter((m) => m.start >= nx.start && m.end <= nx.end).map((m) => ({ start: m.start - nx.start, end: m.end - nx.start })))}`.trim();
       }
+      const inSentence = markers.filter((m) => m.start >= sentSpan.start && m.end <= sentSpan.end);
+      const localClaim = displaySentence(localClause(flow.text, sentSpan, inSentence, first));
+      const around = (j: number) => {
+        if (j < 0 || j >= sentences.length) return '';
+        const lo = Math.min(j, si);
+        const hi = Math.max(j, si);
+        if (flow.text.slice(sentences[lo].end, sentences[hi].start).includes(PARA)) return '';
+        const sp = sentences[j];
+        return cleanClaim(flow.text.slice(sp.start, sp.end), markers.filter((m) => m.start >= sp.start && m.end <= sp.end).map((m) => ({ start: m.start - sp.start, end: m.end - sp.start })));
+      };
+      const context = si >= 0 ? displaySentence(`${around(si - 1)} ${around(si + 1)}`) : '';
       let k = 0;
       for (const m of group) {
         const res = resolveMarker(m as MarkerReference, bibPubs);
@@ -596,12 +656,14 @@ export function computeEvidence(input: ComputeEvidenceInput): EvidenceReport {
           candidates: res.status === 'ambiguous' ? res.candidates : [],
           sentence: displaySentence(sentenceRaw),
           claim: displaySentence(claim),
+          localClaim: localClaim || undefined,
+          context: context || undefined,
           notes: [],
           passages: [],
         };
         if (res.status === 'resolved') {
           const pub = graph.nodes[res.publicationId] as PublicationNode;
-          scoreOccurrence(occ, pub, graph, texts, indexFor, claimTermsCache, params);
+          scoreOccurrence(occ, pub, graph, texts, indexFor, claimTermsCache, params, input.onPending);
         }
         occurrences.push(occ);
       }
@@ -629,6 +691,7 @@ function scoreOccurrence(
   indexFor: (fileId: string) => ReferenceIndex | undefined,
   termsCache: Map<string, Set<string>>,
   params: EvidenceParams,
+  collect?: (pm: PendingMatch) => void,
 ) {
   const { fileId, failed } = referenceFileFor(graph, pub, texts);
   if (!fileId) {
@@ -648,6 +711,23 @@ function scoreOccurrence(
     occ.status = 'nao_localizado';
     occ.reason = 'sem_texto';
     occ.notes.push('O PDF da referência não tem texto extraível.');
+    return;
+  }
+  if (params.matcher === 'v2') {
+    const parts = claimPartsOf(occ);
+    const query = buildQuery(parts, params.match);
+    // neighbouring sentences only help ranking; the cited sentence itself must carry searchable content
+    const own = buildQuery({ local: parts.local, sentence: parts.sentence }, params.match);
+    if (own.filter((q) => q.t[0] !== '#' || q.t.length > 3).length < params.minClaimTerms) {
+      occ.status = 'nao_localizado';
+      occ.reason = 'frase_curta';
+      occ.notes.push('A frase que cita tem pouco conteúdo pesquisável (por exemplo, só o nome do autor); não há como buscar a passagem.');
+      return;
+    }
+    const candidates = lexicalCandidates(index, query, params.match, params.maxPassageChars);
+    const pm: PendingMatch = { occId: occ.id, fileId, index, parts, candidates };
+    collect?.(pm);
+    finalizeV2(occ, pm, params);
     return;
   }
   let terms = termsCache.get(occ.claim);
@@ -694,6 +774,73 @@ function scoreOccurrence(
 
 const round = (n: number) => Math.round(n * 1000) / 1000;
 
+export const claimPartsOf = (occ: Pick<CitationOccurrence, 'claim' | 'localClaim' | 'context'>): ClaimParts => ({ local: occ.localClaim, sentence: occ.claim, context: occ.context });
+
+/** A v2 occurrence waiting for its final label (and, optionally, a semantic re-rank of its candidates). */
+export interface PendingMatch {
+  occId: string;
+  fileId: string;
+  index: ReferenceIndex;
+  parts: ClaimParts;
+  candidates: Candidate[];
+}
+
+const zscores = (a: number[]) => {
+  const m = a.reduce((x, y) => x + y, 0) / (a.length || 1);
+  const sd = Math.sqrt(a.reduce((x, y) => x + (y - m) ** 2, 0) / (a.length || 1)) || 1;
+  return a.map((v) => (v - m) / sd);
+};
+
+/**
+ * Orders the candidates (lexical only, or lexical + cosine similarity when `sem` is present) and sets `score`
+ * (absolute 0..1 value used by the thresholds). Returns whether embeddings took part.
+ */
+export function fuseCandidates(cands: Candidate[], params: EvidenceParams): boolean {
+  const semantic = cands.length > 0 && cands.every((c) => c.sem !== undefined);
+  const { lambdaRank, lambda, semFloor, semCeil } = params.fusion;
+  if (!semantic) {
+    for (const c of cands) c.score = c.lex;
+    cands.sort((a, b) => b.lex - a.lex || a.len - b.len || a.start - b.start);
+    return false;
+  }
+  const zl = zscores(cands.map((c) => c.lex));
+  const zs = zscores(cands.map((c) => c.sem as number));
+  const rank = new Map(cands.map((c, i) => [c, (1 - lambdaRank) * zl[i] + lambdaRank * zs[i]]));
+  for (const c of cands) c.score = (1 - lambda) * c.lex + lambda * Math.min(1, Math.max(0, ((c.sem as number) - semFloor) / (semCeil - semFloor)));
+  cands.sort((a, b) => (rank.get(b) as number) - (rank.get(a) as number) || a.start - b.start);
+  return true;
+}
+
+/** Labels an occurrence from its candidates. */
+export function finalizeV2(occ: CitationOccurrence, pm: PendingMatch, params: EvidenceParams) {
+  const cands = pm.candidates;
+  const semantic = fuseCandidates(cands, params);
+  const th = semantic ? { strong: params.v2.strongSem, weak: params.v2.weakSem } : { strong: params.v2.strong, weak: params.v2.weak };
+  occ.passages = cands
+    .slice(0, params.maxPassages)
+    .filter((c, i) => i === 0 || c.score >= params.minShown)
+    .map((c) => ({ fileId: pm.fileId, page: c.page, text: c.text, score: round(c.score), region: c.region }));
+  occ.notes = [];
+  const best = cands[0];
+  if (!best || best.score < th.weak) {
+    occ.status = 'nao_localizado';
+    occ.reason = 'sem_passagem';
+    occ.score = best ? round(best.score) : 0;
+    occ.notes.push('Nenhuma passagem do PDF tem sobreposição suficiente com a frase.');
+    return;
+  }
+  occ.score = round(best.score);
+  occ.reason = undefined;
+  if (best.score >= th.strong) occ.status = 'localizado';
+  else {
+    occ.status = 'ressalva';
+    occ.reason = 'baixa_similaridade';
+    occ.notes.push('A melhor passagem cobre só parte dos termos da frase.');
+  }
+  if (best.missingNumbers.length) occ.notes.push(`Número(s) da frase ausente(s) da passagem: ${best.missingNumbers.join(', ')}.`);
+  if (best.region === 'resumo') occ.notes.push('A passagem mais próxima está no resumo/início do artigo; confira o corpo do texto.');
+}
+
 // ---------------------------------------------------------------------------
 // Privacy
 // ---------------------------------------------------------------------------
@@ -709,6 +856,8 @@ export function redactEvidenceForSharing(report: EvidenceReport, files: Record<s
       marker: mainPrivate ? REDACTED_TEXT : o.marker,
       sentence: mainPrivate ? REDACTED_TEXT : o.sentence,
       claim: mainPrivate ? REDACTED_TEXT : o.claim,
+      localClaim: mainPrivate ? undefined : o.localClaim,
+      context: mainPrivate ? undefined : o.context,
       rects: mainPrivate ? [] : o.rects,
       notes: o.notes,
       passages: o.passages.map((p) => ({ ...p, text: isPrivate(p.fileId) ? REDACTED_TEXT : p.text })),

@@ -77,7 +77,15 @@ export function parseParenthetical(content: string): MarkerReference[] {
   return out;
 }
 
-export function extractMarkersFromText(text: string): (MarkerReference & { raw: string; start: number; end: number })[] {
+/**
+ * "Autor (2026)", "Author (2026)", "Elaboração própria (2026)": the thesis author pointing at their own work
+ * (typically the source line of a table or figure). It is not a citation of a bibliography entry and is never
+ * reported as an unidentified reference.
+ */
+const SELF_AUTHOR_RE = /^(?:autor(?:a|es|as)?|author(?:s)?|o\s+autor|a\s+autora|elabora[cç][aã]o(?:\s+pr[oó]pria)?|own\s+work|nosso\s+trabalho)$/i;
+export const isSelfCitation = (m: Pick<MarkerReference, 'authors' | 'etAl'>) => m.authors.length === 1 && SELF_AUTHOR_RE.test(m.authors[0].trim());
+
+export function extractMarkersFromText(text: string, opts: { includeSelf?: boolean } = {}): (MarkerReference & { raw: string; start: number; end: number })[] {
   const out: (MarkerReference & { raw: string; start: number; end: number })[] = [];
   for (const m of text.matchAll(PAREN_RE)) {
     for (const ref of parseParenthetical(m[1])) {
@@ -90,7 +98,7 @@ export function extractMarkersFromText(text: string): (MarkerReference & { raw: 
     const yearLabel = m[2];
     out.push({ ...parsed, narrative: true, year: Number(yearLabel.slice(0, 4)), yearLabel, raw: m[0], start: m.index!, end: m.index! + m[0].length });
   }
-  return out.sort((a, b) => a.start - b.start);
+  return out.filter((m) => opts.includeSelf || !isSelfCitation(m)).sort((a, b) => a.start - b.start);
 }
 
 /** Extracts markers page by page, keeping the rectangles of the lines that contain them. */

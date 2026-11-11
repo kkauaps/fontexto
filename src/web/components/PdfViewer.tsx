@@ -45,7 +45,7 @@ export function PdfViewer({ projectId, request: initial, backLabel = 'Voltar', o
           return;
         }
         setPage(t.page);
-        const d = await openPdf(api.pdfUrl(projectId, t.fileId)).promise;
+        const d = await openPdf(await api.pdfSource(projectId, t.fileId)).promise;
         if (!cancelled) setDoc(d);
       })
       .catch((e: Error) => !cancelled && setError(e.message));

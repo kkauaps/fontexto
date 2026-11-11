@@ -65,10 +65,11 @@ describe('no third-party code or network use in the web app', () => {
       for (const m of src.matchAll(/https?:\/\/[^\s'"`)<>]+/g)) expect(m[0], `${f}: ${m[0]}`).toMatch(allowed);
     }
   });
-  it('only talks to its own /api through fetch', () => {
+  it('only talks to its own origin through fetch (/api, or the self-hosted model under /models/)', () => {
+    expect(readFileSync('src/web/local/embed.worker.ts', 'utf8')).toMatch(/const MODEL_DIR = '\/models\//);
     for (const f of webFiles.filter((x) => /\.tsx?$/.test(x))) {
       const src = readFileSync(f, 'utf8');
-      for (const m of src.matchAll(/\bfetch\(\s*([^,)]+)/g)) expect(m[1], f).toMatch(/^(url|`\$\{?base|'\/api|`\/api)/);
+      for (const m of src.matchAll(/\bfetch\(\s*([^,)]+)/g)) expect(m[1], f).toMatch(/^(url|`\$\{?base|'\/api|`\/api|`\$\{MODEL_DIR\}|'\/models\/)/);
       expect(src, f).not.toMatch(/XMLHttpRequest|sendBeacon|WebSocket\(|EventSource\(/);
     }
   });

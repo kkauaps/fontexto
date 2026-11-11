@@ -11,7 +11,8 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { existsSync } from 'node:fs';
-import type { PdfText, TextLine } from '../core/text.js';
+import { textFromDocument, type PdfDocLike, type PdfJsLike } from '../core/pdfjsText.js';
+import type { PdfText } from '../core/text.js';
 import { toPdfJsFactoryUrl } from './pdfPaths.js';
 
 export interface PdfJsPaths {
@@ -77,14 +78,6 @@ function wasmUrl(): string | undefined {
   return existsSync(dir) ? toPdfJsFactoryUrl(dir) : undefined;
 }
 
-interface RawItem {
-  str: string;
-  transform: number[];
-  width: number;
-  height: number;
-  hasEOL?: boolean;
-}
-
 export async function extractPdfText(data: Uint8Array): Promise<PdfText> {
   const pdfjs = await loadPdfJs();
   const fontsDir = standardFontDataUrl();
@@ -99,60 +92,7 @@ export async function extractPdfText(data: Uint8Array): Promise<PdfText> {
   });
   const doc = await task.promise;
   try {
-    let info: PdfText['info'] = {};
-    try {
-      const meta = await doc.getMetadata();
-      const i = (meta.info ?? {}) as Record<string, unknown>;
-      const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
-      info = { title: str(i.Title), author: str(i.Author), subject: str(i.Subject), keywords: str(i.Keywords) };
-    } catch {
-      /* metadata is optional */
-    }
-    const pages: PdfText['pages'] = [];
-    for (let n = 1; n <= doc.numPages; n++) {
-      const page = await doc.getPage(n);
-      const viewport = page.getViewport({ scale: 1 });
-      const content = await page.getTextContent();
-      const lines: TextLine[] = [];
-      let cur: { parts: string[]; x0: number; x1: number; top: number; bottom: number; base: number; size: number } | undefined;
-      const flush = () => {
-        if (cur) {
-          const text = cur.parts.join('').replace(/\s+/g, ' ').trim();
-          if (text) lines.push({ text, rect: { x: cur.x0, y: cur.top, w: Math.max(0.5, cur.x1 - cur.x0), h: Math.max(0.5, cur.bottom - cur.top) }, fontSize: cur.size });
-        }
-        cur = undefined;
-      };
-      for (const raw of content.items as RawItem[]) {
-        if (typeof raw.str !== 'string') continue;
-        const t = pdfjs.Util.transform(viewport.transform, raw.transform);
-        const size = Math.hypot(t[2], t[3]) || raw.height || 1;
-        const x = t[4];
-        const base = t[5];
-        const w = raw.width;
-        if (raw.str.length > 0) {
-          const newLine = !cur || Math.abs(base - cur.base) > size * 0.5 || x < cur.x1 - size * 2;
-          if (newLine) {
-            flush();
-            cur = { parts: [], x0: x, x1: x + w, top: base - size, bottom: base + size * 0.25, base, size };
-          } else if (cur) {
-            const gap = x - cur.x1;
-            const last = cur.parts[cur.parts.length - 1] ?? '';
-            if (gap > size * 0.15 && !/\s$/.test(last) && !/^\s/.test(raw.str)) cur.parts.push(' ');
-            cur.x0 = Math.min(cur.x0, x);
-            cur.x1 = Math.max(cur.x1, x + w);
-            cur.top = Math.min(cur.top, base - size);
-            cur.bottom = Math.max(cur.bottom, base + size * 0.25);
-            cur.size = Math.max(cur.size, size);
-          }
-          cur!.parts.push(raw.str);
-        }
-        if (raw.hasEOL) flush();
-      }
-      flush();
-      pages.push({ page: n, width: viewport.width, height: viewport.height, lines });
-      page.cleanup();
-    }
-    return { pageCount: doc.numPages, info, pages };
+    return await textFromDocument(pdfjs as unknown as PdfJsLike, doc as unknown as PdfDocLike);
   } finally {
     await task.destroy();
   }

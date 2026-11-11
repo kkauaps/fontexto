@@ -130,6 +130,24 @@ mkdirSync(outDir, { recursive: true });
 copyFileSync(process.execPath, exePath);
 stripPeSignature(exePath);
 
+// Fontexto icon + version info (pure-JS PE resource editing, before the SEA blob is injected).
+{
+  const ResEdit = await import('resedit');
+  const exe = ResEdit.NtExecutable.from(readFileSync(exePath));
+  const res = ResEdit.NtExecutableResource.from(exe);
+  const ico = ResEdit.Data.IconFile.from(readFileSync(path.join(root, 'src', 'web', 'public', 'favicon.ico')));
+  const group = res.entries.find((e) => e.type === 14);
+  ResEdit.Resource.IconGroupEntry.replaceIconsForResource(res.entries, group?.id ?? 1, group?.lang ?? 1033, ico.icons.map((i) => i.data));
+  const [vi] = ResEdit.Resource.VersionInfo.fromEntries(res.entries);
+  if (vi) {
+    vi.setStringValues({ lang: 1033, codepage: 1200 }, { FileDescription: 'Fontexto', ProductName: 'Fontexto', InternalName: 'Fontexto', OriginalFilename: 'Fontexto.exe', LegalCopyright: '' });
+    vi.outputToResourceEntries(res.entries);
+  }
+  res.outputResource(exe);
+  writeFileSync(exePath, Buffer.from(exe.generate()));
+  console.log('Applied the Fontexto icon and version info.');
+}
+
 const postjectCli = require.resolve('postject/dist/cli.js');
 console.log('Injecting the SEA blob into Fontexto.exe…');
 execFileSync(

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { categoryOf, type CategoryRule } from '../core/categories';
 import type { CitationGraph, ReviewAction } from '../core/model';
 import { buildView, DEFAULT_FILTERS, type GraphMode, type ViewFilters } from '../core/view';
-import { api, type ProjectSummary } from './api';
+import { api, edition, type ProjectSummary } from './api';
 import { BRAND, pageTitle } from './brand';
 import { Landing, type FlowMode } from './components/Landing';
 import { UploadFlow } from './components/UploadFlow';
@@ -41,7 +41,7 @@ export function App() {
   const [flow, setFlow] = useState<FlowMode | undefined>();
 
   useEffect(() => {
-    api.health().then((h) => setExternalAvailable(h.externalMetadataAvailable), () => setError('API indisponível. Inicie o servidor (npm run dev).'));
+    api.health().then((h) => setExternalAvailable(h.externalMetadataAvailable), () => setError(edition === 'web' ? 'Seu navegador não conseguiu iniciar o processamento local. Atualize a página ou use um navegador recente.' : 'API indisponível. Inicie o servidor (npm run dev).'));
     api.listProjects().then(setProjects, () => undefined);
   }, []);
 

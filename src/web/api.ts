@@ -41,7 +41,7 @@ const json = (body: unknown, method = 'POST'): RequestInit => ({
 });
 const base = (p: string) => `/api/projects/${encodeURIComponent(p)}`;
 
-export const api = {
+const httpApi = {
   health: () => req<{ ok: boolean; externalMetadataAvailable: boolean }>('/api/health'),
   listProjects: () => req<ProjectSummary[]>('/api/projects'),
   createProject: (name: string) => req<ProjectSummary>('/api/projects', json({ name })),
@@ -57,7 +57,8 @@ export const api = {
     return req<{ graph: CitationGraph }>(`${base(p)}/files`, { method: 'POST', body: fd });
   },
   deleteFile: (p: string, fileId: string) => req<CitationGraph>(`${base(p)}/files/${fileId}`, { method: 'DELETE' }),
-  pdfUrl: (p: string, fileId: string) => `${base(p)}/files/${fileId}/pdf`,
+  /** What pdf.js opens: a URL here, raw bytes in the browser edition. */
+  pdfSource: async (p: string, fileId: string): Promise<string | Uint8Array> => `${base(p)}/files/${fileId}/pdf`,
   resolveAnchor: (p: string, anchor: Anchor) => req<ViewerTarget>(`${base(p)}/anchor`, json(anchor)),
   identityDecision: (p: string, reviewId: string, decision: 'same' | 'distinct' | null) =>
     req<CitationGraph>(`${base(p)}/decisions/identity`, json({ reviewId, decision })),
@@ -83,5 +84,60 @@ export const api = {
     return req<{ source: string; items: number; applied: number; graph: CitationGraph }>(`${base(p)}/curated`, { method: 'POST', body: fd });
   },
   removeCurated: (p: string) => req<CitationGraph>(`${base(p)}/curated`, { method: 'DELETE' }),
-  exportUrl: (p: string, kind: 'graphml' | 'json' | 'evidence') => `${base(p)}/export/${kind}`,
+  download: async (p: string, kind: 'graphml' | 'json' | 'evidence') => {
+    const a = document.createElement('a');
+    a.href = `${base(p)}/export/${kind}`;
+    a.download = '';
+    a.click();
+  },
 };
+
+export type Api = typeof httpApi;
+
+/** Semantic re-rank (browser edition only). */
+export interface SemanticState {
+  available: boolean;
+  active: boolean;
+  cachedTexts: number;
+}
+
+
+const call = async <T>(method: string, args: unknown[] = []): Promise<T> => (await import('./local/client')).call<T>(method, args);
+
+const localApi: Api = {
+  health: () => call('health'),
+  listProjects: () => call('listProjects'),
+  createProject: (name) => call('createProject', [name]),
+  deleteProject: (p) => call('deleteProject', [p]),
+  project: (p) => call('project', [p]),
+  graph: (p) => call('graph', [p]),
+  rebuild: (p) => call('rebuild', [p]),
+  upload: (p, files, role, visibility) => call('upload', [p, files, role, visibility]),
+  deleteFile: (p, fileId) => call('deleteFile', [p, fileId]),
+  pdfSource: async (p, fileId) => new Uint8Array(await call<ArrayBuffer>('pdfBytes', [p, fileId])),
+  resolveAnchor: (p, anchor) => call('resolveAnchor', [p, anchor]),
+  identityDecision: (p, reviewId, decision) => call('identityDecision', [p, reviewId, decision]),
+  fileLink: (p, fileId, publicationId) => call('fileLink', [p, fileId, publicationId]),
+  edgeReview: (p, edgeId, action, note) => call('edgeReview', [p, edgeId, action, note]),
+  category: (p, publicationId, category) => call('category', [p, publicationId, category]),
+  categories: (p) => call('categories', [p]),
+  setCategories: (p, rules) => call('setCategories', [p, rules]),
+  enrich: (p) => call('enrich', [p]),
+  evidence: (p) => call('evidence', [p]),
+  extractReferences: (p) => call('extractReferences', [p]),
+  curated: (p) => call('curated', [p]),
+  importCurated: (p, file) => call('importCurated', [p, file]),
+  removeCurated: (p) => call('removeCurated', [p]),
+  download: async (p, kind) => {
+    const f = await call<{ name: string; mime: string; text: string }>('exportFile', [p, kind]);
+    const url = URL.createObjectURL(new Blob([f.text], { type: f.mime }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = f.name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  },
+};
+
+export const edition: 'web' | 'local' = __EDITION__;
+export const api: Api = edition === 'web' ? localApi : httpApi;

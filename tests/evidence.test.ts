@@ -176,15 +176,18 @@ describe('statuses by passage quality', () => {
     const { graph, texts } = project({
       mainLines: [['Gradient lattices improve tissue boundary estimation by 99.9 percent on dermatology images (QUINTANA et al., 2020).'], ['REFERENCES']],
     });
-    const o = computeEvidence({ projectId: 't', now: NOW, graph, texts }).occurrences[0];
+    const o = computeEvidence({ projectId: 't', now: NOW, graph, texts, params: { matcher: 'v1' } }).occurrences[0];
     expect(o.status).toBe('ressalva');
     expect(o.reason).toBe('numero_ausente');
     expect(o.notes.join(' ')).toMatch(/99\.9/);
+    // v2 keeps the label of its calibrated score but still tells the reader which number is missing
+    const v2 = computeEvidence({ projectId: 't', now: NOW, graph, texts }).occurrences[0];
+    expect(v2.notes.join(' ')).toMatch(/99\.9/);
   });
 
   it('labels as nao_localizado when nothing in the PDF resembles the sentence', () => {
     const { graph, texts } = project({ mainLines: [['Football stadiums require concrete foundations and drainage systems (QUINTANA et al., 2020).'], ['REFERENCES']] });
-    const o = computeEvidence({ projectId: 't', now: NOW, graph, texts }).occurrences[0];
+    const o = computeEvidence({ projectId: 't', now: NOW, graph, texts, params: { matcher: 'v1' } }).occurrences[0];
     expect(o.status).toBe('nao_localizado');
     expect(o.reason).toBe('sem_passagem');
   });
@@ -193,8 +196,11 @@ describe('statuses by passage quality', () => {
     const { graph, texts } = project({
       mainLines: [['Tissue boundary with cooking recipes, mountain climbing guides, football stadiums, concrete foundations, drainage systems, wedding catering budgets and airline timetables (QUINTANA et al., 2020).'], ['REFERENCES']],
     });
-    const o = computeEvidence({ projectId: 't', now: NOW, graph, texts }).occurrences[0];
+    const o = computeEvidence({ projectId: 't', now: NOW, graph, texts, params: { matcher: 'v1' } }).occurrences[0];
     expect(o.status).not.toBe('localizado');
+    // v2 scores a claim that mostly talks about something else well below a full match
+    const v2 = computeEvidence({ projectId: 't', now: NOW, graph, texts }).occurrences[0];
+    expect(v2.score ?? 0).toBeLessThan(0.45);
   });
 });
 
