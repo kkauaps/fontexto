@@ -97,3 +97,18 @@ How the labels are computed (`src/core/evidence.ts`): the citing sentence (marke
 - **Não localizado**: no similar passage, no reference PDF, no extractable text, or a sentence with too little content.
 
 These labels are *candidates for human review*, not proof that the reference supports the claim. Everything runs locally; the shared export (`/export/evidence`) removes text taken from private files. Results are stored in `evidence.json` per project and recomputed whenever files are added/removed or the project is rebuilt.
+
+## Web edition (fontexto.com, client-side)
+
+`npm run build:site` builds a static site (`dist/site`) with **no server**: the PDF parsing (pdf.js), reference extraction,
+linking and matching run in Web Workers (`src/web/local/`, on top of the platform-neutral `src/core/coreStore.ts`) and the
+projects live in the browser's IndexedDB. Nothing is uploaded. The Windows executable is the offline edition and shares
+`src/core`.
+
+- Optional "busca semântica" (re-rank by a multilingual sentence-embedding model, ~135 MB, downloaded once and cached) needs
+  the model files: `npm run fetch-model` (SHA-256 pinned) before `npm run build:site`. Without them the site builds without
+  that option.
+- Cloudflare Pages: `npx wrangler pages deploy dist/site --project-name fontexto --branch <branch>`. The `_headers` file
+  (strict CSP + Trusted Types, COOP/COEP/CORP, HSTS) is generated from `src/server/securityHeaders.ts`.
+- Check a deployment end to end in headless Chrome: `scripts/e2e/web-flow.mjs` (see its header for the variables).
+- How the automatic matcher is measured and its limits: `docs/matcher-evaluation.md`.
