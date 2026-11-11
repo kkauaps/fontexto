@@ -8,6 +8,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { viewerTarget } from '../core/anchors.js';
 import type { CategoryRule } from '../core/categories.js';
+import { redactEvidenceForSharing } from '../core/evidence.js';
 import { redactForSharing, toGraphML } from '../core/export.js';
 import type { Anchor, FileRole, ReviewAction, Visibility } from '../core/model.js';
 import { lookupMany } from './metadata.js';
@@ -70,6 +71,9 @@ export function createApp(cfg: AppConfig) {
   );
 
   app.get('/api/projects/:projectId/graph', h(async (req, res) => res.json(await store.getGraph(pid(req)))));
+
+  /** Citation occurrences of the main PDF with the evidence found in the reference PDFs (local data, includes text). */
+  app.get('/api/projects/:projectId/evidence', h(async (req, res) => res.json(await store.getEvidence(pid(req)))));
 
   app.post('/api/projects/:projectId/rebuild', h(async (req, res) => {
     await store.ensureExtracted(pid(req));
@@ -241,6 +245,16 @@ export function createApp(cfg: AppConfig) {
       const graph = await store.getGraph(pid(req));
       res.setHeader('Content-Disposition', `attachment; filename="${pid(req)}.citation-graph.json"`);
       res.json(req.query.full === '1' ? graph : redactForSharing(graph));
+    }),
+  );
+
+  app.get(
+    '/api/projects/:projectId/export/evidence',
+    h(async (req, res) => {
+      const projectId = pid(req);
+      const [evidence, graph] = await Promise.all([store.getEvidence(projectId), store.getGraph(projectId)]);
+      res.setHeader('Content-Disposition', `attachment; filename="${projectId}.evidence.json"`);
+      res.json(req.query.full === '1' ? evidence : redactEvidenceForSharing(evidence, graph.files));
     }),
   );
 

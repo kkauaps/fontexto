@@ -85,3 +85,15 @@ CitationTrace.exe --no-browser
 The same thing can be done with the environment variable `CITATION_GRAPH_NO_BROWSER=1`. The last bound URL is written to `%APPDATA%\CitationTrace\last-url.txt`.
 
 The executable is unsigned, so Windows SmartScreen may show a warning on first launch.
+
+## Document view (tab C · Documento)
+
+Upload the main PDF, the `.bib` and, optionally, the reference PDFs ("Arquivos e revisão"). Tab **C · Documento** renders the main PDF page by page and highlights every in-text citation (author–year). Clicking one shows, in the side panel, the cited publication(s), the citing sentence, and the passages found in the reference PDF (page, similarity, text), with a button that opens the reference PDF on that page with the passage highlighted. Filters: status, reference, free text. From the graph, a publication or a "cites" edge has a "Ver N citação(ões) no documento" button.
+
+How the labels are computed (`src/core/evidence.ts`): the citing sentence (markers removed) is segmented from the main PDF; every sentence of the reference PDF (bibliography excluded) is scored by IDF-weighted overlap of content terms (numbers, acronyms, 5-letter stems, PT↔EN glossary). The best passages are shown with one of:
+
+- **Localizado**: a passage shares most of the sentence's rare terms;
+- **Ressalva**: weaker overlap, a number of the sentence missing from the passage, or only the abstract matches;
+- **Não localizado**: no similar passage, no reference PDF, no extractable text, or a sentence with too little content.
+
+These labels are *candidates for human review*, not proof that the reference supports the claim. Everything runs locally; the shared export (`/export/evidence`) removes text taken from private files. Results are stored in `evidence.json` per project and recomputed whenever files are added/removed or the project is rebuilt.

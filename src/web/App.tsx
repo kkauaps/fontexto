@@ -4,6 +4,11 @@ import { categoryOf, type CategoryRule } from '../core/categories';
 import type { CitationGraph, ReviewAction } from '../core/model';
 import { buildView, DEFAULT_FILTERS, type GraphMode, type ViewFilters } from '../core/view';
 import { api, type ProjectSummary } from './api';
+import { BRAND, pageTitle } from './brand';
+import { SetupChecklist } from './components/SetupChecklist';
+import { occurrencesByPublication } from '../core/evidenceView';
+import type { EvidenceReport } from '../core/evidence';
+import { DocumentView, type DocumentFocus } from './components/DocumentView';
 import { FiltersPanel } from './components/FiltersPanel';
 import { GraphCanvas, type Selection } from './components/GraphCanvas';
 import { PdfViewer } from './components/PdfViewer';
@@ -23,6 +28,9 @@ export function App() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selection, setSelection] = useState<Selection>();
   const [viewer, setViewer] = useState<OpenRequest | undefined>();
+  const [docMode, setDocMode] = useState(false);
+  const [docFocus, setDocFocus] = useState<DocumentFocus | undefined>();
+  const [evidence, setEvidence] = useState<EvidenceReport | undefined>();
   const [panelOpen, setPanelOpen] = useState(false);
   const [layoutNonce, setLayoutNonce] = useState(0);
   const [error, setError] = useState<string | undefined>();
@@ -38,6 +46,7 @@ export function App() {
     if (!projectId) return;
     localStorage.setItem(LAST_PROJECT, projectId);
     setGraph(undefined);
+    setEvidence(undefined);
     setSelection(undefined);
     api.graph(projectId).then(setGraph, (e: Error) => {
       setError(e.message);
@@ -50,6 +59,28 @@ export function App() {
   useEffect(() => {
     if (projectId && graph) api.categories(projectId).then(setRules, () => undefined);
   }, [projectId, graph?.builtAt]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!projectId || !graph) return;
+    let cancelled = false;
+    api.evidence(projectId).then(
+      (r) => !cancelled && setEvidence(r),
+      () => !cancelled && setEvidence(undefined),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, graph?.builtAt]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const docCitations = useMemo(() => (evidence ? occurrencesByPublication(evidence) : undefined), [evidence]);
+  const showInDocument = useCallback((pubId?: string) => {
+    setDocFocus((f) => ({ pubId, nonce: (f?.nonce ?? 0) + 1 }));
+    setDocMode(true);
+  }, []);
+
+  useEffect(() => {
+    document.title = pageTitle(projectId ? (projects.find((p) => p.id === projectId)?.name ?? undefined) : undefined);
+  }, [projectId, projects]);
 
   const view = useMemo(() => (graph ? buildView(graph, filters, collapsed) : undefined), [graph, filters, collapsed]);
   const categories = useMemo(() => {
@@ -92,6 +123,7 @@ export function App() {
     setGraph(await api.category(projectId, pubId, value));
   };
   const setMode = (mode: GraphMode) => {
+    setDocMode(false);
     setFilters((f) => ({ ...f, mode }));
     setSelection(undefined);
   };
@@ -100,8 +132,9 @@ export function App() {
   if (!projectId) {
     return (
       <div className="welcome">
-        <h1>CitationTrace</h1>
-        <p className="muted">Grafo de citações e evidências — processamento local, sem envio de documentos a serviços externos.</p>
+        <h1>{BRAND.name}</h1>
+        <p className="lead">{BRAND.tagline}. Veja cada citação do seu texto, a frase que cita e o trecho correspondente na referência.</p>
+        <p className="muted small">{BRAND.privacyNote}</p>
         {error && <div className="notice error">{error}</div>}
         <section>
           <h3>Projetos</h3>
@@ -144,7 +177,7 @@ export function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <strong className="brand">CitationTrace</strong>
+        <strong className="brand">{BRAND.name}</strong>
         <select value={projectId} onChange={(e) => setProjectId(e.target.value || undefined)} aria-label="Projeto">
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
@@ -153,14 +186,18 @@ export function App() {
           ))}
           <option value="">+ Projetos…</option>
         </select>
-        <div className="segmented" role="tablist">
-          <button role="tab" aria-selected={filters.mode === 'bibliographic'} className={filters.mode === 'bibliographic' ? 'on' : ''} onClick={() => setMode('bibliographic')}>
+        <nav className="tabs" role="tablist" aria-label="Visões">
+          <button role="tab" aria-selected={!docMode && filters.mode === 'bibliographic'} className={!docMode && filters.mode === 'bibliographic' ? 'on' : ''} onClick={() => setMode('bibliographic')}>
             A · Bibliográfico
           </button>
-          <button role="tab" aria-selected={filters.mode === 'evidence'} className={filters.mode === 'evidence' ? 'on' : ''} onClick={() => setMode('evidence')}>
+          <button role="tab" aria-selected={!docMode && filters.mode === 'evidence'} className={!docMode && filters.mode === 'evidence' ? 'on' : ''} onClick={() => setMode('evidence')}>
             B · Evidências
           </button>
-        </div>
+          <button role="tab" aria-selected={docMode} className={docMode ? 'on' : ''} onClick={() => setDocMode(true)}>
+            C · Documento{evidence && evidence.summary.occurrences > 0 ? ` (${evidence.summary.occurrences})` : ''}
+          </button>
+        </nav>
+        {!docMode && (
         <input
           className="search"
           type="search"
@@ -168,13 +205,14 @@ export function App() {
           value={filters.search ?? ''}
           onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
         />
+        )}
         {stats && (
           <span className="stats small">
             {stats.pubs} publicações · {stats.confirmed} citações confirmadas · {stats.unverified} a verificar
             {stats.pending > 0 && <span className="badge warn"> {stats.pending} pendência(s)</span>}
           </span>
         )}
-        <button onClick={() => setLayoutNonce((n) => n + 1)}>Reorganizar</button>
+        {!docMode && <button onClick={() => setLayoutNonce((n) => n + 1)}>Reorganizar</button>}
         <button className="primary" onClick={() => setPanelOpen(true)}>
           Arquivos e revisão
         </button>
@@ -184,6 +222,29 @@ export function App() {
           {error}
         </div>
       )}
+      {docMode && !graph && (
+        <div className="loading">
+          <span className="spinner" /> Carregando projeto…
+        </div>
+      )}
+      {docMode && graph && (
+        <div className="main">
+          <DocumentView
+            projectId={projectId}
+            graph={graph}
+            evidence={evidence}
+            focus={docFocus}
+            onOpenReference={setViewer}
+            onShowInGraph={(pubId) => {
+              setDocMode(false);
+              setSelection({ type: 'node', id: pubId });
+            }}
+            onOpenFiles={() => setPanelOpen(true)}
+            onGraph={setGraph}
+          />
+        </div>
+      )}
+      {!docMode && (
       <div className="main">
         <FiltersPanel
           filters={filters}
@@ -216,12 +277,15 @@ export function App() {
               />
             </ReactFlowProvider>
           ) : (
-            <div className="loading">Carregando grafo…</div>
+            <div className="loading">
+              <span className="spinner" /> Montando o grafo…
+            </div>
           )}
           {graph && Object.keys(graph.files).length === 0 && (
-            <div className="mode-note">
-              Projeto vazio. Abra <button className="linklike" onClick={() => setPanelOpen(true)}>Arquivos e revisão</button> para enviar o .bib, o PDF
-              principal e os PDFs das referências.
+            <div className="empty-card">
+              <h2>Comece enviando seus arquivos</h2>
+              <p className="muted">Com o PDF do documento e a bibliografia, o grafo e a aba “C · Documento” são montados automaticamente.</p>
+              <SetupChecklist projectId={projectId} graph={graph} onGraph={setGraph} />
             </div>
           )}
         </div>
@@ -234,12 +298,15 @@ export function App() {
             onClose={() => setSelection(undefined)}
             onSelect={setSelection}
             onOpen={setViewer}
+            docCitations={docCitations}
+            onShowInDocument={showInDocument}
             onReview={onReview}
             onCategory={onCategory}
           />
         )}
       </div>
-      {viewer && <PdfViewer projectId={projectId} request={viewer} onClose={() => setViewer(undefined)} />}
+      )}
+      {viewer && <PdfViewer projectId={projectId} request={viewer} backLabel={panelOpen ? 'Voltar aos arquivos' : docMode ? 'Voltar ao documento' : 'Voltar ao grafo'} onClose={() => setViewer(undefined)} />}
       {panelOpen && graph && (
         <ProjectPanel
           projectId={projectId}

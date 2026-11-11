@@ -1,32 +1,34 @@
-import * as pdfjs from 'pdfjs-dist';
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { useEffect, useRef, useState } from 'react';
 import type { ViewerTarget } from '../../core/anchors';
 import { api } from '../api';
+import { locatePhraseBoxes, openPdf, renderPage, type BoxRect, type PdfDoc } from '../pdfRender';
 import type { OpenRequest } from './SidePanel';
-
-pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
 interface Props {
   projectId: string;
   request: OpenRequest;
+  /** Where "back" leads, e.g. "Voltar ao documento". */
+  backLabel?: string;
   onClose: () => void;
 }
 
-type Loaded = Awaited<ReturnType<typeof pdfjs.getDocument>['promise']>;
 
 /**
  * Local PDF viewer (pdf.js). Opens the page of the anchor and highlights it
  * only when the server validated the extractor rectangles; otherwise it opens
  * the page and says that an exact highlight is unavailable.
  */
-export function PdfViewer({ projectId, request, onClose }: Props) {
+export function PdfViewer({ projectId, request: initial, backLabel = 'Voltar', onClose }: Props) {
+  const [request, setRequest] = useState<OpenRequest>(initial);
+  useEffect(() => setRequest(initial), [initial]);
   const [target, setTarget] = useState<ViewerTarget | undefined>();
-  const [doc, setDoc] = useState<Loaded | undefined>();
+  const [doc, setDoc] = useState<PdfDoc | undefined>();
   const [page, setPage] = useState(1);
   const [error, setError] = useState<string | undefined>();
   const [scale, setScale] = useState(1.3);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const layerRef = useRef<HTMLDivElement>(null);
+  const [phraseBoxes, setPhraseBoxes] = useState<{ boxes: BoxRect[]; exact: boolean } | undefined>();
   const [pageSize, setPageSize] = useState<{ w: number; h: number; base: { width: number; height: number } }>();
 
   useEffect(() => {
@@ -43,8 +45,7 @@ export function PdfViewer({ projectId, request, onClose }: Props) {
           return;
         }
         setPage(t.page);
-        const task = pdfjs.getDocument({ url: api.pdfUrl(projectId, t.fileId), isEvalSupported: false } as Parameters<typeof pdfjs.getDocument>[0]);
-        const d = await task.promise;
+        const d = await openPdf(api.pdfUrl(projectId, t.fileId)).promise;
         if (!cancelled) setDoc(d);
       })
       .catch((e: Error) => !cancelled && setError(e.message));
@@ -54,30 +55,31 @@ export function PdfViewer({ projectId, request, onClose }: Props) {
   }, [projectId, request]);
 
   useEffect(() => {
-    if (!doc || !canvasRef.current) return;
+    if (!doc || !canvasRef.current || !layerRef.current) return;
     let cancelled = false;
-    let task: { cancel: () => void; promise: Promise<unknown> } | undefined;
+    let cancel: (() => void) | undefined;
+    setPhraseBoxes(undefined);
     (async () => {
-      const p = await doc.getPage(page);
+      const base = (await doc.getPage(page)).getViewport({ scale: 1 });
+      const r = await renderPage(doc, page, scale, canvasRef.current!, layerRef.current!);
+      cancel = r.cancel;
+      if (cancelled) return r.cancel();
+      setPageSize({ w: r.width, h: r.height, base: { width: base.width, height: base.height } });
+      await r.done;
       if (cancelled) return;
-      const base = p.getViewport({ scale: 1 });
-      const vp = p.getViewport({ scale });
-      const canvas = canvasRef.current!;
-      const ratio = window.devicePixelRatio || 1;
-      canvas.width = Math.floor(vp.width * ratio);
-      canvas.height = Math.floor(vp.height * ratio);
-      canvas.style.width = `${vp.width}px`;
-      canvas.style.height = `${vp.height}px`;
-      setPageSize({ w: vp.width, h: vp.height, base: { width: base.width, height: base.height } });
-      task = p.render({ canvas, canvasContext: canvas.getContext('2d')!, viewport: vp, transform: ratio !== 1 ? [ratio, 0, 0, ratio, 0, 0] : undefined } as Parameters<typeof p.render>[0]);
-      await task.promise.catch(() => undefined);
-      if (!cancelled) requestAnimationFrame(() => document.querySelector('.viewer .hl')?.scrollIntoView({ block: 'center' }));
+      if (request.phrase && layerRef.current) {
+        const hit = locatePhraseBoxes(layerRef.current, request.phrase);
+        setPhraseBoxes(hit ? { boxes: hit.boxes, exact: hit.exact } : { boxes: [], exact: false });
+        requestAnimationFrame(() => document.querySelector('.viewer .hl')?.scrollIntoView({ block: 'center' }));
+      } else {
+        requestAnimationFrame(() => document.querySelector('.viewer .hl')?.scrollIntoView({ block: 'center' }));
+      }
     })();
     return () => {
       cancelled = true;
-      task?.cancel();
+      cancel?.();
     };
-  }, [doc, page, scale]);
+  }, [doc, page, scale, request.phrase]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -98,7 +100,7 @@ export function PdfViewer({ projectId, request, onClose }: Props) {
     <div className="viewer" role="dialog" aria-label="Visualizador de PDF">
       <header className="viewer-bar">
         <button className="primary" onClick={onClose}>
-          ← Voltar ao grafo
+          ← {backLabel}
         </button>
         <div className="viewer-title">
           <strong>{request.title}</strong>
@@ -134,12 +136,39 @@ export function PdfViewer({ projectId, request, onClose }: Props) {
           {ok && page !== ok.page && <button onClick={() => setPage(ok.page)}>Ir para p. {ok.page}</button>}
         </div>
       </header>
-      {ok?.notice && request.anchor.text && <div className="notice">{ok.notice}</div>}
+      {request.citing && (
+        <div className="cite-ctx">
+          <span className="small muted">Frase que cita esta referência</span>
+          <div>{request.citing}</div>
+        </div>
+      )}
+      {request.alternatives && request.alternatives.length > 1 && (
+        <div className="alt-bar">
+          <span className="small muted">Passagens encontradas:</span>
+          {request.alternatives.map((a, i) => (
+            <button key={i} className={i === (request.altIndex ?? 0) ? 'chip-filter on' : 'chip-filter'} onClick={() => setRequest({ ...a.request, alternatives: request.alternatives, altIndex: i })}>
+              {a.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {ok?.notice && request.anchor.text && !request.phrase && <div className="notice">{ok.notice}</div>}
+      {request.phrase && phraseBoxes && phraseBoxes.boxes.length > 0 && (
+        <div className="notice ok">{phraseBoxes.exact ? 'Passagem destacada no texto da página.' : 'Início da passagem destacado (o resto do trecho foi extraído de forma diferente do texto da página).'}</div>
+      )}
+      {request.phrase && phraseBoxes && phraseBoxes.boxes.length === 0 && (
+        <div className="notice">Não foi possível marcar a passagem no texto desta página (provável diferença de extração). A página correta está aberta; a passagem procurada é: “{request.phrase}”</div>
+      )}
+      
       {ok?.exactHighlight && <div className="notice ok">Trecho destacado a partir das coordenadas extraídas do PDF (nível de linha).</div>}
       {error && <div className="notice error">{error}</div>}
       <div className="viewer-body">
         <div className="page-wrap" style={pageSize ? { width: pageSize.w, height: pageSize.h } : undefined}>
           <canvas ref={canvasRef} />
+          <div ref={layerRef} className="ct-textlayer" />
+          {phraseBoxes?.boxes.map((b, i) => (
+            <div key={`p${i}`} className="hl" style={{ left: b.left - 1, top: b.top - 1, width: b.width + 2, height: b.height + 2 }} />
+          ))}
           {showHighlights &&
             ok.highlights.map((r, i) => (
               <div key={i} className="hl" style={{ left: r.x * sx, top: r.y * sy, width: r.w * sx, height: r.h * sy }} />

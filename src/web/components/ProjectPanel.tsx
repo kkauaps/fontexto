@@ -297,6 +297,9 @@ export function ProjectPanel({ projectId, graph, externalAvailable, onGraph, onO
           <a className="button" href={api.exportUrl(projectId, 'json')}>
             JSON (compartilhável, sem texto privado)
           </a>
+          <a className="button" href={api.exportUrl(projectId, 'evidence')}>
+            Citações e evidências (JSON, sem texto privado)
+          </a>
         </div>
       </section>
 
