@@ -1,0 +1,49 @@
+{
+  "name": "citation-tracer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CitationTrace: bibliographic citation graph and evidence navigation for academic documents (local-first).",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=20.10"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n api,web \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "tsx watch src/server/index.ts",
+    "dev:web": "vite",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "npm run typecheck && vite build && tsc -p tsconfig.server.json",
+    "start": "node dist/server/server/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "ingest": "tsx src/server/cli.ts",
+    "demo:seed": "tsx src/server/devtools/seedDemo.ts",
+    "package:win": "npm run build && node scripts/package-win.mjs"
+  },
+  "dependencies": {
+    "@xyflow/react": "^12.12.1",
+    "elkjs": "^0.12.1",
+    "express": "^5.3.0",
+    "html-to-image": "^1.11.13",
+    "multer": "^2.5.0",
+    "pdfjs-dist": "^6.5.438",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.3.0",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "concurrently": "^10.0.7",
+    "esbuild": "^0.28.2",
+    "postject": "^1.0.0-alpha.6",
+    "tsx": "^4.23.15",
+    "typescript": "~5.9.3",
+    "vite": "^8.3.7",
+    "vitest": "^5.1.0"
+  }
+}
