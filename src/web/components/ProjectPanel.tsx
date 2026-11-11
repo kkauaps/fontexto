@@ -22,11 +22,14 @@ export function ProjectPanel({ projectId, graph, externalAvailable, onGraph, onO
   const [error, setError] = useState<string | undefined>();
   const [shareable, setShareable] = useState(false);
   const [rulesText, setRulesText] = useState('');
+  const [curated, setCurated] = useState<{ source: string; importedAt: string; items: number } | null>(null);
+  const [curatedMsg, setCuratedMsg] = useState<string | undefined>();
 
   const refresh = () => api.project(projectId).then((p) => setFiles(p.files));
   useEffect(() => {
     refresh().catch((e: Error) => setError(e.message));
     api.categories(projectId).then((r) => setRulesText(JSON.stringify(r, null, 2)));
+    api.curated(projectId).then(setCurated).catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, graph.builtAt]);
 
@@ -113,6 +116,53 @@ export function ProjectPanel({ projectId, graph, externalAvailable, onGraph, onO
             </button>
           )}
         </div>
+      </section>
+
+      <section>
+        <h3>Curadoria (evidência já revisada)</h3>
+        <p className="small muted">
+          Se você já revisou as citações à mão (por exemplo, no <code>index.html</code> de uma rodada anterior), importe o arquivo: as páginas e trechos
+          revisados passam a valer no lugar do rótulo automático, marcados como “curadoria”. O rótulo automático continua visível para comparação.
+        </p>
+        {curated && (
+          <p className="small">
+            Curadoria ativa: <strong>{curated.source}</strong> · {curated.items} itens.{' '}
+            <button
+              className="linklike small"
+              disabled={Boolean(busy)}
+              onClick={() =>
+                void run('Removendo curadoria…', async () => {
+                  const g = await api.removeCurated(projectId);
+                  setCurated(null);
+                  setCuratedMsg(undefined);
+                  return g;
+                })
+              }
+            >
+              Remover curadoria
+            </button>
+          </p>
+        )}
+        <label className="upload">
+          <span>{curated ? 'Substituir curadoria' : 'Importar curadoria (.html ou .json)'}</span>
+          <input
+            type="file"
+            accept=".html,.htm,.json,text/html,application/json"
+            disabled={Boolean(busy)}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = '';
+              if (!f) return;
+              void run('Importando curadoria…', async () => {
+                const r = await api.importCurated(projectId, f);
+                setCurated(await api.curated(projectId));
+                setCuratedMsg(`${r.applied} de ${r.items} citações receberam a evidência revisada.`);
+                return r.graph;
+              });
+            }}
+          />
+        </label>
+        {curatedMsg && <div className="notice ok">{curatedMsg}</div>}
       </section>
 
       <section>

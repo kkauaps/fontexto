@@ -71,5 +71,17 @@ export const api = {
   setCategories: (p: string, rules: CategoryRule[]) => req<CitationGraph>(`${base(p)}/categories`, json(rules, 'PUT')),
   enrich: (p: string) => req<{ looked_up: number; found: number; graph: CitationGraph }>(`${base(p)}/metadata/enrich`, json({ consent: true })),
   evidence: (p: string) => req<EvidenceReport>(`${base(p)}/evidence`),
+  extractReferences: (p: string) =>
+    req<{ references: { key: string; authors: { family: string; given?: string }[]; etAl: boolean; year?: number; title?: string; doi?: string; style: string; text: string }[]; usable: number; numbered: boolean; graph: CitationGraph }>(
+      `${base(p)}/references/extract`,
+      { method: 'POST' },
+    ),
+  curated: (p: string) => req<{ source: string; importedAt: string; items: number } | null>(`${base(p)}/curated`),
+  importCurated: (p: string, file: File) => {
+    const fd = new FormData();
+    fd.append('file', file, file.name);
+    return req<{ source: string; items: number; applied: number; graph: CitationGraph }>(`${base(p)}/curated`, { method: 'POST', body: fd });
+  },
+  removeCurated: (p: string) => req<CitationGraph>(`${base(p)}/curated`, { method: 'DELETE' }),
   exportUrl: (p: string, kind: 'graphml' | 'json' | 'evidence') => `${base(p)}/export/${kind}`,
 };

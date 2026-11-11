@@ -69,7 +69,8 @@ export type EvidenceReason =
   | 'sem_passagem' // nothing in the PDF resembles the sentence
   | 'baixa_similaridade' // best passage only partially overlaps (ressalva)
   | 'numero_ausente' // numbers of the sentence are absent from the best passage (ressalva)
-  | 'so_resumo'; // the only close passage is in the abstract/front matter (ressalva)
+  | 'so_resumo' // the only close passage is in the abstract/front matter (ressalva)
+  | 'fonte_sem_trecho'; // curated: source note of a table, whose support lives in the table rows themselves
 
 export interface Passage {
   fileId: string;
@@ -79,6 +80,19 @@ export interface Passage {
   /** Weighted overlap 0..1. */
   score: number;
   region: 'resumo' | 'corpo';
+  /** True when the passage comes from imported, human-reviewed evidence (its `score` is then 1 and not a similarity). */
+  curated?: boolean;
+}
+
+/** Marks an occurrence whose status and passages were taken from imported curated evidence instead of the automatic matcher. */
+export interface CuratedMark {
+  source: string;
+  /** Status the automatic matcher gave (kept so both can be compared). */
+  autoStatus?: EvidenceStatus;
+  autoReason?: EvidenceReason;
+  autoScore?: number;
+  /** Table source note ("Fonte: ...") rather than a sentence of the running text. */
+  sourceNote?: boolean;
 }
 
 export interface CitationOccurrence {
@@ -108,6 +122,7 @@ export interface CitationOccurrence {
   /** Best passage score, if any. */
   score?: number;
   passages: Passage[];
+  curated?: CuratedMark;
 }
 
 export interface EvidenceSummary {
@@ -477,13 +492,27 @@ export function referenceFileFor(graph: CitationGraph, pub: PublicationNode, tex
   return failed ? { failed } : {};
 }
 
+export function summarizeOccurrences(occurrences: CitationOccurrence[]): EvidenceSummary {
+  const summary: EvidenceSummary = { occurrences: 0, resolved: 0, unresolved: 0, ambiguous: 0, localizado: 0, ressalva: 0, nao_localizado: 0, semPdf: 0, semTexto: 0, frasesCurtas: 0 };
+  for (const o of occurrences) {
+    summary.occurrences++;
+    if (o.resolution === 'resolved') summary.resolved++;
+    else if (o.resolution === 'ambiguous') summary.ambiguous++;
+    else summary.unresolved++;
+    if (o.status) summary[o.status]++;
+    if (o.reason === 'sem_pdf') summary.semPdf++;
+    if (o.reason === 'sem_texto') summary.semTexto++;
+    if (o.reason === 'frase_curta') summary.frasesCurtas++;
+  }
+  return summary;
+}
+
 export function computeEvidence(input: ComputeEvidenceInput): EvidenceReport {
   const { graph, texts } = input;
   const params: EvidenceParams = { ...EVIDENCE_PARAMS, ...input.params };
   const mainFile = Object.values(graph.files).find((f) => f.role === 'main');
   const mainText = mainFile ? texts[mainFile.id] : undefined;
   const occurrences: CitationOccurrence[] = [];
-  const emptySummary = (): EvidenceSummary => ({ occurrences: 0, resolved: 0, unresolved: 0, ambiguous: 0, localizado: 0, ressalva: 0, nao_localizado: 0, semPdf: 0, semTexto: 0, frasesCurtas: 0 });
 
   const indexFor = (fileId: string): ReferenceIndex | undefined => {
     const t = texts[fileId];
@@ -579,17 +608,7 @@ export function computeEvidence(input: ComputeEvidenceInput): EvidenceReport {
     }
   }
 
-  const summary = emptySummary();
-  for (const o of occurrences) {
-    summary.occurrences++;
-    if (o.resolution === 'resolved') summary.resolved++;
-    else if (o.resolution === 'ambiguous') summary.ambiguous++;
-    else summary.unresolved++;
-    if (o.status) summary[o.status]++;
-    if (o.reason === 'sem_pdf') summary.semPdf++;
-    if (o.reason === 'sem_texto') summary.semTexto++;
-    if (o.reason === 'frase_curta') summary.frasesCurtas++;
-  }
+  const summary = summarizeOccurrences(occurrences);
   return {
     schemaVersion: EVIDENCE_SCHEMA_VERSION,
     projectId: input.projectId,

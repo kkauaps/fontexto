@@ -101,4 +101,5 @@ export const REASON_TEXT: Record<string, string> = {
   baixa_similaridade: 'só parte dos termos coincide',
   numero_ausente: 'número da frase ausente da passagem',
   so_resumo: 'só o resumo parece tratar do tema',
+  fonte_sem_trecho: 'nota de fonte de quadro: o apoio está nas linhas do próprio quadro',
 };

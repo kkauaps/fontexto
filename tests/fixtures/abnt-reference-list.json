@@ -1,0 +1,37 @@
+{
+ "note": "Fictional ABNT reference list (invented authors, titles and non-resolving 10.99999 DOIs) with the matching .bib keys. Used to test reference extraction without a .bib.",
+ "entries": [
+  { "index": 0, "text": "ALVERNO, Marisa; QUILLEN, Tobias. Physiology of Imaginary Tissue Repair. In: SYNTHPEDIA. Porto Fictício: Editora Inventada, 2022. Atualizado em 24 out. 2022. Disponível em: https://example.org/synthpedia/tissue-repair. Acesso em: 10 nov. 2026." },
+  { "index": 1, "text": "BARROWBY, Nadia Okonkwo et al. Hybrid annotation strategies for synthetic image segmentation. Journal of Invented Imaging, v. 15, n. 1, art. 41200, 2025. DOI: 10.99999/jii.2025.41200." },
+  { "index": 2, "text": "CHAO, Wen-Hsiu et al. Encoder-Decoder Lattices for Imaginary Scene Parsing. In: VALDEZ, Ignacio et al. (ed.). Computer Vision – FCV 2018. Cham: Fictional Press, 2018. (Lecture Notes in Invented Science, v. 11211). p. 833-851. DOI: 10.99999/fcv.2018.049." },
+  { "index": 3, "text": "CVAT.AI. CVAT documentation. 2026. Disponível em: https://docs.cvat.ai/. Acesso em: 18 out. 2026." },
+  { "index": 4, "text": "DALEN, Mirte J. van et al. Definitions and criteria for a fictional foot condition (FFC 2023 update). Journal of Synthetic Metabolism, v. 40, n. 3, e3654, 2024. DOI: 10.99999/jsm.2024.3654." },
+  { "index": 5, "text": "ESTEVEZ, Lorena; FAIRWEATHER, Simon; GRUBER, Tilda. Choosing a Dressing Based on Invented Surface Characteristics. Advances in Imaginary Care, v. 5, n. 1, p. 32-41, 2016. DOI: 10.99999/aic.2016.0032." },
+  { "index": 6, "text": "HOLLOWAY, Brennan E.; IVERSEN, Petra V. M. Synthetic plantar lesions. Fictional Medical Journal, v. 332, n. 7538, p. 407-410, 2006. DOI: 10.99999/fmj.2006.407." },
+  { "index": 7, "text": "KESSEL-BRANDT, Lena et al. Metrics revisited: recommendations for synthetic image analysis validation. Invented Methods, v. 21, n. 2, p. 195-212, 2024. DOI: 10.99999/im.2024.195." },
+  { "index": 8, "text": "LINDQVIST, Hanna et al. Agreement among imaginary experts on terms used to describe synthetic surfaces: An international study. International Journal of Fictional Studies, v. 20, n. 4, p. 1-12, 2023. DOI: 10.99999/ijfs.2023.14164." },
+  { "index": 9, "text": "MERIWETHER, Arlo; NAKASHIMA, Yui. Leakage and the reproducibility crisis in invented-data science. Patterns of Fiction, v. 4, n. 9, art. 100804, 2023. DOI: 10.99999/pof.2023.100804." },
+  { "index": 10, "text": "OKAFOR, Chidi; PRYCE, Della. Metodologia do trabalho fictício: métodos e técnicas da pesquisa inventada. 2. ed. Porto Fictício: Editora Inventada, 2013. ISBN 978-0-00-000000-2." },
+  { "index": 11, "text": "QUINTANA, Aurelio et al. Gradient Lattices for Tissue Boundary Estimation. In: INTERNATIONAL CONFERENCE ON SYNTHETIC SIGNALS AND IMAGES (ICSSI), 34., 2021, Gramado. Anais [...]. Porto Alegre: Sociedade Inventada, 2021. p. 1-8. DOI: 10.99999/icssi.2021.001." },
+  { "index": 12, "text": "SANTOS, Edna de Freitas Lima et al. Application-aided identification of invented classes with a multi-class network. Cuadernos de Ciencia Ficticia, v. 17, n. 4, p. 1-20, 2025. DOI: 10.99999/ccf.2025.017." },
+  { "index": 13, "text": "TRELAWNEY, Odile. Metodologia de pesquisa para ciência inventada. Rio de Janeiro: Editora Imaginária, 2009. ISBN 978-0-00-000000-9." },
+  { "index": 14, "text": "UNDERHILL, Mabel C. et al. What is a synthetic coating? Defining the composition of imaginary layers and its implications. Fictional Repair and Regeneration, v. 32, n. 1, p. 11-25, 2024. DOI: 10.99999/frr.2024.011." }
+ ],
+ "bib": [
+  { "key": "alverno2022", "firstAuthor": "Alverno", "year": 2022, "doi": null },
+  { "key": "barrowby2025", "firstAuthor": "Barrowby", "year": 2025, "doi": "10.99999/jii.2025.41200" },
+  { "key": "chao2018", "firstAuthor": "Chao", "year": 2018, "doi": "10.99999/fcv.2018.049" },
+  { "key": "cvatdocs", "firstAuthor": "CVAT.ai", "year": 2026, "doi": null },
+  { "key": "vandalen2024", "firstAuthor": "van Dalen", "year": 2024, "doi": "10.99999/jsm.2024.3654" },
+  { "key": "estevez2016", "firstAuthor": "Estevez", "year": 2016, "doi": "10.99999/aic.2016.0032" },
+  { "key": "holloway2006", "firstAuthor": "Holloway", "year": 2006, "doi": "10.99999/fmj.2006.407" },
+  { "key": "kesselbrandt2024", "firstAuthor": "Kessel-Brandt", "year": 2024, "doi": "10.99999/im.2024.195" },
+  { "key": "lindqvist2023", "firstAuthor": "Lindqvist", "year": 2023, "doi": "10.99999/ijfs.2023.14164" },
+  { "key": "meriwether2023", "firstAuthor": "Meriwether", "year": 2023, "doi": "10.99999/pof.2023.100804" },
+  { "key": "okafor2013", "firstAuthor": "Okafor", "year": 2013, "doi": null },
+  { "key": "quintana2021", "firstAuthor": "Quintana", "year": 2021, "doi": "10.99999/icssi.2021.001" },
+  { "key": "santos2025", "firstAuthor": "Santos", "year": 2025, "doi": "10.99999/ccf.2025.017" },
+  { "key": "trelawney2009", "firstAuthor": "Trelawney", "year": 2009, "doi": null },
+  { "key": "underhill2024", "firstAuthor": "Underhill", "year": 2024, "doi": "10.99999/frr.2024.011" }
+ ]
+}

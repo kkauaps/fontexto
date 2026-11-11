@@ -1,0 +1,6 @@
+# Para relatar uma vulnerabilidade no Fontexto, escreva para o contato abaixo.
+# (Placeholder: troque pelo e-mail real antes de publicar. Veja também /SECURITY.md no repositório.)
+Contact: mailto:security@fontexto.com
+Expires: 2027-11-10T00:00:00.000Z
+Preferred-Languages: pt, en
+Canonical: https://fontexto.com/.well-known/security.txt

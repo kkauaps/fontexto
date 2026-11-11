@@ -3,8 +3,8 @@
  * lives here (the server-side executable name is set in scripts/package-win.mjs).
  */
 export const BRAND = {
-  name: 'CitationTrace',
-  tagline: 'Grafo de citações e evidências',
+  name: 'Fontexto',
+  tagline: 'Cada citação ligada ao trecho exato da fonte',
   /** Shown on the welcome screen. Reword when the app runs somewhere other than the user's own machine. */
   privacyNote: 'Os arquivos enviados ficam guardados apenas neste computador e nunca são enviados a serviços externos.',
 } as const;

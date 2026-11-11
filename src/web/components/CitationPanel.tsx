@@ -5,7 +5,16 @@ import type { OpenRequest } from './SidePanel';
 
 function StatusPill({ o }: { o: CitationOccurrence }) {
   const s = occurrenceStatus(o);
-  return <span className={`pill st-${s}`}>{STATUS_TEXT[s]}</span>;
+  return (
+    <>
+      <span className={`pill st-${s}`}>{STATUS_TEXT[s]}</span>
+      {o.curated && (
+        <span className="tag tag-curated" title={`Veredito e passagens da curadoria importada (${o.curated.source}).${o.curated.autoStatus ? ` O rótulo automático era: ${STATUS_TEXT[o.curated.autoStatus]}.` : ''}`}>
+          curadoria
+        </span>
+      )}
+    </>
+  );
 }
 
 /** The sentence with its citation marker emphasised. */
@@ -36,12 +45,12 @@ function OccurrenceCard({ o, graph, props }: { o: CitationOccurrence; graph: Cit
   const pub = o.publicationId ? (graph.nodes[o.publicationId] as PublicationNode | undefined) : undefined;
   const label = pub?.label ?? 'Referência não identificada';
   const alternatives = o.passages.map((p, i) => ({
-    label: `${i + 1} · p. ${p.page} · ${Math.round(p.score * 100)}%`,
+    label: p.curated ? `${i + 1} · p. ${p.page} · curadoria` : `${i + 1} · p. ${p.page} · ${Math.round(p.score * 100)}%`,
     request: {
       anchor: { fileId: p.fileId, page: p.page, text: p.text },
       phrase: p.text,
       title: label,
-      context: `Passagem ${i + 1} de ${o.passages.length}, na página ${p.page}. Candidata a sustentar a frase citada; confira no texto.`,
+      context: p.curated ? `Passagem ${i + 1} de ${o.passages.length}, na página ${p.page}, vinda da curadoria importada (${o.curated?.source ?? ''}).` : `Passagem ${i + 1} de ${o.passages.length}, na página ${p.page}. Candidata a sustentar a frase citada; confira no texto.`,
       citing: o.sentence,
     } as OpenRequest,
   }));
@@ -76,12 +85,16 @@ function OccurrenceCard({ o, graph, props }: { o: CitationOccurrence; graph: Cit
       )}
       {o.passages.length > 0 && (
         <>
-          <h5>{o.passages.length > 1 ? 'Passagens mais próximas' : 'Passagem mais próxima'} na referência</h5>
+          <h5>{o.passages.some((p) => p.curated) ? (o.passages.length > 1 ? 'Passagens revisadas' : 'Passagem revisada') : o.passages.length > 1 ? 'Passagens mais próximas' : 'Passagem mais próxima'} na referência</h5>
           {o.passages.map((p, i) => (
             <div key={i} className="passage">
               <div className="passage-meta small">
                 <span className="chip-page">p. {p.page}</span>
-                <span title="Sobreposição ponderada entre a frase e a passagem (0–100%). Não é prova de que a passagem sustenta a frase.">similaridade {Math.round(p.score * 100)}%</span>
+                {p.curated ? (
+                  <span className="tag tag-curated" title="Passagem escolhida na revisão importada, não calculada.">curadoria</span>
+                ) : (
+                  <span title="Sobreposição ponderada entre a frase e a passagem (0–100%). Não é prova de que a passagem sustenta a frase.">similaridade {Math.round(p.score * 100)}%</span>
+                )}
                 {p.region === 'resumo' && <span className="tag">resumo/início</span>}
               </div>
               <blockquote>{p.text}</blockquote>

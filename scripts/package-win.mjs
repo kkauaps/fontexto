@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * Build a portable Windows folder:
- *   dist/win/CitationTrace/CitationTrace.exe
- *   dist/win/CitationTrace/resources/{web,pdfjs}
+ *   dist/win/Fontexto/Fontexto.exe
+ *   dist/win/Fontexto/resources/{web,pdfjs}
  *
  * The exe is a Node.js single executable application (SEA) that embeds the
  * bundled server. pdf.js (ESM + worker + fonts + wasm) and the Vite UI stay
@@ -29,11 +29,11 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const packDir = path.join(root, 'dist', 'package');
-const outDir = path.join(root, 'dist', 'win', 'CitationTrace');
+const outDir = path.join(root, 'dist', 'win', 'Fontexto');
 const serverBundle = path.join(packDir, 'server.cjs');
 const seaConfig = path.join(packDir, 'sea-config.json');
 const seaBlob = path.join(packDir, 'sea-prep.blob');
-const exePath = path.join(outDir, 'CitationTrace.exe');
+const exePath = path.join(outDir, 'Fontexto.exe');
 
 function stripPeSignature(file) {
   const buf = Buffer.from(readFileSync(file));
@@ -131,7 +131,7 @@ copyFileSync(process.execPath, exePath);
 stripPeSignature(exePath);
 
 const postjectCli = require.resolve('postject/dist/cli.js');
-console.log('Injecting the SEA blob into CitationTrace.exe…');
+console.log('Injecting the SEA blob into Fontexto.exe…');
 execFileSync(
   process.execPath,
   [postjectCli, exePath, 'NODE_SEA_BLOB', seaBlob, '--sentinel-fuse', 'NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2'],
@@ -157,4 +157,4 @@ if (existsSync(path.join(pdfjsSrc, 'wasm'))) {
 
 const exeSize = Math.round(readFileSync(exePath).byteLength / 1024 / 1024);
 console.log(`Wrote ${outDir}`);
-console.log(`  CitationTrace.exe (${exeSize} MB) + resources/`);
+console.log(`  Fontexto.exe (${exeSize} MB) + resources/`);

@@ -2,7 +2,7 @@
   "name": "citation-tracer",
   "version": "0.1.0",
   "private": true,
-  "description": "CitationTrace: bibliographic citation graph and evidence navigation for academic documents (local-first).",
+  "description": "Fontexto: bibliographic citation graph and evidence navigation for academic documents (local-first).",
   "license": "UNLICENSED",
   "type": "module",
   "engines": {
