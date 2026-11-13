@@ -1,4 +1,4 @@
-import type { CitationOccurrence } from '../../core/evidence';
+import type { CitationOccurrence, EvidenceStatus } from '../../core/evidence';
 import type { CitationGraph, PublicationNode } from '../../core/model';
 import { occurrenceStatus, REASON_TEXT, STATUS_TEXT, type CitationGroup } from '../../core/evidenceView';
 import type { OpenRequest } from './SidePanel';
@@ -8,6 +8,11 @@ function StatusPill({ o }: { o: CitationOccurrence }) {
   return (
     <>
       <span className={`pill st-${s}`}>{STATUS_TEXT[s]}</span>
+      {o.override && (
+        <span className="tag tag-manual" title={`Rótulo definido por você. O automático era: ${o.override.auto ? STATUS_TEXT[o.override.auto] : '—'}.`}>
+          marcado por você
+        </span>
+      )}
       {o.curated && (
         <span className="tag tag-curated" title={`Veredito e passagens da curadoria importada (${o.curated.source}).${o.curated.autoStatus ? ` O rótulo automático era: ${STATUS_TEXT[o.curated.autoStatus]}.` : ''}`}>
           curadoria
@@ -39,6 +44,38 @@ interface PanelProps {
   onOpenReference: (r: OpenRequest) => void;
   onShowInGraph: (pubId: string) => void;
   onOpenFiles: () => void;
+  onLabel: (occId: string, status: EvidenceStatus | null) => void;
+}
+
+const LABEL_BUTTONS: { status: EvidenceStatus; text: string }[] = [
+  { status: 'localizado', text: 'OK' },
+  { status: 'ressalva', text: 'Ressalva' },
+  { status: 'nao_localizado', text: 'Não localizada' },
+];
+
+/** The researcher's own verdict: overrides the automatic label, is saved in the project and can be undone. */
+function LabelControl({ o, onLabel }: { o: CitationOccurrence; onLabel: PanelProps['onLabel'] }) {
+  if (o.resolution !== 'resolved') return null;
+  return (
+    <div className="label-control" role="group" aria-label="Sua avaliação desta citação">
+      <span className="small muted">Sua avaliação:</span>
+      {LABEL_BUTTONS.map((b) => (
+        <button
+          key={b.status}
+          className={`small st-btn st-${b.status}${o.override?.status === b.status ? ' on' : ''}`}
+          aria-pressed={o.override?.status === b.status}
+          onClick={() => onLabel(o.id, o.override?.status === b.status ? null : b.status)}
+        >
+          {b.text}
+        </button>
+      ))}
+      {o.override && (
+        <button className="linklike small" onClick={() => onLabel(o.id, null)} title="Volta ao rótulo calculado automaticamente">
+          desfazer (automático: {o.override.auto ? STATUS_TEXT[o.override.auto] : '—'})
+        </button>
+      )}
+    </div>
+  );
 }
 
 function OccurrenceCard({ o, graph, props }: { o: CitationOccurrence; graph: CitationGraph; props: PanelProps }) {
@@ -72,8 +109,15 @@ function OccurrenceCard({ o, graph, props }: { o: CitationOccurrence; graph: Cit
       <blockquote className="sentence">
         <Sentence text={o.sentence} marker={o.marker} />
       </blockquote>
-      {o.reason && o.status !== 'localizado' && <p className="small reason">{REASON_TEXT[o.reason] ?? o.reason}</p>}
-      {o.notes.map((n, i) => (
+      {(o.override ? o.override.autoWhy : o.why) && (
+        <p className={`why small st-${o.override ? (o.override.auto ?? 'nao_localizado') : occurrenceStatus(o)}`}>
+          <b>{o.override ? 'Automático: ' : 'Por quê: '}</b>
+          {o.override ? o.override.autoWhy : o.why}
+        </p>
+      )}
+      {!o.why && o.reason && o.status !== 'localizado' && <p className="small reason">{REASON_TEXT[o.reason] ?? o.reason}</p>}
+      <LabelControl o={o} onLabel={props.onLabel} />
+      {o.notes.filter((n) => n !== o.why && n !== o.override?.autoWhy).map((n, i) => (
         <p key={i} className="small muted">
           {n}
         </p>
@@ -143,8 +187,12 @@ export function CitationList({ groups, graph, onSelect, method }: { groups: Cita
           <li key={g.spanId}>
             <button onClick={() => onSelect(g.spanId)}>
               <span className={`dot st-${g.status}`} title={STATUS_TEXT[g.status]} />
+              {g.occurrences.some((o) => o.override) && <span className="manual-mark" title="Você marcou esta citação à mão">✎</span>}
               <span className="cit-main">
                 <b>{g.occurrences.map((o) => (o.publicationId ? graph.nodes[o.publicationId]?.label : undefined) ?? g.marker).join(' · ')}</b>
+                {g.status !== 'localizado' && g.occurrences.find((o) => occurrenceStatus(o) === g.status)?.why && (
+                  <span className={`small why-inline st-${g.status}`}>{g.occurrences.find((o) => occurrenceStatus(o) === g.status)!.why}</span>
+                )}
                 <span className="small muted">
                   p. {g.page} — {g.occurrences[0].sentence.slice(0, 110)}
                   {g.occurrences[0].sentence.length > 110 ? '…' : ''}

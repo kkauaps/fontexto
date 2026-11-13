@@ -185,8 +185,25 @@ function parseAuthorsGeneric(block: string): { authors: ParsedReference['authors
   return { authors, etAl: etAl || authors.length > 12 };
 }
 
+const FAMILY = String.raw`(?:(?:van|von|de|da|der|den|dos|das|del|della|di|du|le|la)\s+)*\p{Lu}[\p{L}\p{M}'’¨´\-]+(?:\s(?:\p{Lu}[\p{L}\p{M}'’¨´\-]+))?`;
+const INITIALS = String.raw`\p{Lu}\.(?:\s?-?\p{Lu}\.)*`;
+const FAMILY_INITIALS_BLOCK = new RegExp(
+  String.raw`^(${FAMILY},\s${INITIALS}(?:(?:,\s|,?\s&\s|,?\sand\s)${FAMILY},\s${INITIALS})*(?:,?\s(?:et\s+al\.|\.\.\.\s${FAMILY},\s${INITIALS}))?)(?:,\s((?:1[5-9]|20)\d{2})[a-z]?\.|:(?=\s)|(?=\s(?:\p{Lu}[\p{Ll}\d\-]|["“\d]|\p{Lu}{2,}[\s:\-])))`,
+  'u',
+);
+
+const NAME_WORD = String.raw`(?:\p{Lu}[\p{L}\p{M}'’\-]+|\p{Lu}\.?|(?:van|von|de|da|der|den|dos|del|di|du|le|la))`;
+const GIVEN_FAMILY = String.raw`\p{Lu}[\p{L}\p{M}'’\-]+(?:\s${NAME_WORD}){1,3}`;
+
+/** "Family, A. B., Family2, C. & Family3, D." author block (APA/Harvard/Nature) and, in Harvard, the year after it. */
+function familyInitialsBlock(text: string): { authors: string; year?: number; end: number } | undefined {
+  const m = FAMILY_INITIALS_BLOCK.exec(text);
+  if (!m) return undefined;
+  return { authors: m[1].replace(/\.$/, ''), year: m[2] ? Number(m[2]) : undefined, end: m[0].length };
+}
+
 export function parseReferenceText(text: string, index = 0, label?: string): Omit<ParsedReference, 'key'> {
-  const style = detectStyle(text, label);
+  let style = detectStyle(text, label);
   const doi = findDois(text)[0];
   let authors: ParsedReference['authors'] = [];
   let etAl = false;
@@ -199,8 +216,18 @@ export function parseReferenceText(text: string, index = 0, label?: string): Omi
     title = titleAfter(text, a.end);
     year = pickYear(text, a.end + (title?.length ?? 0));
   } else if (style === 'apa') {
-    const m = /^(.*?)\(\s*(\d{4})[a-z]?\s*\)\.\s*/su.exec(text);
-    if (m) {
+    const m = /^(.*?)\(\s*(\d{4})[a-z]?\s*\)[.,:]?\s*/su.exec(text);
+    const fb = familyInitialsBlock(text);
+    // the block wins unless the "(year)" comes right after it (plain APA)
+    const block = fb && (!m || m[1].trim().length > fb.end + 2) ? fb : undefined;
+    if (block) {
+      // Harvard ("Akram, S. U., Kannala, J., 2016. Title.") and Nature ("Sen, C. K. Title. J. 8, 39 (2019).")
+      const g = parseAuthorsGeneric(block.authors);
+      authors = g.authors;
+      etAl = g.etAl;
+      year = block.year ?? pickYear(text, block.end);
+      title = titleAfter(text, block.end);
+    } else if (m) {
       const g = parseAuthorsGeneric(m[1].trim().replace(/\.$/, ''));
       authors = g.authors;
       etAl = g.etAl;
@@ -224,6 +251,29 @@ export function parseReferenceText(text: string, index = 0, label?: string): Omi
         title = titleAfter(text, dot + 1);
         year = pickYear(text, dot + (title?.length ?? 0));
       }
+    }
+  }
+  if (!authors.length && style !== 'abnt') {
+    // LNCS "Long, J., Shelhamer, E.: Title (2014)" and the like
+    const fb = familyInitialsBlock(text);
+    if (fb) {
+      const g = parseAuthorsGeneric(fb.authors);
+      authors = g.authors;
+      etAl = g.etAl;
+      title = titleAfter(text.replace(/\s*\((?:1[5-9]|20)\d{2}[a-z]?\)/, '.'), fb.end);
+      year = fb.year ?? pickYear(text, fb.end);
+    }
+  }
+  if (!authors.length && style === 'unknown') {
+    // NeurIPS/ICLR natbib: "Mahmoud Assran, Mathilde Caron, and Nicolas Ballas. Title. In ICLR, 2021."
+    const m = new RegExp(String.raw`^(${GIVEN_FAMILY}(?:,?\s(?:and\s)?${GIVEN_FAMILY})*(?:,?\set\sal\.?)?)\.\s+(?=\p{Lu}|\d)`, 'u').exec(text);
+    if (m) {
+      const g = parseAuthorsGeneric(m[1]);
+      authors = g.authors;
+      etAl = g.etAl;
+      title = titleAfter(text, m[0].length);
+      year = pickYear(text, m[0].length + (title?.length ?? 0));
+      style = 'ieee';
     }
   }
   if (year === undefined) year = pickYear(text);

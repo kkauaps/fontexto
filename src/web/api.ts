@@ -68,6 +68,9 @@ const httpApi = {
     req<CitationGraph>(`${base(p)}/decisions/edge`, json({ edgeId, action, note })),
   category: (p: string, publicationId: string, category: string | null | undefined) =>
     req<CitationGraph>(`${base(p)}/decisions/category`, json({ publicationId, category })),
+  /** Sets (or clears, with null) the researcher's own label of one citation occurrence. */
+  evidenceLabel: (p: string, occId: string, status: 'localizado' | 'ressalva' | 'nao_localizado' | null) =>
+    req<CitationGraph>(`${base(p)}/decisions/evidence`, json({ occId, status })),
   categories: (p: string) => req<CategoryRule[]>(`${base(p)}/categories`),
   setCategories: (p: string, rules: CategoryRule[]) => req<CitationGraph>(`${base(p)}/categories`, json(rules, 'PUT')),
   enrich: (p: string) => req<{ looked_up: number; found: number; graph: CitationGraph }>(`${base(p)}/metadata/enrich`, json({ consent: true })),
@@ -84,7 +87,7 @@ const httpApi = {
     return req<{ source: string; items: number; applied: number; graph: CitationGraph }>(`${base(p)}/curated`, { method: 'POST', body: fd });
   },
   removeCurated: (p: string) => req<CitationGraph>(`${base(p)}/curated`, { method: 'DELETE' }),
-  download: async (p: string, kind: 'graphml' | 'json' | 'evidence') => {
+  download: async (p: string, kind: 'graphml' | 'json' | 'evidence' | 'csv') => {
     const a = document.createElement('a');
     a.href = `${base(p)}/export/${kind}`;
     a.download = '';
@@ -120,6 +123,7 @@ const localApi: Api = {
   fileLink: (p, fileId, publicationId) => call('fileLink', [p, fileId, publicationId]),
   edgeReview: (p, edgeId, action, note) => call('edgeReview', [p, edgeId, action, note]),
   category: (p, publicationId, category) => call('category', [p, publicationId, category]),
+  evidenceLabel: (p, occId, status) => call('evidenceLabel', [p, occId, status]),
   categories: (p) => call('categories', [p]),
   setCategories: (p, rules) => call('setCategories', [p, rules]),
   enrich: (p) => call('enrich', [p]),

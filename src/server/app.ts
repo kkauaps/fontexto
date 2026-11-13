@@ -10,7 +10,7 @@ import { viewerTarget } from '../core/anchors.js';
 import type { CategoryRule } from '../core/categories.js';
 import { parseCuratedUpload } from '../core/curated.js';
 import { redactEvidenceForSharing } from '../core/evidence.js';
-import { redactForSharing, toGraphML } from '../core/export.js';
+import { evidenceCsv, redactForSharing, toGraphML } from '../core/export.js';
 import type { Anchor, FileRole, ReviewAction, Visibility } from '../core/model.js';
 import { securityHeaders } from './securityHeaders.js';
 import { lookupMany } from './metadata.js';
@@ -224,6 +224,20 @@ export function createApp(cfg: AppConfig) {
   );
 
   app.post(
+    '/api/projects/:projectId/decisions/evidence',
+    h(async (req, res) => {
+      const { occId, status } = req.body ?? {};
+      if (typeof occId !== 'string' || !/^o\d+-\d+$/.test(occId) || !(status === null || ['localizado', 'ressalva', 'nao_localizado'].includes(status))) throw new ValidationError('Invalid label');
+      res.json(
+        await store.updateDecisions(pid(req), (d) => {
+          d.evidence ??= {};
+          if (status === null) delete d.evidence[occId];
+          else d.evidence[occId] = { status, at: new Date().toISOString() };
+        }),
+      );
+    }),
+  );
+  app.post(
     '/api/projects/:projectId/decisions/category',
     h(async (req, res) => {
       const { publicationId, category } = req.body ?? {};
@@ -287,6 +301,17 @@ export function createApp(cfg: AppConfig) {
       const graph = await store.getGraph(pid(req));
       res.setHeader('Content-Disposition', `attachment; filename="${pid(req)}.citation-graph.json"`);
       res.json(req.query.full === '1' ? graph : redactForSharing(graph));
+    }),
+  );
+
+  app.get(
+    '/api/projects/:projectId/export/csv',
+    h(async (req, res) => {
+      const projectId = pid(req);
+      const [evidence, graph] = await Promise.all([store.getEvidence(projectId), store.getGraph(projectId)]);
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${projectId}.citacoes.csv"`);
+      res.send(evidenceCsv(evidence, graph));
     }),
   );
 

@@ -6,7 +6,7 @@
 import { parseBibtex } from './bibtex.js';
 import type { CategoryRule } from './categories.js';
 import { applyCurated, type CuratedApplyResult, type CuratedFile } from './curated.js';
-import { computeEvidence, EVIDENCE_PARAMS, type EvidenceReport, type PendingMatch, type ReferenceIndex } from './evidence.js';
+import { applyOverrides, computeEvidence, EVIDENCE_PARAMS, type EvidenceReport, type PendingMatch, type ReferenceIndex } from './evidence.js';
 import { emptyDecisions, type CitationGraph, type FileRecord, type FileRole, type UserDecisions, type Visibility } from './model.js';
 import { buildGraph, type ExternalMetadata } from './pipeline.js';
 import { extractReferenceEntries } from './references.js';
@@ -321,6 +321,7 @@ export class CoreStore {
       let evidence = await this.applyCachedSemantic(projectId, report, pendings, graph);
       const curated = await this.getCurated(projectId);
       if (curated) evidence = applyCurated(graph, evidence, curated).report;
+      evidence = applyOverrides(evidence, (await this.getDecisions(projectId)).evidence);
       await this.d.putJson(projectId, 'evidence.json', evidence);
       return graph;
     });

@@ -361,6 +361,7 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
             onOpenReference={onOpenReference}
             onShowInGraph={onShowInGraph}
             onOpenFiles={onOpenFiles}
+            onLabel={async (occId, status) => onGraph(await api.evidenceLabel(projectId, occId, status))}
           />
         ) : (
           <CitationList groups={filtered} graph={graph} onSelect={(id) => select(id, true)} method={evidence.method} />

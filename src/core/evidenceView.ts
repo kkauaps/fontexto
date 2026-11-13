@@ -99,7 +99,9 @@ export const REASON_TEXT: Record<string, string> = {
   frase_curta: 'frase com pouco conteúdo para buscar',
   sem_passagem: 'nenhuma passagem parecida',
   baixa_similaridade: 'só parte dos termos coincide',
-  numero_ausente: 'número da frase ausente da passagem',
+  numero_ausente: 'número da frase não aparece no PDF da fonte',
+  pagina_citada: 'página citada não confere',
+  citacao_direta: 'citação direta não encontrada literalmente',
   so_resumo: 'só o resumo parece tratar do tema',
   fonte_sem_trecho: 'nota de fonte de quadro: o apoio está nas linhas do próprio quadro',
 };

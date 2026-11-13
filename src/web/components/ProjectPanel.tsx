@@ -347,6 +347,9 @@ export function ProjectPanel({ projectId, graph, externalAvailable, onGraph, onO
           <button onClick={() => void api.download(projectId, 'json')}>
             JSON (compartilhável, sem texto privado)
           </button>
+          <button onClick={() => void api.download(projectId, 'csv')}>
+            Planilha de citações (CSV, com suas marcações)
+          </button>
           <button onClick={() => void api.download(projectId, 'evidence')}>
             Citações e evidências (JSON, sem texto privado)
           </button>
