@@ -86,6 +86,20 @@ const methods: Record<string, Method> = {
     const graph = await s.rebuild(p);
     return { added: added.map(view), graph };
   },
+  /** Reference PDFs that already know which bibliography entry they are (e.g. fetched from open access). */
+  addLinkedFiles: async (s, [p, items], progress) => {
+    if (!Array.isArray(items) || items.length === 0) throw new ValidationError('No files received');
+    const links: [string, string][] = [];
+    for (const it of items as { file: File; publicationId: string }[]) {
+      if (!(it?.file instanceof Blob) || typeof it.publicationId !== 'string') throw new ValidationError('Invalid file');
+      const rec = await s.addFile(p, { data: new Uint8Array(await it.file.arrayBuffer()), originalName: it.file.name, role: 'reference', visibility: 'private' });
+      links.push([rec.id, it.publicationId]);
+    }
+    await s.ensureExtracted(p, (done, total, name) => progress({ stage: 'extract', done, total, name }));
+    return s.updateDecisions(p, (d) => {
+      for (const [fileId, pub] of links) d.fileLinks[fileId] = pub;
+    });
+  },
   deleteFile: async (s, [p, fileId]) => {
     await s.removeFile(p, fileId);
     return s.getGraph(p);
@@ -133,11 +147,7 @@ const methods: Record<string, Method> = {
   },
   evidenceLabel: (s, [p, occId, status]) => {
     if (typeof occId !== 'string' || !/^o\d+-\d+$/.test(occId) || !(status === null || ['localizado', 'ressalva', 'nao_localizado'].includes(status))) throw new ValidationError('Invalid label');
-    return s.updateDecisions(p, (d) => {
-      d.evidence ??= {};
-      if (status === null) delete d.evidence[occId];
-      else d.evidence[occId] = { status, at: new Date().toISOString() };
-    });
+    return s.setEvidenceLabel(p, occId, status);
   },
   categories: (s, [p]) => s.getCategoryRules(p),
   setCategories: (s, [p, rules]) => {

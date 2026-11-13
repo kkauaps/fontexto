@@ -19,8 +19,9 @@ import { toPng, toSvg } from 'html-to-image';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CategoryRule } from '../../core/categories';
 import { neighbourhood, type ViewEdge, type ViewGraph, type ViewNode } from '../../core/view';
+import { REF_STATUS_COLOR, REF_STATUS_ORDER, REF_STATUS_TEXT, type RefStatus } from '../../core/refStatus';
 import { categoryColor } from '../labels';
-import { layoutGraph, nodeSize, type Positioned } from '../layout';
+import { layoutGraph, nodeSize, statusGridLayout, type Positioned } from '../layout';
 
 export type Selection = { type: 'node'; id: string } | { type: 'edge'; id: string } | undefined;
 
@@ -41,11 +42,11 @@ const PublicationNodeView = memo(({ data }: NodeProps<Node<NodeData>>) => {
     <div
       className={`node-pub${dim ? ' dim' : ''}${selected ? ' selected' : ''}${vn.matchesSearch ? ' match' : ''}${vn.hasPdf ? '' : ' no-pdf'}`}
       style={{ width, height, borderColor: color, ['--cat' as string]: color }}
-      title={`${vn.title ?? vn.label}${vn.hasPdf ? '' : '\n(PDF não disponível)'}${vn.categorySuggested ? '\nCategoria sugerida automaticamente' : ''}`}
+      title={`${vn.title ?? vn.label}${vn.refStatus ? `\nSituação: ${REF_STATUS_TEXT[vn.refStatus]}` : ''}${vn.hasPdf ? '' : '\n(PDF da fonte não enviado)'}\nClique para ver detalhes`}
     >
       <Handle type="target" position={Position.Left} style={handleStyle} />
       <span className="node-label">{vn.label}</span>
-      {vn.inDegree > 0 && <span className="node-badge" title="Citado por N nós visíveis">{vn.inDegree}</span>}
+      {vn.inDegree > 1 && <span className="node-badge" title="Citado por N nós visíveis">{vn.inDegree}</span>}
       <Handle type="source" position={Position.Right} style={handleStyle} />
     </div>
   );
@@ -84,11 +85,11 @@ const nodeTypes = { publication: PublicationNodeView, document: DocumentNodeView
 
 const EDGE_STYLE: Record<string, { stroke: string; dash?: string; width: number; arrow: boolean }> = {
   'cites:confirmed': { stroke: '#3c4657', width: 1.4, arrow: true },
-  'cites:unverified': { stroke: '#d98a1f', dash: '6 4', width: 1.4, arrow: true },
-  'cites:rejected': { stroke: '#c0392b', dash: '2 4', width: 1, arrow: true },
+  'cites:unverified': { stroke: '#8a94a6', dash: '6 4', width: 1.4, arrow: true },
+  'cites:rejected': { stroke: '#b8c0cc', dash: '2 4', width: 1, arrow: true },
   'related_to:suggested': { stroke: '#8e6bbf', dash: '1 5', width: 1.6, arrow: false },
   'related_to:validated': { stroke: '#8e6bbf', dash: '4 4', width: 1.6, arrow: false },
-  'related_to:rejected': { stroke: '#c0392b', dash: '1 5', width: 1, arrow: false },
+  'related_to:rejected': { stroke: '#b8c0cc', dash: '1 5', width: 1, arrow: false },
 };
 
 export function edgeStyleFor(e: Pick<ViewEdge, 'kind' | 'status'>) {
@@ -104,9 +105,10 @@ interface Props {
   layoutNonce: number;
   search: string;
   exportName: string;
+  colorBy?: 'status' | 'category';
 }
 
-export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, layoutNonce, search, exportName }: Props) {
+export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, layoutNonce, search, exportName, colorBy = 'category' }: Props) {
   const rf = useReactFlow();
   const [positions, setPositions] = useState<Map<string, Positioned>>(new Map());
   const [layingOut, setLayingOut] = useState(false);
@@ -119,7 +121,10 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
   useEffect(() => {
     let cancelled = false;
     setLayingOut(true);
-    layoutGraph(viewRef.current)
+    const v = viewRef.current;
+    const docIds = new Set(v.nodes.filter((n) => n.kind === 'document').map((n) => n.id));
+    const starOnly = v.edges.every((e) => docIds.has(e.source) && e.kind !== 'related_to');
+    (starOnly ? Promise.resolve(statusGridLayout(v)) : layoutGraph(v))
       .then((pos) => {
         if (cancelled) return;
         setPositions(pos);
@@ -151,7 +156,7 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
           position: { x: p?.x ?? 0, y: p?.y ?? 0 },
           data: {
             vn,
-            color: categoryColor(vn.category, rules),
+            color: colorBy === 'status' && vn.refStatus ? REF_STATUS_COLOR[vn.refStatus] : categoryColor(vn.category, rules),
             dim: Boolean(focus && !focus.nodes.has(vn.id)),
             selected: selection?.type === 'node' && selection.id === vn.id,
             onToggleGroup,
@@ -159,13 +164,14 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
           hidden: !p,
         };
       }),
-    [view, positions, rules, focus, selection, onToggleGroup],
+    [view, positions, rules, focus, selection, onToggleGroup, colorBy],
   );
 
   const edges: Edge[] = useMemo(
     () =>
       view.edges.map((e) => {
-        const st = edgeStyleFor(e);
+        const fromDoc = view.nodes.find((n) => n.id === e.source)?.kind === 'document';
+        const st = colorBy === 'status' && fromDoc && e.status === 'confirmed' ? { stroke: '#c5d3cd', width: 1, arrow: false, dash: undefined } : edgeStyleFor(e);
         const dim = Boolean(focus && !focus.edges.has(e.id));
         const sel = selection?.type === 'edge' && selection.id === e.id;
         return {
@@ -180,8 +186,13 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
           zIndex: sel ? 10 : 0,
         };
       }),
-    [view, focus, selection],
+    [view, focus, selection, colorBy],
   );
+  const legend = useMemo(() => {
+    const c = new Map<RefStatus, number>();
+    for (const n of view.nodes) if (n.refStatus) c.set(n.refStatus, (c.get(n.refStatus) ?? 0) + 1);
+    return REF_STATUS_ORDER.filter((s) => c.get(s)).map((s) => ({ s, n: c.get(s) as number }));
+  }, [view]);
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     setPositions((prev) => {
@@ -247,6 +258,16 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
       <Background gap={24} size={1} color="#e0ece6" />
       <Controls showInteractive={false} position="bottom-left" />
       <MiniMap pannable zoomable nodeColor={(n) => (n.data as NodeData).color} position="bottom-right" />
+      {colorBy === 'status' && legend.length > 0 && (
+        <Panel position="top-left" className="graph-legend" aria-label="Legenda">
+          {legend.map(({ s, n }) => (
+            <span key={s}>
+              <i style={{ background: REF_STATUS_COLOR[s] }} /> {REF_STATUS_TEXT[s]} ({n})
+            </span>
+          ))}
+          <span className="muted">borda tracejada = PDF da fonte não enviado · clique num nó para detalhes</span>
+        </Panel>
+      )}
       <Panel position="top-right" className="canvas-actions">
         {layingOut && <span className="muted small">organizando…</span>}
         <button onClick={() => rf.fitView({ padding: 0.12, duration: 300 })}>Centralizar</button>

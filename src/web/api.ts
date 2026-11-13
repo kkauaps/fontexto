@@ -41,6 +41,36 @@ const json = (body: unknown, method = 'POST'): RequestInit => ({
 });
 const base = (p: string) => `/api/projects/${encodeURIComponent(p)}`;
 
+/** What the open-access proxy said about one reference (same-origin: /api/oa/*). */
+export interface OaResult {
+  status: 'oa' | 'closed' | 'not_found';
+  doi?: string;
+  title?: string;
+  landingUrl?: string;
+  pdfUrls: { url: string; source: string }[];
+}
+export type OaFetch = { file: File; source: string } | { file?: undefined; result: OaResult; error?: string };
+
+/** Asks the proxy for a free PDF of one reference. Only DOI/title/year/first author leave the browser. */
+async function oaFetchPdf(q: { doi?: string; title?: string; year?: number; author?: string }, name: string, signal?: AbortSignal): Promise<OaFetch> {
+  const u = new URLSearchParams();
+  if (q.doi) u.set('doi', q.doi);
+  if (q.title) u.set('title', q.title);
+  if (q.year) u.set('year', String(q.year));
+  if (q.author) u.set('author', q.author);
+  const res = await fetch(`/api/oa/pdf?${u}`, { signal, credentials: 'omit' });
+  const type = res.headers.get('content-type') ?? '';
+  if (res.ok && type.startsWith('application/pdf')) {
+    const blob = await res.blob();
+    return { file: new File([blob], name, { type: 'application/pdf' }), source: decodeURIComponent(res.headers.get('x-fontexto-source') ?? '') };
+  }
+  if (type.includes('json')) {
+    const body = (await res.json()) as { error?: string; result?: OaResult };
+    return { result: body.result ?? { status: 'not_found', pdfUrls: [] }, error: body.error };
+  }
+  throw new Error(res.status === 404 ? 'A busca de artigos gratuitos não está disponível nesta instalação.' : `${res.status} ${res.statusText}`);
+}
+
 const httpApi = {
   health: () => req<{ ok: boolean; externalMetadataAvailable: boolean }>('/api/health'),
   listProjects: () => req<ProjectSummary[]>('/api/projects'),
@@ -57,6 +87,21 @@ const httpApi = {
     return req<{ graph: CitationGraph }>(`${base(p)}/files`, { method: 'POST', body: fd });
   },
   deleteFile: (p: string, fileId: string) => req<CitationGraph>(`${base(p)}/files/${fileId}`, { method: 'DELETE' }),
+  /** Uploads reference PDFs and links each one to its bibliography entry. */
+  addLinkedFiles: async (p: string, items: { file: File; publicationId: string }[]) => {
+    let graph: CitationGraph | undefined;
+    for (const it of items) {
+      const fd = new FormData();
+      fd.append('files', it.file, it.file.name);
+      fd.append('role', 'reference');
+      fd.append('visibility', 'private');
+      const out = await req<{ added: FileView[]; graph: CitationGraph }>(`${base(p)}/files`, { method: 'POST', body: fd });
+      graph = out.graph;
+      if (out.added[0]) graph = await req<CitationGraph>(`${base(p)}/decisions/file-link`, json({ fileId: out.added[0].id, publicationId: it.publicationId }));
+    }
+    return graph as CitationGraph;
+  },
+  oaFetchPdf,
   /** What pdf.js opens: a URL here, raw bytes in the browser edition. */
   pdfSource: async (p: string, fileId: string): Promise<string | Uint8Array> => `${base(p)}/files/${fileId}/pdf`,
   resolveAnchor: (p: string, anchor: Anchor) => req<ViewerTarget>(`${base(p)}/anchor`, json(anchor)),
@@ -70,7 +115,7 @@ const httpApi = {
     req<CitationGraph>(`${base(p)}/decisions/category`, json({ publicationId, category })),
   /** Sets (or clears, with null) the researcher's own label of one citation occurrence. */
   evidenceLabel: (p: string, occId: string, status: 'localizado' | 'ressalva' | 'nao_localizado' | null) =>
-    req<CitationGraph>(`${base(p)}/decisions/evidence`, json({ occId, status })),
+    req<EvidenceReport>(`${base(p)}/decisions/evidence`, json({ occId, status })),
   categories: (p: string) => req<CategoryRule[]>(`${base(p)}/categories`),
   setCategories: (p: string, rules: CategoryRule[]) => req<CitationGraph>(`${base(p)}/categories`, json(rules, 'PUT')),
   enrich: (p: string) => req<{ looked_up: number; found: number; graph: CitationGraph }>(`${base(p)}/metadata/enrich`, json({ consent: true })),
@@ -117,6 +162,8 @@ const localApi: Api = {
   rebuild: (p) => call('rebuild', [p]),
   upload: (p, files, role, visibility) => call('upload', [p, files, role, visibility]),
   deleteFile: (p, fileId) => call('deleteFile', [p, fileId]),
+  addLinkedFiles: (p, items) => call('addLinkedFiles', [p, items]),
+  oaFetchPdf,
   pdfSource: async (p, fileId) => new Uint8Array(await call<ArrayBuffer>('pdfBytes', [p, fileId])),
   resolveAnchor: (p, anchor) => call('resolveAnchor', [p, anchor]),
   identityDecision: (p, reviewId, decision) => call('identityDecision', [p, reviewId, decision]),

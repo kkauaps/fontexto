@@ -3,7 +3,8 @@
  * End-to-end check of the browser edition in headless Chrome: upload article (+ .bib) + reference PDFs, read the graph,
  * the Documento view and a reference PDF page; fail on any CSP / Trusted Types violation.
  *
- *   BASE=http://127.0.0.1:5193 INPUT=/path/inputs SHOTS=/path/out MODE=bib|nobib [SEMANTIC=1] \
+ *   BASE=http://127.0.0.1:5193 INPUT=/path/inputs SHOTS=/path/out MODE=bib|nobib|doc [SEMANTIC=1] \
+ *   (MODE=doc uploads only the article and needs the /api/oa Functions: use `wrangler pages dev dist/site`)
  *   PLAYWRIGHT_CORE=/path/to/playwright-core CHROME=/usr/bin/google-chrome node scripts/e2e/web-flow.mjs
  */
 import { createRequire } from 'node:module';
@@ -44,11 +45,11 @@ process.on('uncaughtException', (e) => {
 const t0 = Date.now();
 await page.goto(BASE);
 await shot('01-landing');
-await page.getByRole('button', { name: MODE === 'bib' ? 'Artigo + .bib + referências' : 'Só artigo + referências' }).click();
+await page.getByRole('button', { name: MODE === 'bib' ? 'Envie com o .bib' : MODE === 'doc' ? 'Só o meu documento' : 'Documento + PDFs das referências' }).click();
 const files = readdirSync(INPUT);
 await page.setInputFiles('#uf-main', path.join(INPUT, files.find((f) => f.startsWith('demo'))));
 if (MODE === 'bib') await page.setInputFiles('#uf-bib', path.join(INPUT, files.find((f) => f.endsWith('.bib'))));
-await page.setInputFiles('#uf-refs', files.filter((f) => f.startsWith('refs-')).map((f) => path.join(INPUT, f)));
+if (MODE !== 'doc') await page.setInputFiles('#uf-refs', files.filter((f) => f.startsWith('refs-')).map((f) => path.join(INPUT, f)));
 await page.locator('.uf-name input').fill(`demo-${MODE}`);
 await shot('02-form');
 await page.getByRole('button', { name: 'Processar e abrir' }).click();

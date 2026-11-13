@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CitationOccurrence } from '../src/core/evidence';
-import { countByStatus, filterGroups, groupOccurrences, neighbourGroup, occurrencesByPublication } from '../src/core/evidenceView';
+import { countByStatus, filterGroups, formatPassage, groupOccurrences, neighbourGroup, occurrencesByPublication } from '../src/core/evidenceView';
 
 const occ = (id: string, spanId: string, extra: Partial<CitationOccurrence> = {}): CitationOccurrence => ({
   id,
@@ -42,7 +42,7 @@ describe('evidence view helpers', () => {
   });
 
   it('counts occurrences by status, like the report summary', () => {
-    expect(countByStatus(report)).toEqual({ all: 4, localizado: 1, ressalva: 1, nao_localizado: 1, unresolved: 1 });
+    expect(countByStatus(report)).toEqual({ all: 4, localizado: 1, ressalva: 1, nao_localizado: 1, unresolved: 1, sem_pdf: 0 });
     expect(occurrencesByPublication(report).get('pub:b')).toBe(1);
   });
 
@@ -60,5 +60,23 @@ describe('evidence view helpers', () => {
     expect(neighbourGroup(groups, 's3', 1)?.spanId).toBe('s1');
     expect(neighbourGroup(groups, 's1', -1)?.spanId).toBe('s3');
     expect(neighbourGroup([], 's1', 1)).toBeUndefined();
+  });
+
+  it('counts a missing PDF separately from “não localizado”', () => {
+    const r = { occurrences: [occ('o4-0', 's4', { status: 'nao_localizado', reason: 'sem_pdf' }), occ('o5-0', 's5', { status: 'nao_localizado', reason: 'sem_passagem' })] };
+    expect(countByStatus(r)).toMatchObject({ sem_pdf: 1, nao_localizado: 1, all: 2 });
+    expect(groupOccurrences(r).map((g) => g.status)).toEqual(['sem_pdf', 'nao_localizado']);
+  });
+});
+
+describe('formatPassage', () => {
+  it('breaks a single extracted block into sentences', () => {
+    const block = 'However, wound assessment is visual. Wound evolution is assessed not only based on its dimensions. The Red/Yellow/Black model allows discrimination of tissue types.';
+    expect(formatPassage(block)).toBe(
+      'However, wound assessment is visual.\n\nWound evolution is assessed not only based on its dimensions.\n\nThe Red/Yellow/Black model allows discrimination of tissue types.',
+    );
+  });
+  it('rejoins hyphenated line wraps and keeps paragraph breaks', () => {
+    expect(formatPassage('segmen-\ntation of wound\n\nNext paragraph.')).toBe('segmentation of wound\n\nNext paragraph.');
   });
 });

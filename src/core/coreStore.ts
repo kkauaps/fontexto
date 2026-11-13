@@ -6,7 +6,7 @@
 import { parseBibtex } from './bibtex.js';
 import type { CategoryRule } from './categories.js';
 import { applyCurated, type CuratedApplyResult, type CuratedFile } from './curated.js';
-import { applyOverrides, computeEvidence, EVIDENCE_PARAMS, type EvidenceReport, type PendingMatch, type ReferenceIndex } from './evidence.js';
+import { applyOverrides, computeEvidence, reapplyOverrides, EVIDENCE_PARAMS, type EvidenceReport, type EvidenceStatus, type PendingMatch, type ReferenceIndex } from './evidence.js';
 import { emptyDecisions, type CitationGraph, type FileRecord, type FileRole, type UserDecisions, type Visibility } from './model.js';
 import { buildGraph, type ExternalMetadata } from './pipeline.js';
 import { extractReferenceEntries } from './references.js';
@@ -271,6 +271,26 @@ export class CoreStore {
       await this.d.putJson(projectId, 'decisions.json', dec);
     });
     return this.rebuild(projectId);
+  }
+
+  /**
+   * The researcher's own label of one citation (null = back to automatic). Only the stored report is
+   * updated: the match itself does not change, so no rebuild (instant even with many PDFs).
+   */
+  async setEvidenceLabel(projectId: string, occId: string, status: EvidenceStatus | null): Promise<EvidenceReport> {
+    const done = await this.withLock(projectId, async () => {
+      const dec = await this.getDecisions(projectId);
+      dec.evidence ??= {};
+      if (status === null) delete dec.evidence[occId];
+      else dec.evidence[occId] = { status, at: new Date().toISOString() };
+      await this.d.putJson(projectId, 'decisions.json', dec);
+      const ev = await this.d.getJson<EvidenceReport>(projectId, 'evidence.json');
+      if (!ev) return undefined;
+      const next = reapplyOverrides(ev, dec.evidence);
+      await this.d.putJson(projectId, 'evidence.json', next);
+      return next;
+    });
+    return done ?? this.getEvidence(projectId);
   }
 
   async getCategoryRules(projectId: string): Promise<CategoryRule[]> {

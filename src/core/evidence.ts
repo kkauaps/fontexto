@@ -647,7 +647,18 @@ export function computeEvidence(input: ComputeEvidenceInput): EvidenceReport {
       const rawKey = `${page}|${first.raw}`;
       const nthOnPage = seenRaw.get(rawKey) ?? 0;
       seenRaw.set(rawKey, nthOnPage + 1);
-      const rects = flow.lines.filter((l) => l.page === page && l.start < first.end && l.end > first.start).map((l) => l.rect);
+      // Numeric markers ("[3]", superscripts) are too short to be found again by text search in the viewer (any "3"
+      // matches), so they get a box narrowed to their share of the line instead of the whole line.
+      const numeric = /^[[(]?\d/.test(first.raw);
+      const rects = flow.lines
+        .filter((l) => l.page === page && l.start < first.end && l.end > first.start)
+        .map((l) => {
+          if (!numeric) return l.rect;
+          const len = Math.max(1, l.end - l.start);
+          const a = Math.max(first.start, l.start) - l.start;
+          const b = Math.min(first.end, l.end) - l.start;
+          return { x: l.rect.x + (l.rect.w * a) / len, y: l.rect.y, w: Math.max(6, (l.rect.w * (b - a)) / len), h: l.rect.h };
+        });
       const si = sentenceIndexAt(first.start);
       const sentSpan = si >= 0 ? sentences[si] : { start: first.start, end: first.end };
       const sentenceRaw = flow.text.slice(sentSpan.start, sentSpan.end);
@@ -760,7 +771,12 @@ export function numericMarkers(text: string, mainText: PdfText, pubs: Publicatio
     }
     found.push({ raw: m[0], start: m.index!, end: m.index! + m[0].length, nums });
   }
-  for (const sp of sups) {
+  // Superscripts only count when the paper does not use [n] (otherwise they are affiliations/footnotes), and
+  // never before the body starts (author affiliations "Kang¹, Oh²" sit above the abstract/introduction).
+  const head = /(?:^|\n)\s*(?:\d+\.?\s*)?(?:abstract|resumo|summary|introduction|introdução|background)\b/i.exec(text.slice(0, Math.floor(text.length * 0.3)));
+  const bodyStart = head ? head.index : 0;
+  for (const sp of found.length >= 3 ? [] : sups) {
+    if (sp.start < bodyStart) continue;
     const raw = text.slice(sp.start, sp.end).replace(/\s+/g, '').replace(/[,;]$/, '');
     const nums = /^\d/.test(raw) ? expand(raw.replace(/[−]/g, '-')) : undefined;
     if (nums && !found.some((f) => f.start < sp.end && sp.start < f.end)) found.push({ raw: text.slice(sp.start, sp.start + raw.length), start: sp.start, end: sp.start + raw.length, nums });
@@ -1078,6 +1094,17 @@ export function applyOverrides(report: EvidenceReport, overrides: Record<string,
     return { ...o, status: ov.status, override: { status: ov.status, at: ov.at, auto: o.status, autoReason: o.reason, autoWhy: o.why } };
   });
   return { ...report, occurrences, summary: summarizeOccurrences(occurrences) };
+}
+
+/** Same as applyOverrides, on a report that may already carry overrides (they are undone first). */
+export function reapplyOverrides(report: EvidenceReport, overrides: Record<string, { status: EvidenceStatus; at: string }> | undefined): EvidenceReport {
+  const occurrences = report.occurrences.map((o) => {
+    if (!o.override) return o;
+    const { override, ...rest } = o;
+    return { ...rest, status: override.auto, reason: override.autoReason, why: override.autoWhy };
+  });
+  const base = { ...report, occurrences, summary: summarizeOccurrences(occurrences) };
+  return applyOverrides(base, overrides);
 }
 
 // ---------------------------------------------------------------------------

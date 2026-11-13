@@ -15,6 +15,7 @@ import type { Anchor, FileRole, ReviewAction, Visibility } from '../core/model.j
 import { securityHeaders } from './securityHeaders.js';
 import { lookupMany } from './metadata.js';
 import { NotFoundError, ProjectStore, ValidationError } from './store.js';
+import { handleOaRequest } from '../core/openAccess.js';
 
 export interface AppConfig {
   dataDir: string;
@@ -53,6 +54,22 @@ export function createApp(cfg: AppConfig) {
     res.json({ ok: true, externalMetadataAvailable: cfg.externalMetadata });
   });
 
+  // Open-access lookup/proxy (same code as the Pages Function). Only DOI/title/year/author arrive here.
+  for (const route of ['/api/oa/lookup', '/api/oa/pdf']) {
+    app.get(route, h(async (req, res) => {
+      const r = await handleOaRequest(new URL(req.originalUrl, 'http://localhost'));
+      res.status(r.status);
+      r.headers.forEach((v, k) => res.setHeader(k, v));
+      if (!r.body) return void res.end();
+      const reader = r.body.getReader();
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        res.write(value);
+      }
+      res.end();
+    }));
+  }
   app.get('/api/projects', h(async (_req, res) => res.json(await store.listProjects())));
 
   app.post(
@@ -228,13 +245,12 @@ export function createApp(cfg: AppConfig) {
     h(async (req, res) => {
       const { occId, status } = req.body ?? {};
       if (typeof occId !== 'string' || !/^o\d+-\d+$/.test(occId) || !(status === null || ['localizado', 'ressalva', 'nao_localizado'].includes(status))) throw new ValidationError('Invalid label');
-      res.json(
-        await store.updateDecisions(pid(req), (d) => {
-          d.evidence ??= {};
-          if (status === null) delete d.evidence[occId];
-          else d.evidence[occId] = { status, at: new Date().toISOString() };
-        }),
-      );
+      await store.updateDecisions(pid(req), (d) => {
+        d.evidence ??= {};
+        if (status === null) delete d.evidence[occId];
+        else d.evidence[occId] = { status, at: new Date().toISOString() };
+      });
+      res.json(await store.getEvidence(pid(req)));
     }),
   );
   app.post(

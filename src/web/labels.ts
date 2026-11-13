@@ -50,7 +50,8 @@ export function categoryColor(category: string, rules: CategoryRule[]): string {
   if (category === UNCATEGORIZED) return '#8a94a6';
   if (category === 'Documento principal') return '#064e3b';
   const rule = rules.find((r) => r.name === category);
-  if (rule?.color) return rule.color;
+  // The old built-in "Segmentação de feridas" rule was red, which read as "this source does not exist".
+  if (rule?.color) return rule.color.toLowerCase() === '#d9485f' ? '#c2569b' : rule.color;
   let h = 0;
   for (let i = 0; i < category.length; i++) h = (h * 31 + category.charCodeAt(i)) >>> 0;
   return PALETTE[h % PALETTE.length];

@@ -5,10 +5,17 @@ import type { CategoryRule } from '../core/categories.js';
  * They only drive *suggested* categories and colors; they never create
  * bibliographic relations.
  */
-export const DEFAULT_CATEGORY_RULES: CategoryRule[] = [
+export const DEFAULT_CATEGORY_RULES: CategoryRule[] = [];
+
+/**
+ * The rules new projects used to start with (written for one specific thesis about wound segmentation).
+ * Kept as an example for the categories editor; new projects start empty so unrelated papers are not
+ * colored by keywords that make no sense for them.
+ */
+export const EXAMPLE_CATEGORY_RULES: CategoryRule[] = [
   {
     name: 'Segmentação de feridas',
-    color: '#d9485f',
+    color: '#c2569b',
     keywords: ['wound', 'wounds', 'ulcer', 'ulcers', 'ferida', 'feridas', 'úlcera', 'tissue segmentation', 'granulation', 'slough', 'burn', 'diabetic foot'],
   },
   {

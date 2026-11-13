@@ -1,6 +1,6 @@
 import type { CitationOccurrence, EvidenceStatus } from '../../core/evidence';
 import type { CitationGraph, PublicationNode } from '../../core/model';
-import { occurrenceStatus, REASON_TEXT, STATUS_TEXT, type CitationGroup } from '../../core/evidenceView';
+import { formatPassage, occurrenceStatus, REASON_TEXT, STATUS_TEXT, type CitationGroup } from '../../core/evidenceView';
 import type { OpenRequest } from './SidePanel';
 
 function StatusPill({ o }: { o: CitationOccurrence }) {
@@ -124,7 +124,7 @@ function OccurrenceCard({ o, graph, props }: { o: CitationOccurrence; graph: Cit
       ))}
       {o.resolution === 'resolved' && o.reason === 'sem_pdf' && (
         <button className="primary" onClick={props.onOpenFiles}>
-          Enviar PDFs das referências
+          Buscar ou enviar PDFs das referências
         </button>
       )}
       {o.passages.length > 0 && (
@@ -141,7 +141,7 @@ function OccurrenceCard({ o, graph, props }: { o: CitationOccurrence; graph: Cit
                 )}
                 {p.region === 'resumo' && <span className="tag">resumo/início</span>}
               </div>
-              <blockquote>{p.text}</blockquote>
+              <blockquote>{formatPassage(p.text)}</blockquote>
               <button className="primary small" onClick={() => props.onOpenReference(requests[i])}>
                 Abrir no artigo · p. {p.page}
               </button>
