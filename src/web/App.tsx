@@ -1,8 +1,8 @@
 import { ReactFlowProvider } from '@xyflow/react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { categoryOf, type CategoryRule } from '../core/categories';
 import type { CitationGraph, ReviewAction } from '../core/model';
-import { buildView, DEFAULT_FILTERS, type GraphMode, type ViewFilters } from '../core/view';
+import { buildView, DEFAULT_FILTERS, type ViewFilters } from '../core/view';
 import { api, edition, type ProjectSummary } from './api';
 import { BRAND, pageTitle } from './brand';
 import { Landing, type FlowMode } from './components/Landing';
@@ -17,6 +17,11 @@ import { GraphCanvas, type Selection } from './components/GraphCanvas';
 import { PdfViewer } from './components/PdfViewer';
 import { ProjectPanel } from './components/ProjectPanel';
 import { SidePanel, type OpenRequest } from './components/SidePanel';
+import { ReferencesView, type OaState } from './components/ReferencesView';
+import { REF_STATUS_ORDER, refRows, refStatusMap, type RefStatus } from '../core/refStatus';
+
+type Tab = 'doc' | 'refs' | 'graph';
+const INITIAL_FILTERS: ViewFilters = { ...DEFAULT_FILTERS, interSource: false, colorBy: 'status' };
 
 const LAST_PROJECT = 'fontexto:lastProject';
 
@@ -27,11 +32,15 @@ export function App() {
   );
   const [graph, setGraph] = useState<CitationGraph | undefined>();
   const [rules, setRules] = useState<CategoryRule[]>([]);
-  const [filters, setFilters] = useState<ViewFilters>(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<ViewFilters>(INITIAL_FILTERS);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selection, setSelection] = useState<Selection>();
   const [viewer, setViewer] = useState<OpenRequest | undefined>();
-  const [docMode, setDocMode] = useState(false);
+  const [tab, setTab] = useState<Tab>('doc');
+  const docMode = tab === 'doc';
+  const setDocMode = (on: boolean) => setTab(on ? 'doc' : 'graph');
+  const [oa, setOa] = useState<Record<string, OaState>>({});
+  const pendingOa = useRef<Record<string, OaState> | undefined>(undefined);
   const [docFocus, setDocFocus] = useState<DocumentFocus | undefined>();
   const [evidence, setEvidence] = useState<EvidenceReport | undefined>();
   const [panelOpen, setPanelOpen] = useState(false);
@@ -54,6 +63,8 @@ export function App() {
     setGraph(undefined);
     setEvidence(undefined);
     setSelection(undefined);
+    setOa(pendingOa.current ?? {});
+    pendingOa.current = undefined;
     api.graph(projectId).then(setGraph, (e: Error) => {
       setError(e.message);
       setProjectId(undefined);
@@ -88,7 +99,11 @@ export function App() {
     document.title = pageTitle(projectId ? (projects.find((p) => p.id === projectId)?.name ?? undefined) : undefined);
   }, [projectId, projects]);
 
-  const view = useMemo(() => (graph ? buildView(graph, filters, collapsed) : undefined), [graph, filters, collapsed]);
+  const rows = useMemo(() => (graph ? refRows(graph, evidence) : []), [graph, evidence]);
+  const statusMap = useMemo(() => refStatusMap(rows), [rows]);
+  const rowsById = useMemo(() => new Map(rows.map((r) => [r.pub.id, r])), [rows]);
+  const refCounts = useMemo(() => Object.fromEntries(REF_STATUS_ORDER.map((s) => [s, rows.filter((r) => r.status === s).length])) as Record<RefStatus, number>, [rows]);
+  const view = useMemo(() => (graph ? buildView(graph, filters, collapsed, statusMap) : undefined), [graph, filters, collapsed, statusMap]);
   const categories = useMemo(() => {
     if (!graph) return [];
     const s = new Set<string>(rules.map((r) => r.name));
@@ -111,14 +126,12 @@ export function App() {
 
   const stats = useMemo(() => {
     if (!graph) return undefined;
-    const edges = Object.values(graph.edges);
     return {
-      pubs: Object.values(graph.nodes).filter((n) => n.kind === 'publication').length,
-      confirmed: edges.filter((e) => e.kind === 'cites' && e.status === 'confirmed').length,
-      unverified: edges.filter((e) => e.kind === 'cites' && e.status === 'unverified').length,
+      pubs: rows.length,
+      noPdf: rows.filter((r) => !r.hasPdf).length,
       pending: graph.identityReviews.filter((r) => !r.decision).length + graph.fileLinks.filter((l) => l.status === 'ambiguous').length,
     };
-  }, [graph]);
+  }, [graph, rows]);
 
   const onReview = async (edgeId: string, action: ReviewAction) => {
     if (!projectId) return;
@@ -128,12 +141,10 @@ export function App() {
     if (!projectId) return;
     setGraph(await api.category(projectId, pubId, value));
   };
-  const setMode = (mode: GraphMode) => {
-    setDocMode(false);
-    setFilters((f) => ({ ...f, mode }));
-    setSelection(undefined);
+  const showGraph = () => {
+    setTab('graph');
+    setFilters((f) => ({ ...f, mode: 'bibliographic' }));
   };
-  const evidenceCount = graph ? Object.values(graph.nodes).filter((n) => n.kind === 'claim' || n.kind === 'evidence').length : 0;
 
   if (!projectId) {
     if (flow) {
@@ -141,7 +152,8 @@ export function App() {
         <UploadFlow
           mode={flow}
           onBack={() => setFlow(undefined)}
-          onDone={(id, p) => {
+          onDone={(id, p, oaStates) => {
+            pendingOa.current = oaStates;
             setProjects((ps) => (ps.some((x) => x.id === id) ? ps : [...ps, p]));
             setFlow(undefined);
             setDocMode(true);
@@ -168,17 +180,17 @@ export function App() {
           <option value="">+ Projetos…</option>
         </select>
         <nav className="tabs" role="tablist" aria-label="Visões">
-          <button role="tab" aria-selected={!docMode && filters.mode === 'bibliographic'} className={!docMode && filters.mode === 'bibliographic' ? 'on' : ''} onClick={() => setMode('bibliographic')}>
-            A · Bibliográfico
+          <button role="tab" aria-selected={tab === 'doc'} className={tab === 'doc' ? 'on' : ''} onClick={() => setTab('doc')} title="Seu texto, com cada citação conferida">
+            Documento{evidence && evidence.summary.occurrences > 0 ? ` (${evidence.summary.occurrences} citações)` : ''}
           </button>
-          <button role="tab" aria-selected={!docMode && filters.mode === 'evidence'} className={!docMode && filters.mode === 'evidence' ? 'on' : ''} onClick={() => setMode('evidence')}>
-            B · Evidências
+          <button role="tab" aria-selected={tab === 'refs'} className={tab === 'refs' ? 'on' : ''} onClick={() => setTab('refs')} title="Cada referência da bibliografia: situação, PDF e busca de PDF gratuito">
+            Referências{rows.length ? ` (${rows.length})` : ''}
           </button>
-          <button role="tab" aria-selected={docMode} className={docMode ? 'on' : ''} onClick={() => setDocMode(true)}>
-            C · Documento{evidence && evidence.summary.occurrences > 0 ? ` (${evidence.summary.occurrences})` : ''}
+          <button role="tab" aria-selected={tab === 'graph'} className={tab === 'graph' ? 'on' : ''} onClick={showGraph} title="Mapa das fontes, colorido pela situação">
+            Grafo
           </button>
         </nav>
-        {!docMode && (
+        {tab === 'graph' && (
         <input
           className="search"
           type="search"
@@ -189,11 +201,11 @@ export function App() {
         )}
         {stats && (
           <span className="stats small">
-            {stats.pubs} publicações · {stats.confirmed} citações confirmadas · {stats.unverified} a verificar
+            {stats.pubs} referências{stats.noPdf > 0 ? ` · ${stats.noPdf} sem PDF` : ''}
             {stats.pending > 0 && <span className="badge warn"> {stats.pending} pendência(s)</span>}
           </span>
         )}
-        {!docMode && <button onClick={() => setLayoutNonce((n) => n + 1)}>Reorganizar</button>}
+        {tab === 'graph' && <button onClick={() => setLayoutNonce((n) => n + 1)}>Reorganizar</button>}
         <button className="primary" onClick={() => setPanelOpen(true)}>
           Arquivos e revisão
         </button>
@@ -220,12 +232,31 @@ export function App() {
               setDocMode(false);
               setSelection({ type: 'node', id: pubId });
             }}
-            onOpenFiles={() => setPanelOpen(true)}
+            onOpenFiles={() => setTab('refs')}
+            onEvidence={setEvidence}
             onGraph={setGraph}
           />
         </div>
       )}
-      {!docMode && (
+      {tab === 'refs' && graph && (
+        <div className="main">
+          <ReferencesView
+            projectId={projectId}
+            graph={graph}
+            evidence={evidence}
+            oa={oa}
+            setOa={setOa}
+            onGraph={setGraph}
+            onOpen={setViewer}
+            onShowInDocument={showInDocument}
+            onShowInGraph={(pubId) => {
+              showGraph();
+              setSelection({ type: 'node', id: pubId });
+            }}
+          />
+        </div>
+      )}
+      {tab === 'graph' && (
       <div className="main">
         <FiltersPanel
           filters={filters}
@@ -236,14 +267,9 @@ export function App() {
           onToggleGroup={toggleGroup}
           years={years}
           hiddenCount={view?.hiddenCount ?? 0}
+          refCounts={refCounts}
         />
         <div className="canvas">
-          {filters.mode === 'evidence' && evidenceCount === 0 && (
-            <div className="mode-note">
-              Grafo de evidências (Fase 2): afirmações e passagens ainda não são extraídas. O modelo de dados já suporta nós de afirmação/evidência e
-              os estados de verificação; nada é exibido para não apresentar resultados inventados.
-            </div>
-          )}
           {graph && view ? (
             <ReactFlowProvider>
               <GraphCanvas
@@ -255,6 +281,7 @@ export function App() {
                 layoutNonce={layoutNonce}
                 search={filters.search ?? ''}
                 exportName={projectId}
+                colorBy={filters.colorBy}
               />
             </ReactFlowProvider>
           ) : (
@@ -265,7 +292,7 @@ export function App() {
           {graph && Object.keys(graph.files).length === 0 && (
             <div className="empty-card">
               <h2>Comece enviando seus arquivos</h2>
-              <p className="muted">Com o PDF do documento e a bibliografia, o grafo e a aba “C · Documento” são montados automaticamente.</p>
+              <p className="muted">Com o PDF do documento, as abas Documento, Referências e Grafo são montadas automaticamente.</p>
               <SetupChecklist projectId={projectId} graph={graph} onGraph={setGraph} />
             </div>
           )}
@@ -283,11 +310,12 @@ export function App() {
             onShowInDocument={showInDocument}
             onReview={onReview}
             onCategory={onCategory}
+            refRows={rowsById}
           />
         )}
       </div>
       )}
-      {viewer && <PdfViewer projectId={projectId} request={viewer} backLabel={panelOpen ? 'Voltar aos arquivos' : docMode ? 'Voltar ao documento' : 'Voltar ao grafo'} onClose={() => setViewer(undefined)} />}
+      {viewer && <PdfViewer projectId={projectId} request={viewer} backLabel={panelOpen ? 'Voltar aos arquivos' : tab === 'doc' ? 'Voltar ao documento' : tab === 'refs' ? 'Voltar às referências' : 'Voltar ao grafo'} onClose={() => setViewer(undefined)} />}
       {panelOpen && graph && (
         <ProjectPanel
           projectId={projectId}

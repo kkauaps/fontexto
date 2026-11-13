@@ -21,7 +21,8 @@
     "demo:seed": "tsx src/server/devtools/seedDemo.ts",
     "package:win": "npm run build && node scripts/package-win.mjs",
     "fetch-model": "node scripts/fetch-model.mjs",
-    "build:site": "vite build --mode web"
+    "build:site": "vite build --mode web",
+    "deploy:site": "npm run build:site && wrangler pages deploy dist/site --project-name=fontexto --commit-dirty=true"
   },
   "dependencies": {
     "@huggingface/tokenizers": "^0.2.0",

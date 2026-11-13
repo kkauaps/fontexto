@@ -6,7 +6,7 @@ export const BRAND = {
   name: 'Fontexto',
   tagline: 'Cada citação ligada ao trecho exato da fonte',
   /** Shown on the welcome screen. Reword when the app runs somewhere other than the user's own machine. */
-  privacyNote: 'Os arquivos enviados ficam guardados apenas neste computador e nunca são enviados a serviços externos.',
+  privacyNote: 'Os arquivos enviados são lidos e guardados apenas neste computador.',
 } as const;
 
 export const pageTitle = (section?: string) => (section ? `${section} · ${BRAND.name}` : `${BRAND.name} — ${BRAND.tagline}`);

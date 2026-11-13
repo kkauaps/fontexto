@@ -1,5 +1,6 @@
 import type { CategoryRule } from '../../core/categories';
 import type { EdgeKind, VerificationStatus } from '../../core/model';
+import { REF_STATUS_COLOR, REF_STATUS_ORDER, REF_STATUS_TEXT, type RefStatus } from '../../core/refStatus';
 import type { ViewFilters } from '../../core/view';
 import { STATUS_HELP, STATUS_LABEL, categoryColor } from '../labels';
 import { edgeStyleFor } from './GraphCanvas';
@@ -13,6 +14,7 @@ interface Props {
   onToggleGroup: (c: string) => void;
   years: { min?: number; max?: number };
   hiddenCount: number;
+  refCounts: Record<RefStatus, number>;
 }
 
 const BIB_STATUSES: VerificationStatus[] = ['confirmed', 'unverified', 'suggested', 'rejected'];
@@ -27,18 +29,55 @@ function EdgeSwatch({ kind, status }: { kind: EdgeKind; status: VerificationStat
   );
 }
 
-export function FiltersPanel({ filters, onChange, categories, rules, collapsed, onToggleGroup, years, hiddenCount }: Props) {
+export function FiltersPanel({ filters, onChange, categories, rules, collapsed, onToggleGroup, years, hiddenCount, refCounts }: Props) {
   const set = (patch: Partial<ViewFilters>) => onChange({ ...filters, ...patch });
   const toggleStatus = (s: VerificationStatus) =>
     set({ statuses: filters.statuses.includes(s) ? filters.statuses.filter((x) => x !== s) : [...filters.statuses, s] });
   const toggleCategory = (c: string) =>
     set({ categories: filters.categories.includes(c) ? filters.categories.filter((x) => x !== c) : [...filters.categories, c] });
   const relatedOn = filters.edgeKinds.includes('related_to') && filters.statuses.includes('suggested');
+  const byStatus = filters.colorBy !== 'category';
+  const refOn = (s: RefStatus) => !filters.refStatuses?.length || filters.refStatuses.includes(s);
+  const toggleRef = (s: RefStatus) => {
+    const cur = filters.refStatuses?.length ? filters.refStatuses : REF_STATUS_ORDER;
+    const next = cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s];
+    set({ refStatuses: next.length === REF_STATUS_ORDER.length ? [] : next });
+  };
 
   return (
     <aside className="sidebar">
       <section>
-        <h3>Relações</h3>
+        <h3>Cores</h3>
+        <div className="seg" role="radiogroup" aria-label="Colorir por">
+          <button role="radio" aria-checked={byStatus} className={byStatus ? 'on' : ''} onClick={() => set({ colorBy: 'status' })}>
+            Situação
+          </button>
+          <button role="radio" aria-checked={!byStatus} className={!byStatus ? 'on' : ''} onClick={() => set({ colorBy: 'category' })}>
+            Tema
+          </button>
+        </div>
+      </section>
+
+      <section>
+        <h3>Situação das fontes</h3>
+        <p className="hint">Resultado da conferência das citações. Clique para mostrar/ocultar.</p>
+        {REF_STATUS_ORDER.filter((s) => refCounts[s] > 0).map((s) => (
+          <label key={s} className="check">
+            <input type="checkbox" checked={refOn(s)} onChange={() => toggleRef(s)} />
+            <span className="swatch" style={{ background: REF_STATUS_COLOR[s] }} />
+            <span>
+              {REF_STATUS_TEXT[s]} ({refCounts[s]})
+            </span>
+          </label>
+        ))}
+      </section>
+
+      <section>
+        <h3>Ligações</h3>
+        <label className="check" title="Além do seu documento citando cada fonte, mostra quando uma fonte cita outra (pelas bibliografias dos PDFs enviados).">
+          <input type="checkbox" checked={filters.interSource !== false} onChange={(e) => set({ interSource: e.target.checked })} />
+          <span>Mostrar citações entre as fontes</span>
+        </label>
         {BIB_STATUSES.map((s) => {
           const kind: EdgeKind = s === 'suggested' ? 'related_to' : 'cites';
           const checked = s === 'suggested' ? relatedOn : filters.statuses.includes(s);
@@ -62,7 +101,7 @@ export function FiltersPanel({ filters, onChange, categories, rules, collapsed, 
             </label>
           );
         })}
-        <p className="hint">Cores e relações temáticas nunca são evidência de citação.</p>
+        <p className="hint">Relações temáticas nunca são evidência de citação.</p>
       </section>
 
       <section>
@@ -94,8 +133,9 @@ export function FiltersPanel({ filters, onChange, categories, rules, collapsed, 
         </label>
       </section>
 
+      {!byStatus && (
       <section>
-        <h3>Categorias</h3>
+        <h3>Temas</h3>
         <p className="hint">Clique para filtrar; use ▸ para recolher o grupo em um único nó.</p>
         <ul className="legend">
           {categories.map((c) => (
@@ -114,10 +154,11 @@ export function FiltersPanel({ filters, onChange, categories, rules, collapsed, 
         </ul>
         {filters.categories.length > 0 && (
           <button className="linklike small" onClick={() => set({ categories: [] })}>
-            Limpar filtro de categoria
+            Limpar filtro de tema
           </button>
         )}
       </section>
+      )}
 
       <section>
         <h3>Legenda</h3>
@@ -126,10 +167,10 @@ export function FiltersPanel({ filters, onChange, categories, rules, collapsed, 
             <span className="legend-node doc" /> Documento principal
           </li>
           <li>
-            <span className="legend-node" /> Publicação (tamanho ∝ citações recebidas na rede)
+            <span className="legend-node" /> Fonte citada
           </li>
           <li>
-            <span className="legend-node no-pdf" /> Publicação sem PDF disponível
+            <span className="legend-node no-pdf" /> Fonte sem PDF enviado (ela existe; só não temos o arquivo)
           </li>
           <li>
             <span className="legend-node match" /> Resultado da pesquisa

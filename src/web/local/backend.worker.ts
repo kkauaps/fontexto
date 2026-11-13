@@ -10,7 +10,7 @@ import type { CategoryRule } from '../../core/categories';
 import { CoreStore, MemoryDriver, NotFoundError, ValidationError, type StorageDriver } from '../../core/coreStore';
 import { parseCuratedUpload } from '../../core/curated';
 import { redactEvidenceForSharing } from '../../core/evidence';
-import { redactForSharing, toGraphML } from '../../core/export';
+import { evidenceCsv, redactForSharing, toGraphML } from '../../core/export';
 import { textFromDocument, type PdfDocLike, type PdfJsLike } from '../../core/pdfjsText';
 import type { Anchor, FileRecord, FileRole, ReviewAction, Visibility } from '../../core/model';
 import { IdbDriver } from './idbDriver';
@@ -86,6 +86,20 @@ const methods: Record<string, Method> = {
     const graph = await s.rebuild(p);
     return { added: added.map(view), graph };
   },
+  /** Reference PDFs that already know which bibliography entry they are (e.g. fetched from open access). */
+  addLinkedFiles: async (s, [p, items], progress) => {
+    if (!Array.isArray(items) || items.length === 0) throw new ValidationError('No files received');
+    const links: [string, string][] = [];
+    for (const it of items as { file: File; publicationId: string }[]) {
+      if (!(it?.file instanceof Blob) || typeof it.publicationId !== 'string') throw new ValidationError('Invalid file');
+      const rec = await s.addFile(p, { data: new Uint8Array(await it.file.arrayBuffer()), originalName: it.file.name, role: 'reference', visibility: 'private' });
+      links.push([rec.id, it.publicationId]);
+    }
+    await s.ensureExtracted(p, (done, total, name) => progress({ stage: 'extract', done, total, name }));
+    return s.updateDecisions(p, (d) => {
+      for (const [fileId, pub] of links) d.fileLinks[fileId] = pub;
+    });
+  },
   deleteFile: async (s, [p, fileId]) => {
     await s.removeFile(p, fileId);
     return s.getGraph(p);
@@ -131,6 +145,10 @@ const methods: Record<string, Method> = {
       else d.categories[publicationId] = category === null ? null : category.slice(0, 120);
     });
   },
+  evidenceLabel: (s, [p, occId, status]) => {
+    if (typeof occId !== 'string' || !/^o\d+-\d+$/.test(occId) || !(status === null || ['localizado', 'ressalva', 'nao_localizado'].includes(status))) throw new ValidationError('Invalid label');
+    return s.setEvidenceLabel(p, occId, status);
+  },
   categories: (s, [p]) => s.getCategoryRules(p),
   setCategories: (s, [p, rules]) => {
     const r = rules as CategoryRule[];
@@ -163,6 +181,7 @@ const methods: Record<string, Method> = {
   removeCurated: async (s, [p]) => (await s.setCurated(p, undefined)).graph,
   exportFile: async (s, [p, kind]) => {
     const [graph, evidence] = await Promise.all([s.getGraph(p), s.getEvidence(p)]);
+    if (kind === 'csv') return { name: `${p}.citacoes.csv`, mime: 'text/csv;charset=utf-8', text: evidenceCsv(evidence, graph) };
     if (kind === 'graphml') return { name: `${p}.graphml`, mime: 'application/graphml+xml', text: toGraphML(graph) };
     if (kind === 'json') return { name: `${p}.citation-graph.json`, mime: 'application/json', text: JSON.stringify(redactForSharing(graph), null, 1) };
     return { name: `${p}.evidence.json`, mime: 'application/json', text: JSON.stringify(redactEvidenceForSharing(evidence, graph.files), null, 1) };

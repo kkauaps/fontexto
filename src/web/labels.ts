@@ -43,14 +43,15 @@ export const METHOD_LABEL: Record<DetectionMethod, string> = {
   manual: 'Decisão manual',
 };
 
-const PALETTE = ['#2f7fa8', '#d9485f', '#7a8f3a', '#e9a23b', '#8e6bbf', '#5c946e', '#c9692c', '#4f6d7a', '#b5838d', '#6d597a'];
+const PALETTE = ['#2f7fa8', '#3d9a8b', '#7a8f3a', '#e9a23b', '#8e6bbf', '#5c946e', '#c9692c', '#4f6d7a', '#b5838d', '#6d597a'];
 
 /** Category colors are presentation only. They never encode a bibliographic relation. */
 export function categoryColor(category: string, rules: CategoryRule[]): string {
   if (category === UNCATEGORIZED) return '#8a94a6';
   if (category === 'Documento principal') return '#064e3b';
   const rule = rules.find((r) => r.name === category);
-  if (rule?.color) return rule.color;
+  // The old built-in "Segmentação de feridas" rule was red, which read as "this source does not exist".
+  if (rule?.color) return rule.color.toLowerCase() === '#d9485f' ? '#c2569b' : rule.color;
   let h = 0;
   for (let i = 0; i < category.length; i++) h = (h * 31 + category.charCodeAt(i)) >>> 0;
   return PALETTE[h % PALETTE.length];

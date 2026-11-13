@@ -3,7 +3,7 @@ import { BRAND } from '../brand';
 import lockup from '../assets/fontexto-lockup.svg';
 import mark from '../assets/fontexto-mark.svg';
 
-export type FlowMode = 'bib' | 'nobib';
+export type FlowMode = 'doc' | 'bib' | 'nobib';
 
 interface Props {
   projects: ProjectSummary[];
@@ -13,7 +13,7 @@ interface Props {
 }
 
 const STEPS = [
-  { n: '1', title: 'Envie os arquivos', text: 'O PDF do seu texto e os PDFs das referências. Se você tem o .bib, envie junto. Se não tem, o Fontexto lê a lista de referências do próprio artigo.' },
+  { n: '1', title: 'Envie seu documento', text: 'Só o PDF do seu texto já basta: o Fontexto lê a bibliografia e busca os PDFs gratuitos das referências. Tem os PDFs ou o .bib? Envie junto.' },
   { n: '2', title: 'Ele cruza tudo', text: 'Cada citação é ligada à referência certa, e a frase que cita é procurada no PDF dessa referência.' },
   { n: '3', title: 'Você confere', text: 'Abra a fonte já na página do trecho, compare com outras passagens candidatas e decida você mesmo. Nada vira “comprovado” sem a sua revisão.' },
 ];
@@ -35,17 +35,22 @@ export function Landing({ projects, error, onStart, onOpen }: Props) {
           <div className="lp-hero-text">
             <h1>Cada citação ligada ao trecho exato da fonte</h1>
             <p className="lp-lead">
-              Envie seu artigo e os PDFs das referências. O Fontexto mostra, para cada citação, a frase que cita e a página onde a fonte diz aquilo, pronta para você conferir.
+              Envie seu documento. O Fontexto encontra as referências, busca os artigos gratuitos e mostra, para cada citação, a página onde a fonte diz aquilo, pronta para você conferir.
             </p>
             <div className="lp-cta">
-              <button className="primary lp-btn" onClick={() => onStart('bib')}>
-                Artigo + .bib + referências
+              <button className="primary lp-btn" onClick={() => onStart('doc')}>
+                Só o meu documento
               </button>
               <button className="lp-btn lp-btn-soft" onClick={() => onStart('nobib')}>
-                Só artigo + referências
+                Documento + PDFs das referências
               </button>
             </div>
-            <p className="lp-hint small">Sem .bib? Tudo bem: a lista de referências é lida do próprio artigo.</p>
+            <p className="lp-hint small">
+              “Só o meu documento” busca os PDFs gratuitos das referências (OpenAlex, Semantic Scholar, arXiv). Tem um .bib?{' '}
+              <button className="linklike" onClick={() => onStart('bib')}>
+                Envie com o .bib
+              </button>
+            </p>
           </div>
           <figure className="lp-preview">
             <img src="/preview-documento.png" alt="Tela do Fontexto: o texto do artigo com as citações marcadas e, ao lado, a passagem encontrada na fonte" width={1280} height={800} />
@@ -78,7 +83,10 @@ export function Landing({ projects, error, onStart, onOpen }: Props) {
           <img src={mark} alt="" width={44} height={39} />
           <div>
             <h2>Seus arquivos ficam com você</h2>
-            <p>{BRAND.privacyNote} Nada é enviado a outros serviços, não há anúncios nem rastreadores.</p>
+            <p>
+              {BRAND.privacyNote} Seus PDFs nunca são enviados. Só quando você pede a busca de PDFs gratuitos, o DOI, o título, o ano e o 1º autor de cada referência
+              vão ao nosso servidor, que consulta bases abertas e devolve o PDF sem guardar nada. Não há anúncios nem rastreadores.
+            </p>
           </div>
         </section>
 

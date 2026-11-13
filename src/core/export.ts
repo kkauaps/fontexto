@@ -114,3 +114,19 @@ export function toGraphML(graph: CitationGraph): string {
   out.push('  </graph>', '</graphml>');
   return out.join('\n') + '\n';
 }
+
+/** One row per citation occurrence, with the final label, whether it was set by hand, and why. For the researcher's own use (keeps the citing sentence). */
+export function evidenceCsv(report: import('./evidence.js').EvidenceReport, graph: CitationGraph): string {
+  const STATUS: Record<string, string> = { localizado: 'Localizado', ressalva: 'Ressalva', nao_localizado: 'Não localizado' };
+  const esc = (v: unknown) => {
+    const s = v === undefined || v === null ? '' : String(v);
+    return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const head = ['pagina', 'marcador', 'referencia', 'status', 'marcado_por_voce', 'status_automatico', 'motivo', 'similaridade', 'pagina_do_trecho', 'frase'];
+  const rows = report.occurrences.map((o) => {
+    const pub = o.publicationId ? graph.nodes[o.publicationId] : undefined;
+    const status = o.resolution === 'resolved' ? STATUS[o.status ?? 'nao_localizado'] : 'Referência não identificada';
+    return [o.page, o.marker, pub && 'label' in pub ? pub.label : '', status, o.override ? 'sim' : 'não', o.override?.auto ? STATUS[o.override.auto] : status, o.override ? o.override.autoWhy : o.why, o.score !== undefined ? `${Math.round(o.score * 100)}%` : '', o.passages[0]?.page ?? '', o.sentence];
+  });
+  return '\ufeff' + [head, ...rows].map((r) => r.map(esc).join(';')).join('\r\n') + '\r\n';
+}

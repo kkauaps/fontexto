@@ -20,11 +20,11 @@
  *  - Deterministic: the same inputs always produce the same report.
  */
 import { DEFAULT_GLOSSARY } from './glossary.js';
-import { buildQuery, lexicalCandidates, MATCH_PARAMS, type Candidate, type ClaimParts, type MatchParams } from './matching.js';
+import { buildQuery, indexV2, lexicalCandidates, MATCH_PARAMS, windowText, type Candidate, type ClaimParts, type MatchParams } from './matching.js';
 import { extractMarkersFromText, isSelfCitation, resolveMarker, type MarkerReference } from './citations.js';
 import type { CitationGraph, FileRecord, PublicationNode, Rect } from './model.js';
 import { stripDiacritics } from './normalize.js';
-import { isPageNumber, referenceSectionBounds, repeatedLines } from './references.js';
+import { extractReferenceEntries, isPageNumber, matchReference, referenceSectionBounds, repeatedLines } from './references.js';
 import type { PdfText } from './text.js';
 
 export const EVIDENCE_SCHEMA_VERSION = 1 as const;
@@ -88,7 +88,9 @@ export type EvidenceReason =
   | 'sem_passagem' // nothing in the PDF resembles the sentence
   | 'baixa_similaridade' // best passage only partially overlaps (ressalva)
   | 'numero_ausente' // numbers of the sentence are absent from the best passage (ressalva)
-  | 'so_resumo' // the only close passage is in the abstract/front matter (ressalva)
+  | 'so_resumo' // the only close passage is in the abstract/front matter (note only)
+  | 'pagina_citada' // the page given in the marker ("p. 12") does not exist in the PDF or has no similar passage (ressalva)
+  | 'citacao_direta' // the quoted text ("...") of a direct citation is not in the source (ressalva)
   | 'fonte_sem_trecho'; // curated: source note of a table, whose support lives in the table rows themselves
 
 export interface Passage {
@@ -144,6 +146,10 @@ export interface CitationOccurrence {
   notes: string[];
   /** Best passage score, if any. */
   score?: number;
+  /** One line, plain language: why the occurrence got its label (shown next to it). */
+  why?: string;
+  /** Set when the researcher overrode the label by hand (the automatic label stays in `auto`). */
+  override?: { status: EvidenceStatus; at: string; auto?: EvidenceStatus; autoReason?: EvidenceReason; autoWhy?: string };
   passages: Passage[];
   curated?: CuratedMark;
 }
@@ -198,6 +204,8 @@ export interface FlowLine {
 export interface Flow {
   text: string;
   lines: FlowLine[];
+  /** Superscript digit runs (numeric citations), as offsets in `text`. */
+  sups?: Span[];
 }
 
 const HEADING_LINE = /^(?:\d+(?:\.\d+)*\.?\s+)?\p{Lu}[\p{Lu}\d\s\-–:,/&()]{3,}$/u;
@@ -214,6 +222,7 @@ export function buildFlow(pdf: PdfText, skip?: (page: number, lineIndex: number)
   const repeated = repeatedLines(pdf);
   let text = '';
   const lines: FlowLine[] = [];
+  const sups: Span[] = [];
   let prev: { rect: Rect; text: string; page: number } | undefined;
   for (const p of pdf.pages) {
     p.lines.forEach((l, index) => {
@@ -235,11 +244,24 @@ export function buildFlow(pdf: PdfText, skip?: (page: number, lineIndex: number)
       if ((dehyphenate || hyphenJoin) && lines.length) lines[lines.length - 1].end = text.length;
       const start = text.length;
       text += t;
+      if (l.sups?.length) {
+        // `t` is `l.text` with whitespace collapsed; offsets are mapped through the collapse
+        const raw = l.text.replace(/\u00ad/g, '');
+        const map: number[] = [];
+        let k = 0;
+        for (let i = 0; i < raw.length; i++) {
+          map[i] = k;
+          if (!(/\s/.test(raw[i]) && (i === 0 || /\s/.test(raw[i - 1])))) k++;
+        }
+        map[raw.length] = k;
+        const lead = raw.length - raw.trimStart().length;
+        for (const [a, b] of l.sups) sups.push({ start: start + Math.max(0, (map[a] ?? 0) - lead), end: start + Math.max(0, (map[b] ?? k) - lead) });
+      }
       lines.push({ page: p.page, index, start, end: text.length, rect: l.rect });
       prev = { rect: l.rect, text: t, page: p.page };
     });
   }
-  return { text, lines };
+  return { text, lines, sups };
 }
 
 /** Page of a character offset in the flow. */
@@ -371,6 +393,9 @@ export interface ReferenceIndex {
   sentences: IndexedSentence[];
   df: Map<string, number>;
   hasText: boolean;
+  pageCount: number;
+  /** [physical page, printed page number] read from page-number lines (top/bottom of the page). */
+  printedPages?: [number, number][];
 }
 
 const INTRO_RE = /^(?:(?:1|I)\.?\s*)?(?:introduction|introdu[cç][aã]o|introducci[oó]n)\b/i;
@@ -397,7 +422,13 @@ export function buildReferenceIndex(pdf: PdfText): ReferenceIndex {
     sentences.push({ i: sentences.length, page, text, region, tokens });
     for (const t of tokens) df.set(t, (df.get(t) ?? 0) + 1);
   }
-  return { sentences, df, hasText: sentences.length > 0 };
+  const printedPages: [number, number][] = [];
+  for (const p of pdf.pages) {
+    const edge = [...p.lines.slice(0, 3), ...p.lines.slice(-3)];
+    const num = edge.map((l) => l.text.trim()).find((t) => /^\d{1,4}$/.test(t));
+    if (num) printedPages.push([p.page, Number(num)]);
+  }
+  return { sentences, df, hasText: sentences.length > 0, pageCount: pdf.pageCount ?? pdf.pages.length, printedPages };
 }
 
 const typeWeight = (t: string) => (t[0] === '#' ? 3 : t[0] === '@' ? 2 : 1);
@@ -583,7 +614,10 @@ export function computeEvidence(input: ComputeEvidenceInput): EvidenceReport {
     });
     const sentences = segmentSentences(flow.text);
     // self markers ("Fonte: Autor (2026)") stay in the list so they are cut out of claims, but never become occurrences
-    const markers = extractMarkersFromText(flow.text, { includeSelf: true });
+    const markers: (ReturnType<typeof extractMarkersFromText>[number] & { numericPub?: string | null })[] = extractMarkersFromText(flow.text, { includeSelf: true });
+    // Numbered reference lists (IEEE, Vancouver): "[3]", "[2,5]", "[2]–[4]", "[1-3]" point at entry labels.
+    markers.push(...numericMarkers(flow.text, mainText, bibPubs, flow.sups));
+    markers.sort((a, b) => a.start - b.start);
     const pageSize = new Map(mainText.pages.map((p) => [p.page, { width: p.width, height: p.height }]));
     const claimTermsCache = new Map<string, Set<string>>();
 
@@ -613,7 +647,18 @@ export function computeEvidence(input: ComputeEvidenceInput): EvidenceReport {
       const rawKey = `${page}|${first.raw}`;
       const nthOnPage = seenRaw.get(rawKey) ?? 0;
       seenRaw.set(rawKey, nthOnPage + 1);
-      const rects = flow.lines.filter((l) => l.page === page && l.start < first.end && l.end > first.start).map((l) => l.rect);
+      // Numeric markers ("[3]", superscripts) are too short to be found again by text search in the viewer (any "3"
+      // matches), so they get a box narrowed to their share of the line instead of the whole line.
+      const numeric = /^[[(]?\d/.test(first.raw);
+      const rects = flow.lines
+        .filter((l) => l.page === page && l.start < first.end && l.end > first.start)
+        .map((l) => {
+          if (!numeric) return l.rect;
+          const len = Math.max(1, l.end - l.start);
+          const a = Math.max(first.start, l.start) - l.start;
+          const b = Math.min(first.end, l.end) - l.start;
+          return { x: l.rect.x + (l.rect.w * a) / len, y: l.rect.y, w: Math.max(6, (l.rect.w * (b - a)) / len), h: l.rect.h };
+        });
       const si = sentenceIndexAt(first.start);
       const sentSpan = si >= 0 ? sentences[si] : { start: first.start, end: first.end };
       const sentenceRaw = flow.text.slice(sentSpan.start, sentSpan.end);
@@ -642,7 +687,8 @@ export function computeEvidence(input: ComputeEvidenceInput): EvidenceReport {
       const context = si >= 0 ? displaySentence(`${around(si - 1)} ${around(si + 1)}`) : '';
       let k = 0;
       for (const m of group) {
-        const res = resolveMarker(m as MarkerReference, bibPubs);
+        const res: ReturnType<typeof resolveMarker> =
+          m.numericPub !== undefined ? (m.numericPub ? { status: 'resolved', publicationId: m.numericPub } : { status: 'unresolved', candidates: [] }) : resolveMarker(m as MarkerReference, bibPubs);
         const occ: CitationOccurrence = {
           id: `o${first.start}-${k++}`,
           spanId: `s${first.start}`,
@@ -664,7 +710,8 @@ export function computeEvidence(input: ComputeEvidenceInput): EvidenceReport {
         if (res.status === 'resolved') {
           const pub = graph.nodes[res.publicationId] as PublicationNode;
           scoreOccurrence(occ, pub, graph, texts, indexFor, claimTermsCache, params, input.onPending);
-        }
+          occ.why ??= occ.notes[0];
+        } else occ.why = res.status === 'ambiguous' ? 'Mais de uma referência da lista combina com esta citação; escolha a certa.' : 'Nenhuma referência da lista tem este autor e ano.';
         occurrences.push(occ);
       }
     }
@@ -681,6 +728,70 @@ export function computeEvidence(input: ComputeEvidenceInput): EvidenceReport {
     summary,
     occurrences,
   };
+}
+
+/**
+ * Numeric in-text citations, used only when the document's own reference list is numbered. Each number is mapped
+ * to the publication its numbered entry matches (DOI/title/author+year, see `matchReference`). Bracket markers
+ * always count; bare parenthesised numbers "(3)" only when the text has no bracket marker at all and many of them.
+ * A bracket with a number outside 1..N (e.g. the interval "[0, 1]") is not a citation.
+ */
+export function numericMarkers(text: string, mainText: PdfText, pubs: PublicationNode[], sups: Span[] = []) {
+  const entries = extractReferenceEntries(mainText).filter((e) => e.label);
+  if (entries.length < 2) return [];
+  const byNumber = new Map<number, string | null>();
+  for (const e of entries) {
+    const n = Number(/\d+/.exec(e.label!)?.[0]);
+    const m = matchReference(e, pubs);
+    byNumber.set(n, m.status === 'confirmed' || m.status === 'weak' ? m.publicationId : null);
+  }
+  const max = Math.max(...byNumber.keys());
+  const expand = (body: string): number[] | undefined => {
+    const out: number[] = [];
+    for (const part of body.split(/\s*[,;]\s*/)) {
+      const r = /^(\d{1,3})(?:\s*[-–—]\s*(\d{1,3}))?$/.exec(part.trim());
+      if (!r) return undefined;
+      const a = Number(r[1]);
+      const b = r[2] ? Number(r[2]) : a;
+      if (a < 1 || b > max || b < a || b - a > 30) return undefined;
+      for (let i = a; i <= b; i++) out.push(i);
+    }
+    return out.length ? out : undefined;
+  };
+  type M = { raw: string; start: number; end: number; nums: number[] };
+  const found: M[] = [];
+  for (const m of text.matchAll(/\[(\d{1,3}(?:\s*[-–—,;]\s*\d{1,3})*)\](?:\s*[-–—]\s*\[(\d{1,3})\])?/g)) {
+    let nums = expand(m[1]);
+    if (!nums) continue;
+    if (m[2]) {
+      const to = Number(m[2]);
+      const from = nums[nums.length - 1];
+      if (to > from && to <= max && to - from <= 30) for (let i = from + 1; i <= to; i++) nums.push(i);
+      else nums = nums.slice();
+    }
+    found.push({ raw: m[0], start: m.index!, end: m.index! + m[0].length, nums });
+  }
+  // Superscripts only count when the paper does not use [n] (otherwise they are affiliations/footnotes), and
+  // never before the body starts (author affiliations "Kang¹, Oh²" sit above the abstract/introduction).
+  const head = /(?:^|\n)\s*(?:\d+\.?\s*)?(?:abstract|resumo|summary|introduction|introdução|background)\b/i.exec(text.slice(0, Math.floor(text.length * 0.3)));
+  const bodyStart = head ? head.index : 0;
+  for (const sp of found.length >= 3 ? [] : sups) {
+    if (sp.start < bodyStart) continue;
+    const raw = text.slice(sp.start, sp.end).replace(/\s+/g, '').replace(/[,;]$/, '');
+    const nums = /^\d/.test(raw) ? expand(raw.replace(/[−]/g, '-')) : undefined;
+    if (nums && !found.some((f) => f.start < sp.end && sp.start < f.end)) found.push({ raw: text.slice(sp.start, sp.start + raw.length), start: sp.start, end: sp.start + raw.length, nums });
+  }
+  if (found.length === 0) {
+    const paren: M[] = [];
+    for (const m of text.matchAll(/\((\d{1,3}(?:\s*[-–,]\s*\d{1,3})*)\)/g)) {
+      const nums = expand(m[1]);
+      if (nums) paren.push({ raw: m[0], start: m.index!, end: m.index! + m[0].length, nums });
+    }
+    if (paren.length >= 3) found.push(...paren);
+  }
+  return found.flatMap((f) =>
+    [...new Set(f.nums)].map((n) => ({ authors: [] as string[], etAl: false, year: 0, yearLabel: '', raw: f.raw, start: f.start, end: f.end, numericPub: byNumber.get(n) ?? null })),
+  );
 }
 
 function scoreOccurrence(
@@ -811,34 +922,189 @@ export function fuseCandidates(cands: Candidate[], params: EvidenceParams): bool
   return true;
 }
 
-/** Labels an occurrence from its candidates. */
+/** Page cited in a marker: "(Silva, 2020, p. 12)", "(SILVA, 2020, p. 12-14)". */
+export function citedPages(marker: string): number[] | undefined {
+  const m = /\bp(?:p|ág|ag)?\.\s*(\d{1,4})(?:\s*[-–]\s*(\d{1,4}))?/i.exec(marker);
+  if (!m) return undefined;
+  const a = Number(m[1]);
+  const b = m[2] ? Number(m[2]) : a;
+  if (b < a || b - a > 30) return [a];
+  return Array.from({ length: b - a + 1 }, (_, i) => a + i);
+}
+
+const foldQuote = (s: string) => stripDiacritics(s).toLowerCase().replace(/[\u00ad-]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+
+/** Direct quotations (4+ words between quotes) in a sentence. */
+export function directQuotes(sentence: string): string[] {
+  const out: string[] = [];
+  for (const m of sentence.matchAll(/[“"«]([^”"»]{12,600})[”"»]/g)) if (m[1].trim().split(/\s+/).length >= 4) out.push(m[1].trim());
+  return out;
+}
+
+/** Numbers of the claim worth checking: decimals and 3+ digit integers that are not years nor the cited pages. */
+function checkableNumbers(claim: string, pages: number[] = []): string[] {
+  const out = new Set<string>();
+  for (const m of stripDiacritics(claim).matchAll(/(?<![\w.,])(\d+(?:[.,]\d+)?)(?![\w]|[.,]\d)/g)) {
+    const raw = m[1].replace(',', '.');
+    const n = Number(raw);
+    if (!raw.includes('.') && raw.length < 3) continue;
+    if (!raw.includes('.') && n >= 1900 && n <= 2099) continue;
+    if (pages.includes(n)) continue;
+    out.add(raw);
+  }
+  return [...out];
+}
+
+const pct = (x: number) => `${Math.round(x * 100)}%`;
+
+/**
+ * Labels an occurrence from its candidates.
+ *
+ * "Ressalva" is reserved for a concrete, checkable problem, each with its own reason:
+ *  - the page given in the marker does not exist in the source PDF, or holds nothing similar (`pagina_citada`);
+ *  - a direct quotation is not in the source (`citacao_direta`);
+ *  - a number of the claim (decimal, or 3+ digits, not a year) occurs nowhere in the source (`numero_ausente`).
+ * A passage below the similarity floor is "não localizado". Anything else that matched is "localizado", with its
+ * similarity shown: a low similarity is common across languages (PT text citing EN sources) and is NOT a defect of
+ * the citation, so it no longer produces a ressalva (that rule flagged 45 of 56 citations wrongly on the internal gold set).
+ */
 export function finalizeV2(occ: CitationOccurrence, pm: PendingMatch, params: EvidenceParams) {
   const cands = pm.candidates;
   const semantic = fuseCandidates(cands, params);
   const th = semantic ? { strong: params.v2.strongSem, weak: params.v2.weakSem } : { strong: params.v2.strong, weak: params.v2.weak };
-  occ.passages = cands
+  let ordered = cands;
+  occ.notes = [];
+  occ.reason = undefined;
+  const S = pm.index.sentences;
+  const x = indexV2(pm.index);
+
+  // 1. direct quotations are checked literally
+  const quotes = directQuotes(occ.sentence ?? occ.claim ?? '');
+  let quoteOk: boolean | undefined;
+  if (quotes.length && !/tradu[cç][aã]o\s+(?:nossa|livre)/i.test(occ.sentence ?? '')) {
+    const flow = foldQuote(S.map((s) => s.text).join(' '));
+    const missing = quotes.filter((q) => !flow.includes(foldQuote(q)));
+    quoteOk = missing.length === 0;
+    if (quoteOk) {
+      const q = foldQuote(quotes[0]);
+      const hit = S.findIndex((s, i) => foldQuote(s.text + ' ' + (S[i + 1]?.text ?? '')).includes(q.slice(0, 60)));
+      if (hit >= 0) {
+        const c: Candidate = { start: hit, len: 1, lex: 1, page: S[hit].page, region: S[hit].region, text: windowText(S, hit, 2, params.maxPassageChars), missingNumbers: [], matchedTerms: 1, score: 1 };
+        ordered = [c, ...cands.filter((o) => o.start !== hit)];
+      }
+    }
+  }
+
+  // 2. cited page ("p. 12"): physical page from the printed page numbers of the PDF when they can be read
+  const pages = citedPages(occ.marker ?? '');
+  let pageProblem: string | undefined;
+  if (pages && S.length) {
+    const printed = printedPageMap(pm.index);
+    const physical = printed.size ? pages.map((p) => printed.get(p)).filter((p): p is number => p !== undefined) : pages.filter((p) => p <= pm.index.pageCount);
+    const label = pages.length > 1 ? `p. ${pages[0]}–${pages[pages.length - 1]}` : `p. ${pages[0]}`;
+    if (physical.length === 0 && printed.size) {
+      const nums = [...printed.keys()];
+      pageProblem = `A página citada (${label}) não existe no PDF da fonte (numeração ${Math.min(...nums)}–${Math.max(...nums)}).`;
+    } else if (physical.length) {
+      const all = lexicalCandidates(pm.index, buildQuery(pm.parts, params.match), { ...params.match, topK: 400 }, params.maxPassageChars);
+      const onPage = all.filter((c) => physical.includes(c.page)).sort((a, b) => b.lex - a.lex)[0];
+      if (onPage && onPage.lex >= th.weak) {
+        onPage.score = semantic ? Math.max(onPage.lex, onPage.score) : onPage.lex;
+        ordered = [onPage, ...ordered.filter((o) => o.start !== onPage.start)];
+        occ.notes.push(`Há um trecho parecido na página citada (${label}).`);
+      } else if (ordered[0] && ordered[0].score >= th.weak) {
+        pageProblem = `Na página citada (${label}) não há trecho parecido; o mais parecido está na p. ${ordered[0].page} do PDF (similaridade ${pct(ordered[0].score)}).`;
+      }
+    } else occ.notes.push(`Não foi possível conferir a página citada (${label}): o PDF não traz a numeração impressa.`);
+  }
+
+  occ.passages = ordered
     .slice(0, params.maxPassages)
     .filter((c, i) => i === 0 || c.score >= params.minShown)
     .map((c) => ({ fileId: pm.fileId, page: c.page, text: c.text, score: round(c.score), region: c.region }));
-  occ.notes = [];
-  const best = cands[0];
-  if (!best || best.score < th.weak) {
+  const best = ordered[0];
+  occ.score = best ? round(best.score) : 0;
+
+  // 3. numbers that occur nowhere in the source
+  // 0,8588 in the text is often 85.88% in the source (and vice versa); rounding to 1-2 decimals is accepted too
+  const present = (n: string) => {
+    const v = Number(n);
+    const forms = [n, String(+(v * 100).toFixed(4)), String(+(v / 100).toFixed(6))];
+    if ([...x.df.keys()].some((t) => t[0] === '#' && forms.some((f) => t === '#' + f))) return true;
+    if (!n.includes('.')) return false;
+    return [...x.df.keys()].some((t) => {
+      if (t[0] !== '#' || !t.includes('.')) return false;
+      const u = Number(t.slice(1));
+      return [v, v * 100, v / 100].some((w) => Math.abs(u - w) < 0.051 * Math.max(1, Math.abs(w) / 100) && u.toString().length >= 3);
+    });
+  };
+  const absent = checkableNumbers(occ.localClaim ?? occ.claim ?? '', pages).filter((n) => !present(n));
+
+  if (quoteOk === false) {
+    occ.status = 'ressalva';
+    occ.reason = 'citacao_direta';
+    occ.why = 'O trecho entre aspas não aparece literalmente no PDF da fonte.';
+  } else if (pageProblem) {
+    occ.status = 'ressalva';
+    occ.reason = 'pagina_citada';
+    occ.why = pageProblem;
+  } else if (!best || best.score < th.weak) {
     occ.status = 'nao_localizado';
     occ.reason = 'sem_passagem';
-    occ.score = best ? round(best.score) : 0;
+    occ.why = best ? `Nenhum trecho parecido no PDF (melhor similaridade ${pct(best.score)}, mínimo ${pct(th.weak)}).` : 'Nenhum trecho do PDF tem termos em comum com a frase.';
     occ.notes.push('Nenhuma passagem do PDF tem sobreposição suficiente com a frase.');
     return;
-  }
-  occ.score = round(best.score);
-  occ.reason = undefined;
-  if (best.score >= th.strong) occ.status = 'localizado';
-  else {
+  } else if (absent.length) {
     occ.status = 'ressalva';
-    occ.reason = 'baixa_similaridade';
-    occ.notes.push('A melhor passagem cobre só parte dos termos da frase.');
+    occ.reason = 'numero_ausente';
+    occ.why = `${absent.length > 1 ? 'Os números' : 'O número'} ${absent.join(', ')} da frase não ${absent.length > 1 ? 'aparecem' : 'aparece'} em nenhum lugar do PDF da fonte.`;
+  } else {
+    occ.status = 'localizado';
+    occ.why = quoteOk ? `Citação direta encontrada literalmente na p. ${best.page}.` : `Trecho com ${pct(best.score)} de similaridade na p. ${best.page}${best.score < th.strong ? ' (similaridade baixa: confira o trecho)' : ''}.`;
   }
-  if (best.missingNumbers.length) occ.notes.push(`Número(s) da frase ausente(s) da passagem: ${best.missingNumbers.join(', ')}.`);
-  if (best.region === 'resumo') occ.notes.push('A passagem mais próxima está no resumo/início do artigo; confira o corpo do texto.');
+  if (occ.status === 'ressalva' && occ.why) occ.notes.unshift(occ.why);
+  if (best && best.missingNumbers.length && !absent.length && occ.reason !== 'numero_ausente') occ.notes.push(`Número(s) da frase que estão no PDF, mas não neste trecho: ${best.missingNumbers.join(', ')}.`);
+  if (best?.region === 'resumo') occ.notes.push('A passagem mais próxima está no resumo/início do artigo; confira o corpo do texto.');
+}
+
+/** Printed page number -> physical page, read from the page-number lines at the top/bottom of each page. */
+export function printedPageMap(index: ReferenceIndex): Map<number, number> {
+  const m = new Map<number, number>();
+  for (const [phys, printed] of index.printedPages ?? []) if (!m.has(printed)) m.set(printed, phys);
+  // only trust a numbering that advances with the pages (offset constant for most pages)
+  const offsets = new Map<number, number>();
+  for (const [printed, phys] of m) offsets.set(printed - phys, (offsets.get(printed - phys) ?? 0) + 1);
+  const [bestOffset, votes] = [...offsets].sort((a, b) => b[1] - a[1])[0] ?? [0, 0];
+  if (votes < Math.max(2, m.size * 0.5)) return new Map();
+  const out = new Map<number, number>();
+  for (let phys = 1; phys <= index.pageCount; phys++) out.set(phys + bestOffset, phys);
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Manual labels
+// ---------------------------------------------------------------------------
+
+/** Applies the researcher's own labels (they win over the automatic and curated ones; the automatic label is kept). */
+export function applyOverrides(report: EvidenceReport, overrides: Record<string, { status: EvidenceStatus; at: string }> | undefined): EvidenceReport {
+  if (!overrides || Object.keys(overrides).length === 0) return report;
+  const occurrences = report.occurrences.map((o) => {
+    const ov = overrides[o.id];
+    if (!ov) return o;
+    return { ...o, status: ov.status, override: { status: ov.status, at: ov.at, auto: o.status, autoReason: o.reason, autoWhy: o.why } };
+  });
+  return { ...report, occurrences, summary: summarizeOccurrences(occurrences) };
+}
+
+/** Same as applyOverrides, on a report that may already carry overrides (they are undone first). */
+export function reapplyOverrides(report: EvidenceReport, overrides: Record<string, { status: EvidenceStatus; at: string }> | undefined): EvidenceReport {
+  const occurrences = report.occurrences.map((o) => {
+    if (!o.override) return o;
+    const { override, ...rest } = o;
+    return { ...rest, status: override.auto, reason: override.autoReason, why: override.autoWhy };
+  });
+  const base = { ...report, occurrences, summary: summarizeOccurrences(occurrences) };
+  return applyOverrides(base, overrides);
 }
 
 // ---------------------------------------------------------------------------

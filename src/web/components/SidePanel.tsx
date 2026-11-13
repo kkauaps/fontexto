@@ -1,3 +1,4 @@
+import { REF_STATUS_TEXT, type RefRow } from '../../core/refStatus';
 import { useState } from 'react';
 import { UNCATEGORIZED, type CategoryRule } from '../../core/categories';
 import type { Anchor, CitationGraph, GraphEdge, GraphNode, PublicationNode, ReviewAction } from '../../core/model';
@@ -33,6 +34,8 @@ interface Props {
   onShowInDocument: (pubId: string) => void;
   onReview: (edgeId: string, action: ReviewAction) => Promise<void>;
   onCategory: (pubId: string, value: string | null | undefined) => Promise<void>;
+  /** Verification summary per publication (same data as the Referências tab). */
+  refRows?: Map<string, RefRow>;
 }
 
 const label = (g: CitationGraph, id: string) => g.nodes[id]?.label ?? id;
@@ -79,6 +82,26 @@ function PublicationDetails({ g, pub, props }: { g: CitationGraph; pub: Publicat
       <h2 className="pub-title">
         <Value v={pub.title} />
       </h2>
+      {props.refRows?.get(pub.id) && (() => {
+        const r = props.refRows!.get(pub.id)!;
+        return (
+          <div className="side-status">
+            <span className={`pill rs-${r.status}`}>{REF_STATUS_TEXT[r.status]}</span>{' '}
+            {r.citations > 0 && (
+              <span className="small">
+                {r.citations} citação(ões) no texto: {r.counts.localizado} localizada(s), {r.counts.ressalva} com ressalva, {r.counts.nao_localizado} não localizada(s)
+              </span>
+            )}
+            {r.citations > 0 && (
+              <div>
+                <button className="primary" onClick={() => props.onShowInDocument(pub.id)}>
+                  Conferir no documento
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })()}
       <dl className="meta">
         <dt>Autores</dt>
         <dd>
@@ -148,9 +171,7 @@ function PublicationDetails({ g, pub, props }: { g: CitationGraph; pub: Publicat
             Abrir PDF
           </button>
         ) : (
-          <button disabled title="Nenhum PDF associado a esta publicação">
-            PDF indisponível
-          </button>
+          <span className="muted small">Sem PDF desta fonte. Envie ou busque um PDF gratuito na aba Referências.</span>
         )}
       </div>
 
@@ -173,16 +194,14 @@ function PublicationDetails({ g, pub, props }: { g: CitationGraph; pub: Publicat
       )}
 
       <h4>No documento principal</h4>
-      {claims.length > 0 ? (
+      {claims.length > 0 && (
         <ul className="list">
           {claims.map((e) => (
             <li key={e.id}>{label(g, e.source)}</li>
           ))}
         </ul>
-      ) : (
-        <p className="muted small">Afirmações ainda não extraídas (Fase 2: grafo de evidências).</p>
       )}
-      {(props.docCitations?.get(pub.id) ?? 0) > 0 && (
+      {!props.refRows && (props.docCitations?.get(pub.id) ?? 0) > 0 && (
         <button className="primary" onClick={() => props.onShowInDocument(pub.id)}>
           Ver {props.docCitations!.get(pub.id)} citação(ões) no documento
         </button>

@@ -23,6 +23,8 @@ interface Props {
   onOpenReference: (r: OpenRequest) => void;
   onShowInGraph: (pubId: string) => void;
   onOpenFiles: () => void;
+  /** A manual label changed only the evidence report (the graph is the same). */
+  onEvidence: (e: EvidenceReport) => void;
   onGraph: (g: CitationGraph) => void;
 }
 
@@ -45,6 +47,7 @@ const STATUS_CHIPS: { key: StatusFilter; label: string }[] = [
   { key: 'localizado', label: STATUS_TEXT.localizado },
   { key: 'ressalva', label: STATUS_TEXT.ressalva },
   { key: 'nao_localizado', label: STATUS_TEXT.nao_localizado },
+  { key: 'sem_pdf', label: STATUS_TEXT.sem_pdf },
   { key: 'unresolved', label: STATUS_TEXT.unresolved },
 ];
 
@@ -135,7 +138,7 @@ function PageView({ doc, n, scale, size, marks, selected, onMark, scroller }: { 
   );
 }
 
-export function DocumentView({ projectId, graph, evidence, focus, onOpenReference, onShowInGraph, onOpenFiles, onGraph }: Props) {
+export function DocumentView({ projectId, graph, evidence, focus, onOpenReference, onShowInGraph, onOpenFiles, onGraph, onEvidence }: Props) {
   const [doc, setDoc] = useState<PdfDoc | undefined>();
   const [docError, setDocError] = useState<string | undefined>();
   const [size, setSize] = useState<{ w: number; h: number }>({ w: 612 * 1.2, h: 792 * 1.2 });
@@ -216,7 +219,8 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
     for (const g of filtered) {
       const first = g.occurrences[0];
       const list = m.get(g.page) ?? [];
-      list.push({ id: g.spanId, phrase: g.marker, nth: g.nthOnPage, status: g.status, fallback: { rects: first.rects, pageSize: first.pageSize } });
+      // numeric markers: use the extractor's box (a text search for "3" would hit any number on the page)
+      list.push({ id: g.spanId, phrase: /^[[(]?\d/.test(g.marker) ? '' : g.marker, nth: g.nthOnPage, status: g.status, fallback: { rects: first.rects, pageSize: first.pageSize } });
       m.set(g.page, list);
     }
     return m;
@@ -291,7 +295,7 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
           </div>
           {counts && counts.all > 0 && (
             <div className="statbar" title="Proporção de cada status entre as citações">
-              {(['localizado', 'ressalva', 'nao_localizado', 'unresolved'] as const).map((k) => (counts[k] > 0 ? <span key={k} className={`seg st-${k}`} style={{ flexGrow: counts[k] }} /> : null))}
+              {(['localizado', 'ressalva', 'nao_localizado', 'sem_pdf', 'unresolved'] as const).map((k) => (counts[k] > 0 ? <span key={k} className={`seg st-${k}`} style={{ flexGrow: counts[k] }} /> : null))}
             </div>
           )}
           <select value={pubFilter ?? ''} onChange={(e) => setPubFilter(e.target.value || undefined)} aria-label="Filtrar por referência">
@@ -331,7 +335,7 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
           <div className="notice">
             {refsWithoutPdf} citação(ões) sem o PDF da referência; sem ele não há trecho para mostrar.{' '}
             <UploadButton projectId={projectId} role="reference" accept="application/pdf,.pdf" multiple onGraph={onGraph}>
-              Enviar PDFs das referências
+              Buscar ou enviar PDFs das referências
             </UploadButton>
           </div>
         )}
@@ -361,6 +365,7 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
             onOpenReference={onOpenReference}
             onShowInGraph={onShowInGraph}
             onOpenFiles={onOpenFiles}
+            onLabel={async (occId, status) => onEvidence(await api.evidenceLabel(projectId, occId, status))}
           />
         ) : (
           <CitationList groups={filtered} graph={graph} onSelect={(id) => select(id, true)} method={evidence.method} />

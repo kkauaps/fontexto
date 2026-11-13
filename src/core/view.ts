@@ -5,6 +5,7 @@
 import { categoryOf, UNCATEGORIZED } from './categories.js';
 import type { CitationGraph, EdgeKind, GraphEdge, GraphNode, NodeKind, PublicationNode, VerificationStatus } from './model.js';
 import { normalizeName, normalizeTitle } from './normalize.js';
+import type { RefStatus } from './refStatus.js';
 
 export type GraphMode = 'bibliographic' | 'evidence';
 
@@ -20,6 +21,11 @@ export interface ViewFilters {
   search?: string;
   onlyWithPdf?: boolean;
   hideIsolated?: boolean;
+  /** Only these verification statuses (empty/undefined = all). Needs the status map passed to buildView. */
+  refStatuses?: RefStatus[];
+  /** Citations between the sources themselves (pub -> pub). Undefined = shown. */
+  interSource?: boolean;
+  colorBy?: 'status' | 'category';
 }
 
 export const DEFAULT_FILTERS: ViewFilters = {
@@ -44,6 +50,7 @@ export interface ViewNode {
   matchesSearch: boolean;
   groupSize?: number;
   memberIds?: string[];
+  refStatus?: RefStatus;
 }
 
 export interface ViewEdge {
@@ -74,8 +81,9 @@ const MODE_EDGES: Record<GraphMode, EdgeKind[]> = {
 
 export const groupNodeId = (category: string) => `group:${category}`;
 
-function nodePasses(n: GraphNode, f: ViewFilters): boolean {
+function nodePasses(n: GraphNode, f: ViewFilters, refStatus?: ReadonlyMap<string, RefStatus>): boolean {
   if (n.kind !== 'publication') return true;
+  if (refStatus && f.refStatuses?.length && !f.refStatuses.includes(refStatus.get(n.id) ?? 'nao_citada')) return false;
   if (f.yearMin !== undefined && (n.year === undefined || n.year < f.yearMin)) return false;
   if (f.yearMax !== undefined && (n.year === undefined || n.year > f.yearMax)) return false;
   if (f.author?.trim()) {
@@ -98,15 +106,20 @@ export function matchesSearch(n: GraphNode, q: string | undefined): boolean {
   return hay.includes(nq) || (n.kind === 'publication' && Boolean(n.doi) && n.doi!.includes(q.trim().toLowerCase()));
 }
 
-export function buildView(graph: CitationGraph, f: ViewFilters, collapsed: ReadonlySet<string> = new Set()): ViewGraph {
+export function buildView(graph: CitationGraph, f: ViewFilters, collapsed: ReadonlySet<string> = new Set(), refStatus?: ReadonlyMap<string, RefStatus>): ViewGraph {
   const kinds = MODE_NODES[f.mode];
   const edgeKinds = MODE_EDGES[f.mode].filter((k) => f.edgeKinds.includes(k));
   const all = Object.values(graph.nodes).filter((n) => kinds.includes(n.kind));
-  const visible = new Map(all.filter((n) => nodePasses(n, f)).map((n) => [n.id, n]));
+  const visible = new Map(all.filter((n) => nodePasses(n, f, refStatus)).map((n) => [n.id, n]));
   const hiddenByFilter = all.length - visible.size;
 
   let edges: GraphEdge[] = Object.values(graph.edges).filter(
-    (e) => edgeKinds.includes(e.kind) && f.statuses.includes(e.status) && visible.has(e.source) && visible.has(e.target),
+    (e) =>
+      edgeKinds.includes(e.kind) &&
+      f.statuses.includes(e.status) &&
+      visible.has(e.source) &&
+      visible.has(e.target) &&
+      (f.interSource !== false || graph.nodes[e.source]?.kind === 'document'),
   );
   // In evidence mode only publications that take part in evidence relations are shown.
   if (f.mode === 'evidence') {
@@ -141,6 +154,7 @@ export function buildView(graph: CitationGraph, f: ViewFilters, collapsed: Reado
       inDegree: inDeg.get(n.id) ?? 0,
       outDegree: outDeg.get(n.id) ?? 0,
       matchesSearch: matchesSearch(n, f.search),
+      refStatus: pub && refStatus ? (refStatus.get(n.id) ?? 'nao_citada') : undefined,
     };
   };
 

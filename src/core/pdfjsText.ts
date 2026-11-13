@@ -58,7 +58,7 @@ export async function textFromDocument(
     const lines: TextLine[] = [];
     let cur:
       | {
-          parts: string[];
+          parts: { s: string; sup: boolean }[];
           x0: number;
           x1: number;
           top: number;
@@ -69,10 +69,30 @@ export async function textFromDocument(
       | undefined;
     const flush = () => {
       if (cur) {
-        const text = cur.parts.join("").replace(/\s+/g, " ").trim();
-        if (text)
+        // join the parts collapsing whitespace, keeping the offsets of superscript runs (numeric citations "text³,⁵")
+        let text = "";
+        const sups: [number, number][] = [];
+        for (const part of cur.parts) {
+          let s = part.s.replace(/\s+/g, " ");
+          if ((text === "" || text.endsWith(" ")) && s.startsWith(" ")) s = s.slice(1);
+          if (!s) continue;
+          if (part.sup) {
+            const lead = s.length - s.trimStart().length;
+            const core = s.trim();
+            if (core) {
+              const start = text.length + lead;
+              const last = sups[sups.length - 1];
+              if (last && last[1] === start) last[1] = start + core.length;
+              else sups.push([start, start + core.length]);
+            }
+          }
+          text += s;
+        }
+        const trimmed = text.trimEnd();
+        if (trimmed)
           lines.push({
-            text,
+            ...(sups.length ? { sups: sups.filter(([a]) => a < trimmed.length).map(([a, b]) => [a, Math.min(b, trimmed.length)] as [number, number]) } : {}),
+            text: trimmed,
             rect: {
               x: cur.x0,
               y: cur.top,
@@ -92,9 +112,19 @@ export async function textFromDocument(
       const base = t[5];
       const w = raw.width;
       if (raw.str.length > 0) {
+        // a small, raised run of digits right after the text is a superscript (numeric citation), not a new line
+        const sup =
+          !!cur &&
+          /^[\d\s,;\u2013\u2212-]+$/.test(raw.str) &&
+          /\d/.test(raw.str) &&
+          size <= cur.size * 0.85 &&
+          base < cur.base - cur.size * 0.12 &&
+          base > cur.base - cur.size * 0.75 &&
+          x >= cur.x1 - cur.size * 0.5 &&
+          x <= cur.x1 + cur.size * 1.5;
         const newLine =
           !cur ||
-          Math.abs(base - cur.base) > size * 0.5 ||
+          (!sup && Math.abs(base - cur.base) > size * 0.5) ||
           x < cur.x1 - size * 2;
         if (newLine) {
           flush();
@@ -109,16 +139,16 @@ export async function textFromDocument(
           };
         } else if (cur) {
           const gap = x - cur.x1;
-          const last = cur.parts[cur.parts.length - 1] ?? "";
+          const last = cur.parts[cur.parts.length - 1]?.s ?? "";
           if (gap > size * 0.15 && !/\s$/.test(last) && !/^\s/.test(raw.str))
-            cur.parts.push(" ");
+            cur.parts.push({ s: " ", sup: false });
           cur.x0 = Math.min(cur.x0, x);
           cur.x1 = Math.max(cur.x1, x + w);
           cur.top = Math.min(cur.top, base - size);
           cur.bottom = Math.max(cur.bottom, base + size * 0.25);
-          cur.size = Math.max(cur.size, size);
+          if (!sup) cur.size = Math.max(cur.size, size);
         }
-        cur!.parts.push(raw.str);
+        cur!.parts.push({ s: raw.str, sup });
       }
       if (raw.hasEOL) flush();
     }

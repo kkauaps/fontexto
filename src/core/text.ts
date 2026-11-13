@@ -10,6 +10,8 @@ export interface TextLine {
   rect: Rect;
   /** Dominant font size, used to detect headings. */
   fontSize: number;
+  /** [start, end) offsets in `text` of superscript digit runs (numeric citations such as "wounds³,⁵"). */
+  sups?: [number, number][];
 }
 
 export interface PageText {

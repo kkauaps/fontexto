@@ -250,3 +250,56 @@ describe('redactEvidenceForSharing', () => {
     expect(o.passages[0].text).toMatch(/12\.5 percent/);
   });
 });
+
+describe('ressalva only for concrete, explainable problems (v2)', () => {
+  const occOf = (line: string) => {
+    const { graph, texts } = project({ mainLines: [[line], ['REFERENCES']] });
+    return computeEvidence({ projectId: 't', now: NOW, graph, texts }).occurrences[0];
+  };
+
+  it('a matching passage is localizado and says where and how similar it is', () => {
+    const o = occOf('Gradient lattices improve tissue boundary estimation on dermatology images (QUINTANA et al., 2020).');
+    expect(o.status).toBe('localizado');
+    expect(o.why).toMatch(/similaridade na p\. 2/);
+  });
+
+  it('a number of the claim that exists nowhere in the source is a ressalva with the number in the reason', () => {
+    const o = occOf('Gradient lattices improve tissue boundary estimation by 99.9 percent on dermatology images (QUINTANA et al., 2020).');
+    expect(o.status).toBe('ressalva');
+    expect(o.reason).toBe('numero_ausente');
+    expect(o.why).toMatch(/99\.9/);
+  });
+
+  it('accepts 0,125 in the text for 12.5% in the source, and ignores years', () => {
+    const o = occOf('Em 2019, gradient lattices improve tissue boundary estimation em 0,125 nas dermatology images (QUINTANA et al., 2020).');
+    expect(o.status).toBe('localizado');
+  });
+
+  it('checks the cited page: a page outside the PDF numbering is a ressalva', () => {
+    const { graph, texts } = project({ mainLines: [['Gradient lattices improve tissue boundary estimation on dermatology images (QUINTANA et al., 2020, p. 40).'], ['REFERENCES']] });
+    const ref = Object.keys(texts).find((id) => graph.files[id]?.originalName === 'quintana.pdf')!;
+    texts[ref].pages.forEach((p, i) => p.lines.push({ text: String(i + 1), rect: { x: 290, y: 800, w: 10, h: 10 }, fontSize: 9 }));
+    const o = computeEvidence({ projectId: 't', now: NOW, graph, texts }).occurrences[0];
+    expect(o.status).toBe('ressalva');
+    expect(o.reason).toBe('pagina_citada');
+    expect(o.why).toMatch(/p\. 40/);
+  });
+
+  it('checks the cited page: the passage on the cited page comes first', () => {
+    const { graph, texts } = project({ mainLines: [['Gradient lattices improve tissue boundary estimation on dermatology images (QUINTANA et al., 2020, p. 2).'], ['REFERENCES']] });
+    const ref = Object.keys(texts).find((id) => graph.files[id]?.originalName === 'quintana.pdf')!;
+    texts[ref].pages.forEach((p, i) => p.lines.push({ text: String(i + 1), rect: { x: 290, y: 800, w: 10, h: 10 }, fontSize: 9 }));
+    const o = computeEvidence({ projectId: 't', now: NOW, graph, texts }).occurrences[0];
+    expect(o.status).toBe('localizado');
+    expect(o.passages[0].page).toBe(2);
+  });
+
+  it('a direct quotation must be literally in the source', () => {
+    const ok = occOf('Segundo os autores, “gradient lattices improve tissue boundary estimation by 12.5 percent” (QUINTANA et al., 2020).');
+    expect(ok.status).toBe('localizado');
+    expect(ok.why).toMatch(/literalmente/);
+    const bad = occOf('Segundo os autores, “gradient lattices always beat every human expert in boundary estimation” (QUINTANA et al., 2020).');
+    expect(bad.status).toBe('ressalva');
+    expect(bad.reason).toBe('citacao_direta');
+  });
+});

@@ -26,7 +26,7 @@ import { emptyDecisions, type CitationGraph, type FileRecord, type FileRole, typ
 import { extractReferenceEntries } from '../core/references.js';
 import { parseReferences, toBibtex, type ParsedReference } from '../core/refparse.js';
 import { applyCurated, type CuratedApplyResult, type CuratedFile } from '../core/curated.js';
-import { computeEvidence, type EvidenceReport, type ReferenceIndex } from '../core/evidence.js';
+import { applyOverrides, computeEvidence, type EvidenceReport, type ReferenceIndex } from '../core/evidence.js';
 import { buildGraph, type ExternalMetadata } from '../core/pipeline.js';
 import type { PdfText } from '../core/text.js';
 import { DEFAULT_CATEGORY_RULES } from './defaults.js';
@@ -351,6 +351,7 @@ export class ProjectStore {
       let evidence = computeEvidence({ projectId, now: graph.builtAt, graph, texts, cache: this.refIndexCache });
       const curated = await this.getCurated(projectId);
       if (curated) evidence = applyCurated(graph, evidence, curated).report;
+      evidence = applyOverrides(evidence, (await this.getDecisions(projectId)).evidence);
       await writeJsonAtomic(this.file(projectId, 'evidence.json'), evidence);
       return graph;
     });

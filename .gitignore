@@ -17,3 +17,5 @@ dist/package/
 # Embedding model files (npm run fetch-model). Never commit.
 models/
 models-eval/
+# Wrangler / Pages dev state. Never commit.
+.wrangler/

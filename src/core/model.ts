@@ -310,6 +310,8 @@ export interface UserDecisions {
   fileLinks: Record<string, string | null>;
   categories: Record<string, string | null>;
   edgeReviews: Record<string, { action: ReviewAction; note?: string; at: string }[]>;
+  /** Labels set by hand per citation occurrence (id `o<offset>-<k>`), applied over the automatic/curated label. */
+  evidence?: Record<string, { status: 'localizado' | 'ressalva' | 'nao_localizado'; at: string }>;
 }
 
 export const emptyDecisions = (): UserDecisions => ({
@@ -317,6 +319,7 @@ export const emptyDecisions = (): UserDecisions => ({
   fileLinks: {},
   categories: {},
   edgeReviews: {},
+  evidence: {},
 });
 
 export const isPublication = (n: GraphNode | undefined): n is PublicationNode => n?.kind === 'publication';
