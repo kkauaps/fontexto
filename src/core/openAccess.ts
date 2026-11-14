@@ -93,7 +93,7 @@ type Fetch = typeof fetch;
 export const OA_CONTACT = 'oa@fontexto.com';
 const UA = `Fontexto/1.0 (+https://fontexto.com; mailto:${OA_CONTACT})`;
 const withMail = (url: string) => `${url}${url.includes('?') ? '&' : '?'}mailto=${encodeURIComponent(OA_CONTACT)}`;
-const withOpenAlexKey = (ctx: { env: OaEnv }, url: string) => {
+export const withOpenAlexKey = (ctx: { env: OaEnv }, url: string) => {
   const u = withMail(url);
   return ctx.env.OPENALEX_API_KEY ? `${u}&api_key=${encodeURIComponent(ctx.env.OPENALEX_API_KEY)}` : u;
 };
@@ -161,10 +161,10 @@ export function resetOaState() {
   defaultCache = memoryCache();
 }
 
-class RateLimited extends Error {}
-class TimedOut extends Error {}
+export class RateLimited extends Error {}
+export class TimedOut extends Error {}
 
-interface Ctx {
+export interface Ctx {
   f: Fetch;
   env: OaEnv;
   timeoutMs: number;
@@ -212,7 +212,7 @@ async function call(ctx: Ctx, name: OaSourceName, url: string, headers: Record<s
   }
 }
 
-async function callJson<T>(ctx: Ctx, name: OaSourceName, url: string, headers?: Record<string, string>, bucket?: string): Promise<T | undefined> {
+export async function callJson<T>(ctx: Ctx, name: OaSourceName, url: string, headers?: Record<string, string>, bucket?: string): Promise<T | undefined> {
   const r = await call(ctx, name, url, headers, bucket);
   if (!r) return undefined;
   try {
@@ -278,6 +278,9 @@ export function edgeCache(cache: EdgeCacheStore, l1: OaCache = memoryCache()): O
 }
 
 let defaultCache = memoryCache();
+/** Shared catalogue context (timeouts, keys, clock) for other /api/oa/* handlers. */
+export const oaContext = (f: Fetch, opts: OaOptions = {}): Ctx => ({ f, env: opts.env ?? {}, timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, now: opts.now ?? Date.now });
+export const foldText = (s: string) => fold(s);
 // v3: v2 folded non-Latin titles to "", so every Russian/Chinese title of one year shared a cache entry
 export const oaCacheKey = (q: OaQuery) => (q.doi ? `v3|doi|${q.doi}` : `v3|t|${fold(q.title ?? '')}|${q.year ?? ''}|${fold(q.author ?? '')}`);
 
@@ -877,13 +880,13 @@ export async function arxivByTitle(title: string, f: Fetch = fetch, author?: str
 }
 
 /** Pages `_headers` rules do not apply to Functions responses: the API sets its own (no sniffing, never rendered as a page). */
-const API_SAFETY_HEADERS = {
+export const API_SAFETY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',
   'Cross-Origin-Resource-Policy': 'same-origin',
 } as const;
 /** JSON is data only. (Not on the PDF: Chrome refuses to show a PDF under a sandbox CSP.) */
-const JSON_CSP = { 'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'; sandbox" } as const;
+export const JSON_CSP = { 'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'; sandbox" } as const;
 
 /** Full request handling, shared by the Pages Function and the local server. */
 export async function handleOaRequest(url: URL, f: Fetch = fetch, opts: OaOptions = {}): Promise<Response> {

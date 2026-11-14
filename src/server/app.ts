@@ -16,6 +16,7 @@ import { securityHeaders } from './securityHeaders.js';
 import { lookupMany } from './metadata.js';
 import { NotFoundError, ProjectStore, ValidationError } from './store.js';
 import { handleOaRequest } from '../core/openAccess.js';
+import { handleGraphRequest } from '../core/openAlexGraph.js';
 
 export interface AppConfig {
   dataDir: string;
@@ -77,6 +78,14 @@ export function createApp(cfg: AppConfig) {
       res.end();
     }));
   }
+  // Links between references (OpenAlex). Same code as the Pages Function /api/oa/graph.
+  app.post('/api/oa/graph', h(async (req, res) => {
+    const body = JSON.stringify(req.body ?? {});
+    const r = await handleGraphRequest(new Request('http://localhost/api/oa/graph', { method: 'POST', headers: { 'content-type': 'application/json' }, body }), fetch, { env: { OPENALEX_API_KEY: process.env.OPENALEX_API_KEY } });
+    res.status(r.status);
+    r.headers.forEach((v, k) => res.setHeader(k, v));
+    res.end(await r.text());
+  }));
   app.get('/api/projects', h(async (_req, res) => res.json(await store.listProjects())));
 
   app.post(

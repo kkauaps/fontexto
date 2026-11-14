@@ -14,6 +14,7 @@ import type { EvidenceReport } from '../core/evidence';
 import { DocumentView, type DocumentFocus } from './components/DocumentView';
 import { FiltersPanel } from './components/FiltersPanel';
 import { GraphCanvas, type Selection } from './components/GraphCanvas';
+import { NetworkGraph } from './components/NetworkGraph';
 import { PdfViewer } from './components/PdfViewer';
 import { ProjectPanel } from './components/ProjectPanel';
 import { SidePanel, type OpenRequest } from './components/SidePanel';
@@ -25,6 +26,9 @@ type Tab = 'doc' | 'refs' | 'graph';
 const INITIAL_FILTERS: ViewFilters = { ...DEFAULT_FILTERS, interSource: false, colorBy: 'status' };
 
 const LAST_PROJECT = 'fontexto:lastProject';
+
+const GRAPH_VIEW_KEY = 'fontexto:graph-view';
+const NO_COLLAPSE: Set<string> = new Set();
 
 export function App() {
   const { t, locale } = useI18n();
@@ -42,6 +46,13 @@ export function App() {
   const docMode = tab === 'doc';
   const setDocMode = (on: boolean) => setTab(on ? 'doc' : 'graph');
   const [oa, setOa] = useState<Record<string, OaState>>({});
+  const [graphView, setGraphView] = useState<'network' | 'diagram'>(() => {
+    try {
+      return localStorage.getItem(GRAPH_VIEW_KEY) === 'diagram' ? 'diagram' : 'network';
+    } catch {
+      return 'network';
+    }
+  });
   const pendingOa = useRef<Record<string, OaState> | undefined>(undefined);
   const [docFocus, setDocFocus] = useState<DocumentFocus | undefined>();
   const [evidence, setEvidence] = useState<EvidenceReport | undefined>();
@@ -109,6 +120,32 @@ export function App() {
   const rowsById = useMemo(() => new Map(rows.map((r) => [r.pub.id, r])), [rows]);
   const refCounts = useMemo(() => Object.fromEntries(REF_STATUS_ORDER.map((s) => [s, rows.filter((r) => r.status === s).length])) as Record<RefStatus, number>, [rows]);
   const view = useMemo(() => (graph ? buildView(graph, filters, collapsed, statusMap) : undefined), [graph, filters, collapsed, statusMap]);
+  const networkOn = graphView === 'network' && filters.mode === 'bibliographic';
+  // the network view groups by topic itself: category groups are never collapsed there
+  const netView = useMemo(() => (graph && networkOn ? buildView(graph, filters, NO_COLLAPSE, statusMap) : undefined), [graph, filters, statusMap, networkOn]);
+  const openalexIds = useMemo(() => {
+    const out: Record<string, string | undefined> = {};
+    for (const [id, s] of Object.entries(oa)) if ('result' in s && s.result?.openalexId) out[id] = s.result.openalexId;
+    return out;
+  }, [oa]);
+  const chooseGraphView = (v: 'network' | 'diagram') => {
+    setGraphView(v);
+    try {
+      localStorage.setItem(GRAPH_VIEW_KEY, v);
+    } catch {
+      /* private mode */
+    }
+  };
+  const viewSwitch = filters.mode === 'bibliographic' && (
+    <div className="seg view-switch" role="radiogroup" aria-label={t.netViewLabel}>
+      <button role="radio" aria-checked={graphView === 'network'} className={graphView === 'network' ? 'on' : ''} onClick={() => chooseGraphView('network')}>
+        {t.netViewNetwork}
+      </button>
+      <button role="radio" aria-checked={graphView === 'diagram'} className={graphView === 'diagram' ? 'on' : ''} onClick={() => chooseGraphView('diagram')}>
+        {t.netViewDiagram}
+      </button>
+    </div>
+  );
   const categories = useMemo(() => {
     if (!graph) return [];
     const s = new Set<string>(rules.map((r) => r.name));
@@ -280,10 +317,29 @@ export function App() {
             years={years}
             hiddenCount={view?.hiddenCount ?? 0}
             refCounts={refCounts}
+            network={networkOn}
           />
           <div className="canvas">
-            {graph && view ? (
+            {graph && networkOn && netView ? (
+              <NetworkGraph
+                projectId={projectId}
+                graph={graph}
+                view={netView}
+                filters={filters}
+                onFilters={setFilters}
+                years={years}
+                docCitations={docCitations}
+                openalexIds={openalexIds}
+                selection={selection}
+                onSelect={setSelection}
+                search={filters.search ?? ''}
+                layoutNonce={layoutNonce}
+                exportName={projectId}
+                viewSwitch={viewSwitch}
+              />
+            ) : graph && view ? (
               <ReactFlowProvider>
+                {viewSwitch && <div className="view-switch-float">{viewSwitch}</div>}
                 <GraphCanvas
                   view={view}
                   rules={rules}

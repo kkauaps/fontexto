@@ -16,6 +16,8 @@ interface Props {
   years: { min?: number; max?: number };
   hiddenCount: number;
   refCounts: Record<RefStatus, number>;
+  /** Network view: colours and link kinds are chosen inside the graph. */
+  network?: boolean;
 }
 
 const BIB_STATUSES: VerificationStatus[] = ['confirmed', 'unverified', 'suggested', 'rejected'];
@@ -30,7 +32,7 @@ function EdgeSwatch({ kind, status }: { kind: EdgeKind; status: VerificationStat
   );
 }
 
-export function FiltersPanel({ filters, onChange, categories, rules, collapsed, onToggleGroup, years, hiddenCount, refCounts }: Props) {
+export function FiltersPanel({ filters, onChange, categories, rules, collapsed, onToggleGroup, years, hiddenCount, refCounts, network }: Props) {
   const { t } = useI18n();
   const set = (patch: Partial<ViewFilters>) => onChange({ ...filters, ...patch });
   const toggleStatus = (s: VerificationStatus) =>
@@ -48,6 +50,7 @@ export function FiltersPanel({ filters, onChange, categories, rules, collapsed, 
 
   return (
     <aside className="sidebar">
+      {!network && (
       <section>
         <h3>{t.colors}</h3>
         <div className="seg" role="radiogroup" aria-label={t.colorBy}>
@@ -59,6 +62,7 @@ export function FiltersPanel({ filters, onChange, categories, rules, collapsed, 
           </button>
         </div>
       </section>
+      )}
 
       <section>
         <h3>{t.sourceStatus}</h3>
@@ -74,6 +78,7 @@ export function FiltersPanel({ filters, onChange, categories, rules, collapsed, 
         ))}
       </section>
 
+      {!network && (
       <section>
         <h3>{t.links}</h3>
         <label className="check" title={t.showInterSourceTitle}>
@@ -105,6 +110,7 @@ export function FiltersPanel({ filters, onChange, categories, rules, collapsed, 
         })}
         <p className="hint">{t.thematicNeverEvidence}</p>
       </section>
+      )}
 
       <section>
         <h3>{t.year}</h3>
@@ -135,7 +141,7 @@ export function FiltersPanel({ filters, onChange, categories, rules, collapsed, 
         </label>
       </section>
 
-      {!byStatus && (
+      {!byStatus && !network && (
       <section>
         <h3>{t.topics}</h3>
         <p className="hint">{t.topicsHint}</p>
@@ -162,6 +168,7 @@ export function FiltersPanel({ filters, onChange, categories, rules, collapsed, 
       </section>
       )}
 
+      {!network && (
       <section>
         <h3>{t.legend}</h3>
         <ul className="legend static">
@@ -181,6 +188,7 @@ export function FiltersPanel({ filters, onChange, categories, rules, collapsed, 
         </ul>
         {hiddenCount > 0 && <p className="hint">{t.hiddenNodes(hiddenCount)}</p>}
       </section>
+      )}
     </aside>
   );
 }
