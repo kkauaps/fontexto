@@ -2,12 +2,13 @@ import { SemanticNotice } from './SemanticNotice';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EvidenceReport } from '../../core/evidence';
 import type { CitationGraph } from '../../core/model';
-import { countByStatus, filterGroups, groupOccurrences, neighbourGroup, occurrencesByPublication, STATUS_TEXT, type CitationGroup, type GroupStatus, type StatusFilter } from '../../core/evidenceView';
+import { countByStatus, filterGroups, groupOccurrences, neighbourGroup, occurrencesByPublication, type CitationGroup, type GroupStatus, type StatusFilter } from '../../core/evidenceView';
 import { api } from '../api';
 import { locatePhraseBoxes, openPdf, renderPage, type BoxRect, type PdfDoc } from '../pdfRender';
 import { CitationList, CitationPanel } from './CitationPanel';
 import { SetupChecklist, UploadButton } from './SetupChecklist';
 import type { OpenRequest } from './SidePanel';
+import { evidenceStatusText, translateRuntime, useI18n } from '../i18n';
 
 export interface DocumentFocus {
   pubId?: string;
@@ -42,16 +43,9 @@ interface Placed {
   approximate: boolean;
 }
 
-const STATUS_CHIPS: { key: StatusFilter; label: string }[] = [
-  { key: 'all', label: 'Todas' },
-  { key: 'localizado', label: STATUS_TEXT.localizado },
-  { key: 'ressalva', label: STATUS_TEXT.ressalva },
-  { key: 'nao_localizado', label: STATUS_TEXT.nao_localizado },
-  { key: 'sem_pdf', label: STATUS_TEXT.sem_pdf },
-  { key: 'unresolved', label: STATUS_TEXT.unresolved },
-];
 
 function PageView({ doc, n, scale, size, marks, selected, onMark, scroller }: { doc: PdfDoc; n: number; scale: number; size: { w: number; h: number }; marks: Mark[]; selected?: string; onMark: (id: string) => void; scroller: HTMLElement | null }) {
+  const { t } = useI18n();
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const layerRef = useRef<HTMLDivElement>(null);
@@ -128,17 +122,18 @@ function PageView({ doc, n, scale, size, marks, selected, onMark, scroller }: { 
             data-span={p.id}
             className={`cm cm-${statusOf.get(p.id) ?? 'ressalva'}${selected === p.id ? ' sel' : ''}${p.approximate ? ' approx' : ''}`}
             style={{ left: b.left - 1, top: b.top - 1, width: b.width + 2, height: b.height + 2 }}
-            title={`${STATUS_TEXT[statusOf.get(p.id) ?? 'ressalva']} · clique para ver a evidência`}
+            title={`${evidenceStatusText(t, statusOf.get(p.id) ?? 'ressalva')} · ${t.clickToSeeEvidence}`}
             onClick={() => onMark(p.id)}
           />
         )),
       )}
-      <span className="doc-page-no">p. {n}</span>
+      <span className="doc-page-no">{t.pageAbbr} {n}</span>
     </div>
   );
 }
 
 export function DocumentView({ projectId, graph, evidence, focus, onOpenReference, onShowInGraph, onOpenFiles, onGraph, onEvidence }: Props) {
+  const { t } = useI18n();
   const [doc, setDoc] = useState<PdfDoc | undefined>();
   const [docError, setDocError] = useState<string | undefined>();
   const [size, setSize] = useState<{ w: number; h: number }>({ w: 612 * 1.2, h: 792 * 1.2 });
@@ -267,14 +262,14 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
   if (!evidence)
     return (
       <div className="loading">
-        <span className="spinner" /> Localizando as citações do documento…
+        <span className="spinner" /> {t.locatingCitations}
       </div>
     );
   if (!mainFileId) {
     return (
       <div className="doc-empty">
-        <h2>Abra o seu documento</h2>
-        <p className="muted">Envie o PDF do trabalho e a bibliografia. Cada citação do texto fica marcada; ao clicar nela você vê a frase, a referência e o trecho encontrado no artigo citado.</p>
+        <h2>{t.openYourDocument}</h2>
+        <p className="muted">{t.openYourDocumentHint}</p>
         <SetupChecklist projectId={projectId} graph={graph} onGraph={onGraph} />
       </div>
     );
@@ -286,61 +281,68 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
     <div className="docview">
       <div className="doc-main">
         <div className="doc-toolbar">
-          <div className="doc-chips" role="group" aria-label="Filtrar por status">
-            {STATUS_CHIPS.map((c) => (
-              <button key={c.key} className={`chip-filter st-${c.key}${status === c.key ? ' on' : ''}`} onClick={() => setStatus(c.key)} aria-pressed={status === c.key}>
-                {c.label} <b>{counts?.[c.key] ?? 0}</b>
+          <div className="doc-chips" role="group" aria-label={t.filterByStatus}>
+            {([
+              ['all', t.all],
+              ['localizado', evidenceStatusText(t, 'localizado')],
+              ['ressalva', evidenceStatusText(t, 'ressalva')],
+              ['nao_localizado', evidenceStatusText(t, 'nao_localizado')],
+              ['sem_pdf', evidenceStatusText(t, 'sem_pdf')],
+              ['unresolved', evidenceStatusText(t, 'unresolved')],
+            ] as [StatusFilter, string][]).map(([key, label]) => (
+              <button key={key} className={`chip-filter st-${key}${status === key ? ' on' : ''}`} onClick={() => setStatus(key)} aria-pressed={status === key}>
+                {label} <b>{counts?.[key] ?? 0}</b>
               </button>
             ))}
           </div>
           {counts && counts.all > 0 && (
-            <div className="statbar" title="Proporção de cada status entre as citações">
+            <div className="statbar" title={t.statusBarTitle}>
               {(['localizado', 'ressalva', 'nao_localizado', 'sem_pdf', 'unresolved'] as const).map((k) => (counts[k] > 0 ? <span key={k} className={`seg st-${k}`} style={{ flexGrow: counts[k] }} /> : null))}
             </div>
           )}
-          <select value={pubFilter ?? ''} onChange={(e) => setPubFilter(e.target.value || undefined)} aria-label="Filtrar por referência">
-            <option value="">Todas as referências</option>
+          <select value={pubFilter ?? ''} onChange={(e) => setPubFilter(e.target.value || undefined)} aria-label={t.filterByReference}>
+            <option value="">{t.allReferences}</option>
             {pubOptions.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.label} ({p.n})
               </option>
             ))}
           </select>
-          <input type="search" placeholder="Buscar na frase ou referência" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input type="search" placeholder={t.searchInSentenceOrRef} value={search} onChange={(e) => setSearch(e.target.value)} />
           <span className="doc-nav">
-            <button onClick={() => step(-1)} disabled={filtered.length === 0} title="Citação anterior">
+            <button onClick={() => step(-1)} disabled={filtered.length === 0} title={t.previousCitation}>
               ‹
             </button>
-            <span className="small muted">{filtered.length} marcações no texto</span>
-            <button onClick={() => step(1)} disabled={filtered.length === 0} title="Próxima citação">
+            <span className="small muted">{t.marksInText(filtered.length)}</span>
+            <button onClick={() => step(1)} disabled={filtered.length === 0} title={t.nextCitation}>
               ›
             </button>
-            <button onClick={() => setScale((s) => Math.max(0.7, +(s - 0.15).toFixed(2)))} title="Diminuir">
+            <button onClick={() => setScale((s) => Math.max(0.7, +(s - 0.15).toFixed(2)))} title={t.zoomOut}>
               −
             </button>
-            <button onClick={() => setScale((s) => Math.min(2.4, +(s + 0.15).toFixed(2)))} title="Aumentar">
+            <button onClick={() => setScale((s) => Math.min(2.4, +(s + 0.15).toFixed(2)))} title={t.zoomIn}>
               +
             </button>
           </span>
         </div>
         {!hasBib && (
           <div className="notice">
-            Sem bibliografia (.bib), as citações não podem ser ligadas às referências.{' '}
+            {t.noBibNotice}{' '}
             <UploadButton projectId={projectId} role="reference" accept=".bib,text/plain" primary onGraph={onGraph}>
-              Enviar .bib
+              {t.sendBib}
             </UploadButton>
           </div>
         )}
         {hasBib && refsWithoutPdf > 0 && (
           <div className="notice">
-            {refsWithoutPdf} citação(ões) sem o PDF da referência; sem ele não há trecho para mostrar.{' '}
+            {t.citationsWithoutPdf(refsWithoutPdf)}{' '}
             <UploadButton projectId={projectId} role="reference" accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" multiple onGraph={onGraph}>
-              Buscar ou enviar PDFs das referências
+              {t.findOrSendPdfs}
             </UploadButton>
           </div>
         )}
         {hasBib && evidence.summary.occurrences > 0 && <SemanticNotice projectId={projectId} method={evidence.method} onGraph={onGraph} />}
-        {docError && <div className="notice error">{docError}</div>}
+        {docError && <div className="notice error">{translateRuntime(t, docError)}</div>}
         <div className="doc-pages" ref={scrollerRef}>
           {doc ? (
             Array.from({ length: doc.numPages }, (_, i) => i + 1).map((n) => (
@@ -348,7 +350,7 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
             ))
           ) : (
             <div className="loading doc-loading">
-              <span className="spinner" /> Abrindo o PDF…
+              <span className="spinner" /> {t.openingPdf}
             </div>
           )}
         </div>

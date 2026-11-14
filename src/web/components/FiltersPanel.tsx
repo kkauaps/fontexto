@@ -1,8 +1,9 @@
 import type { CategoryRule } from '../../core/categories';
 import type { EdgeKind, VerificationStatus } from '../../core/model';
-import { REF_STATUS_COLOR, REF_STATUS_ORDER, REF_STATUS_TEXT, type RefStatus } from '../../core/refStatus';
+import { REF_STATUS_COLOR, REF_STATUS_ORDER, type RefStatus } from '../../core/refStatus';
 import type { ViewFilters } from '../../core/view';
-import { STATUS_HELP, STATUS_LABEL, categoryColor } from '../labels';
+import { categoryColor } from '../labels';
+import { categoryLabel, refStatusText, useI18n, verificationHelp, verificationLabel } from '../i18n';
 import { edgeStyleFor } from './GraphCanvas';
 
 interface Props {
@@ -30,6 +31,7 @@ function EdgeSwatch({ kind, status }: { kind: EdgeKind; status: VerificationStat
 }
 
 export function FiltersPanel({ filters, onChange, categories, rules, collapsed, onToggleGroup, years, hiddenCount, refCounts }: Props) {
+  const { t } = useI18n();
   const set = (patch: Partial<ViewFilters>) => onChange({ ...filters, ...patch });
   const toggleStatus = (s: VerificationStatus) =>
     set({ statuses: filters.statuses.includes(s) ? filters.statuses.filter((x) => x !== s) : [...filters.statuses, s] });
@@ -47,42 +49,42 @@ export function FiltersPanel({ filters, onChange, categories, rules, collapsed, 
   return (
     <aside className="sidebar">
       <section>
-        <h3>Cores</h3>
-        <div className="seg" role="radiogroup" aria-label="Colorir por">
+        <h3>{t.colors}</h3>
+        <div className="seg" role="radiogroup" aria-label={t.colorBy}>
           <button role="radio" aria-checked={byStatus} className={byStatus ? 'on' : ''} onClick={() => set({ colorBy: 'status' })}>
-            Situação
+            {t.situation}
           </button>
           <button role="radio" aria-checked={!byStatus} className={!byStatus ? 'on' : ''} onClick={() => set({ colorBy: 'category' })}>
-            Tema
+            {t.theme}
           </button>
         </div>
       </section>
 
       <section>
-        <h3>Situação das fontes</h3>
-        <p className="hint">Resultado da conferência das citações. Clique para mostrar/ocultar.</p>
+        <h3>{t.sourceStatus}</h3>
+        <p className="hint">{t.sourceStatusHint}</p>
         {REF_STATUS_ORDER.filter((s) => refCounts[s] > 0).map((s) => (
           <label key={s} className="check">
             <input type="checkbox" checked={refOn(s)} onChange={() => toggleRef(s)} />
             <span className="swatch" style={{ background: REF_STATUS_COLOR[s] }} />
             <span>
-              {REF_STATUS_TEXT[s]} ({refCounts[s]})
+              {refStatusText(t, s)} ({refCounts[s]})
             </span>
           </label>
         ))}
       </section>
 
       <section>
-        <h3>Ligações</h3>
-        <label className="check" title="Além do seu documento citando cada fonte, mostra quando uma fonte cita outra (pelas bibliografias dos PDFs enviados).">
+        <h3>{t.links}</h3>
+        <label className="check" title={t.showInterSourceTitle}>
           <input type="checkbox" checked={filters.interSource !== false} onChange={(e) => set({ interSource: e.target.checked })} />
-          <span>Mostrar citações entre as fontes</span>
+          <span>{t.showInterSource}</span>
         </label>
         {BIB_STATUSES.map((s) => {
           const kind: EdgeKind = s === 'suggested' ? 'related_to' : 'cites';
           const checked = s === 'suggested' ? relatedOn : filters.statuses.includes(s);
           return (
-            <label key={s} className="check" title={STATUS_HELP[s]}>
+            <label key={s} className="check" title={verificationHelp(t, s)}>
               <input
                 type="checkbox"
                 checked={checked}
@@ -97,55 +99,55 @@ export function FiltersPanel({ filters, onChange, categories, rules, collapsed, 
                 }}
               />
               <EdgeSwatch kind={kind} status={s} />
-              <span>{s === 'suggested' ? 'Relação temática sugerida' : `Citação ${STATUS_LABEL[s].toLowerCase()}`}</span>
+              <span>{s === 'suggested' ? t.suggestedThematic : s === 'confirmed' ? t.citationConfirmed : s === 'unverified' ? t.citationUnverified : t.citationRejected}</span>
             </label>
           );
         })}
-        <p className="hint">Relações temáticas nunca são evidência de citação.</p>
+        <p className="hint">{t.thematicNeverEvidence}</p>
       </section>
 
       <section>
-        <h3>Ano</h3>
+        <h3>{t.year}</h3>
         <div className="row">
           <input
             type="number"
-            placeholder={years.min ? String(years.min) : 'de'}
+            placeholder={years.min ? String(years.min) : t.yearFrom}
             value={filters.yearMin ?? ''}
             onChange={(e) => set({ yearMin: e.target.value ? Number(e.target.value) : undefined })}
           />
           <span>–</span>
           <input
             type="number"
-            placeholder={years.max ? String(years.max) : 'até'}
+            placeholder={years.max ? String(years.max) : t.yearTo}
             value={filters.yearMax ?? ''}
             onChange={(e) => set({ yearMax: e.target.value ? Number(e.target.value) : undefined })}
           />
         </div>
-        <h3>Autor</h3>
-        <input type="search" placeholder="Sobrenome" value={filters.author ?? ''} onChange={(e) => set({ author: e.target.value || undefined })} />
+        <h3>{t.author}</h3>
+        <input type="search" placeholder={t.surname} value={filters.author ?? ''} onChange={(e) => set({ author: e.target.value || undefined })} />
         <label className="check">
           <input type="checkbox" checked={Boolean(filters.onlyWithPdf)} onChange={(e) => set({ onlyWithPdf: e.target.checked })} />
-          <span>Somente com PDF</span>
+          <span>{t.onlyWithPdf}</span>
         </label>
         <label className="check">
           <input type="checkbox" checked={Boolean(filters.hideIsolated)} onChange={(e) => set({ hideIsolated: e.target.checked })} />
-          <span>Ocultar nós sem conexões</span>
+          <span>{t.hideIsolated}</span>
         </label>
       </section>
 
       {!byStatus && (
       <section>
-        <h3>Temas</h3>
-        <p className="hint">Clique para filtrar; use ▸ para recolher o grupo em um único nó.</p>
+        <h3>{t.topics}</h3>
+        <p className="hint">{t.topicsHint}</p>
         <ul className="legend">
           {categories.map((c) => (
             <li key={c} className={filters.categories.length && !filters.categories.includes(c) ? 'off' : ''}>
               <button className="linklike" onClick={() => toggleCategory(c)}>
                 <span className="swatch" style={{ background: categoryColor(c, rules) }} />
-                {c}
+                {categoryLabel(t, c)}
               </button>
               {c !== 'Documento principal' && (
-                <button className="mini" title={collapsed.has(c) ? 'Expandir grupo' : 'Recolher grupo'} onClick={() => onToggleGroup(c)}>
+                <button className="mini" title={collapsed.has(c) ? t.expandGroup : t.collapseGroup} onClick={() => onToggleGroup(c)}>
                   {collapsed.has(c) ? '▾' : '▸'}
                 </button>
               )}
@@ -154,30 +156,30 @@ export function FiltersPanel({ filters, onChange, categories, rules, collapsed, 
         </ul>
         {filters.categories.length > 0 && (
           <button className="linklike small" onClick={() => set({ categories: [] })}>
-            Limpar filtro de tema
+            {t.clearTopicFilter}
           </button>
         )}
       </section>
       )}
 
       <section>
-        <h3>Legenda</h3>
+        <h3>{t.legend}</h3>
         <ul className="legend static">
           <li>
-            <span className="legend-node doc" /> Documento principal
+            <span className="legend-node doc" /> {t.mainDocument}
           </li>
           <li>
-            <span className="legend-node" /> Fonte citada
+            <span className="legend-node" /> {t.citedSource}
           </li>
           <li>
-            <span className="legend-node no-pdf" /> Fonte sem PDF enviado (ela existe; só não temos o arquivo)
+            <span className="legend-node no-pdf" /> {t.sourceWithoutPdf}
           </li>
           <li>
-            <span className="legend-node match" /> Resultado da pesquisa
+            <span className="legend-node match" /> {t.searchResult}
           </li>
-          <li>Seta A → B: A cita B</li>
+          <li>{t.arrowMeans}</li>
         </ul>
-        {hiddenCount > 0 && <p className="hint">{hiddenCount} nó(s) ocultos pelos filtros.</p>}
+        {hiddenCount > 0 && <p className="hint">{t.hiddenNodes(hiddenCount)}</p>}
       </section>
     </aside>
   );

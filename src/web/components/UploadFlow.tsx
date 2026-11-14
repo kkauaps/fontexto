@@ -5,6 +5,7 @@ import { BRAND } from '../brand';
 import lockup from '../assets/fontexto-lockup.svg';
 import type { FlowMode } from './Landing';
 import { fetchOpenAccess, OaCell, type OaState } from './ReferencesView';
+import { LanguageSwitcher, privacyNote, translateRuntime, useI18n } from '../i18n';
 
 interface Props {
   mode: FlowMode;
@@ -46,6 +47,7 @@ async function filesFromDrop(e: DragEvent): Promise<File[]> {
 }
 
 function DropZone({ id, title, hint, accept, multiple, folder, files, onFiles }: { id: string; title: string; hint: string; accept: string; multiple?: boolean; folder?: boolean; files: File[]; onFiles: (f: File[]) => void }) {
+  const { t } = useI18n();
   const [over, setOver] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
@@ -69,11 +71,11 @@ function DropZone({ id, title, hint, accept, multiple, folder, files, onFiles }:
       <p className="small muted">{hint}</p>
       <div className="row">
         <button type="button" onClick={() => input.current?.click()}>
-          Escolher {multiple ? 'arquivos' : 'arquivo'}
+          {multiple ? t.chooseFiles : t.chooseFile}
         </button>
         {folder && (
           <button type="button" onClick={() => folderInput.current?.click()}>
-            Escolher pasta
+            {t.chooseFolder}
           </button>
         )}
       </div>
@@ -81,7 +83,7 @@ function DropZone({ id, title, hint, accept, multiple, folder, files, onFiles }:
       {folder && <input ref={folderInput} type="file" hidden multiple {...({ webkitdirectory: '' } as object)} onChange={(e) => onFiles([...(e.target.files ?? [])])} />}
       {files.length > 0 && (
         <p className="uf-picked small" aria-live="polite">
-          {files.length === 1 ? files[0].name : `${files.length} arquivos selecionados`}
+          {t.filesSelected(files.length, files[0].name)}
         </p>
       )}
     </div>
@@ -89,6 +91,7 @@ function DropZone({ id, title, hint, accept, multiple, folder, files, onFiles }:
 }
 
 export function UploadFlow({ mode, onBack, onDone }: Props) {
+  const { t } = useI18n();
   const [name, setName] = useState('');
   const [main, setMain] = useState<File[]>([]);
   const [bib, setBib] = useState<File[]>([]);
@@ -102,20 +105,20 @@ export function UploadFlow({ mode, onBack, onDone }: Props) {
 
   const [oa, setOa] = useState<Record<string, OaState>>({});
   const ready = main.length === 1 && (mode === 'doc' || refs.length > 0) && (mode !== 'bib' || bib.length === 1);
-  const title = mode === 'bib' ? 'Documento + .bib + referências' : mode === 'doc' ? 'Só o meu documento' : 'Documento + PDFs das referências';
+  const title = mode === 'bib' ? t.uploadTitleBib : mode === 'doc' ? t.uploadTitleDoc : t.uploadTitlePdfs;
   const readsList = mode !== 'bib';
 
   const setStep = (i: number, s: Partial<Step>) => setSteps((all) => all.map((x, k) => (k === i ? { ...x, ...s } : x)));
 
   const start = async () => {
     const labels = [
-      'Criando o projeto',
-      'Enviando o documento',
-      ...(mode === 'bib' ? ['Enviando o .bib'] : []),
-      ...(refs.length ? [`Enviando ${refs.length} arquivo(s) de referências`] : []),
-      ...(readsList ? ['Lendo a lista de referências do documento'] : []),
-      ...(mode === 'doc' ? ['Buscando PDFs gratuitos das referências'] : []),
-      'Conferindo as citações',
+      t.stepCreateProject,
+      t.stepUploadDocument,
+      ...(mode === 'bib' ? [t.stepUploadBib] : []),
+      ...(refs.length ? [t.stepUploadRefs(refs.length)] : []),
+      ...(readsList ? [t.stepReadList] : []),
+      ...(mode === 'doc' ? [t.stepSearchFreePdfs] : []),
+      t.stepCheckCitations,
     ];
     setSteps(labels.map((label) => ({ label, state: 'wait' })));
     setPhase('working');
@@ -139,7 +142,7 @@ export function UploadFlow({ mode, onBack, onDone }: Props) {
         const BATCH = 6;
         for (let k = 0; k < refs.length; k += BATCH) {
           await api.upload(p.id, refs.slice(k, k + BATCH), 'reference', 'private');
-          setStep(i, { detail: `${Math.min(k + BATCH, refs.length)} de ${refs.length}` });
+          setStep(i, { detail: t.stepProgress(Math.min(k + BATCH, refs.length), refs.length) });
         }
         setStep(i++, { state: 'ok' });
       }
@@ -149,7 +152,7 @@ export function UploadFlow({ mode, onBack, onDone }: Props) {
         const r = await api.extractReferences(p.id);
         g = r.graph;
         setExtracted({ usable: r.usable, total: r.references.length, numbered: r.numbered });
-        setStep(i++, { state: 'ok', detail: `${r.usable} de ${r.references.length} entradas reconhecidas` });
+        setStep(i++, { state: 'ok', detail: t.entriesRecognized(r.usable, r.references.length) });
       }
       if (mode === 'doc' && g) {
         setStep(i, { state: 'run' });
@@ -161,7 +164,7 @@ export function UploadFlow({ mode, onBack, onDone }: Props) {
           states[id] = st;
           if (st.kind !== 'busy') finished++;
           setOa({ ...states });
-          setStep(step, { detail: `${finished} de ${missing.length} consultadas · ${Object.values(states).filter((x) => x.kind === 'got').length} PDF(s) obtidos` });
+          setStep(step, { detail: t.oaProgress(finished, missing.length, Object.values(states).filter((x) => x.kind === 'got').length) });
         });
         if (out.graph) g = out.graph;
         setStep(i++, { state: 'ok' });
@@ -174,10 +177,12 @@ export function UploadFlow({ mode, onBack, onDone }: Props) {
       if (readsList || pending) setPhase('review');
       else onDone(p.id, p);
     } catch (e) {
-      setError((e as Error).message);
+      setError(translateRuntime(t, (e as Error).message));
       setPhase('error');
     }
   };
+
+  const missing = [main.length !== 1 && t.missingMain, mode === 'bib' && bib.length !== 1 && t.missingBib, mode !== 'doc' && refs.length === 0 && t.missingRefs].filter(Boolean);
 
   return (
     <div className="uf">
@@ -185,32 +190,31 @@ export function UploadFlow({ mode, onBack, onDone }: Props) {
         <button className="linklike" onClick={onBack}>
           <img className="lp-logo" src={lockup} alt={BRAND.name} height={30} />
         </button>
-        <button className="linklike" onClick={onBack}>
-          ← Voltar
-        </button>
+        <div className="lp-nav-right">
+          <button className="linklike" onClick={onBack}>
+            ← {t.back}
+          </button>
+          <LanguageSwitcher />
+        </div>
       </header>
       <main className="uf-main">
         {phase === 'form' && (
           <>
             <h1>{title}</h1>
             <p className="lp-lead">
-              {mode === 'bib'
-                ? 'Envie o PDF do seu texto, o arquivo .bib e os PDFs das obras citadas.'
-                : mode === 'doc'
-                  ? 'Envie só o PDF do seu texto. A lista de referências é lida do documento e os PDFs gratuitos das obras citadas são buscados em bases abertas (OpenAlex, Semantic Scholar, arXiv). As que não forem gratuitas ficam marcadas para você enviar depois, se quiser.'
-                  : 'Envie o PDF do seu texto e os PDFs das obras citadas. A lista de referências é lida do próprio documento e cada PDF é ligado à entrada certa pelo DOI, título e autor.'}
+              {mode === 'bib' ? t.uploadLeadBib : mode === 'doc' ? t.uploadLeadDoc : t.uploadLeadPdfs}
             </p>
             <label className="uf-name">
-              <span className="small muted">Nome do projeto (opcional)</span>
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: TCC 2026" />
+              <span className="small muted">{t.projectNameOptional}</span>
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t.projectNamePlaceholder} />
             </label>
             <div className="uf-grid">
-              <DropZone id="uf-main" title="1 · Seu documento" hint="PDF, foto ou scan (PNG/JPG). Só um arquivo." accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" files={main} onFiles={(f) => setMain(f.filter(isPdf).slice(0, 1))} />
-              {mode === 'bib' && <DropZone id="uf-bib" title="2 · Bibliografia (.bib)" hint="O arquivo BibTeX do artigo." accept=".bib,.bibtex" files={bib} onFiles={(f) => setBib(f.filter(isBib).slice(0, 1))} />}
+              <DropZone id="uf-main" title={t.dropYourDocument} hint={t.dropYourDocumentHint} accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" files={main} onFiles={(f) => setMain(f.filter(isPdf).slice(0, 1))} />
+              {mode === 'bib' && <DropZone id="uf-bib" title={t.dropBib} hint={t.dropBibHint} accept=".bib,.bibtex" files={bib} onFiles={(f) => setBib(f.filter(isBib).slice(0, 1))} />}
               <DropZone
                 id="uf-refs"
-                title={`${mode === 'bib' ? '3' : '2'} · PDFs das referências${mode === 'doc' ? ' (opcional)' : ''}`}
-                hint={mode === 'doc' ? 'Já tem alguns PDFs (ex.: os pagos)? Envie aqui; o resto é buscado.' : 'Arraste os PDFs ou uma pasta inteira. Subpastas também valem.'}
+                title={t.dropRefs(mode === 'bib' ? '3' : '2', mode === 'doc')}
+                hint={mode === 'doc' ? t.dropRefsHintDoc : t.dropRefsHint}
                 accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
                 multiple
                 folder
@@ -219,19 +223,19 @@ export function UploadFlow({ mode, onBack, onDone }: Props) {
               />
             </div>
             <p className="small muted">
-              {BRAND.privacyNote}
-              {mode === 'doc' && ' Para a busca, só o DOI, o título, o ano e o 1º autor de cada referência são enviados ao servidor do Fontexto, que não guarda nada.'}
+              {privacyNote(t)}
+              {mode === 'doc' && t.privacyOaNote}
             </p>
             <button className="primary lp-btn" disabled={!ready} onClick={() => void start()}>
-              Processar e abrir
+              {t.processAndOpen}
             </button>
-            {!ready && <p className="small muted">Falta: {[main.length !== 1 && 'o PDF do documento', mode === 'bib' && bib.length !== 1 && 'o arquivo .bib', mode !== 'doc' && refs.length === 0 && 'os PDFs das referências'].filter(Boolean).join(', ')}.</p>}
+            {!ready && <p className="small muted">{t.missingPrefix}{missing.join(', ')}.</p>}
           </>
         )}
 
         {(phase === 'working' || phase === 'error') && (
           <>
-            <h1>{phase === 'working' ? 'Processando…' : 'Algo deu errado'}</h1>
+            <h1>{phase === 'working' ? t.processing : t.somethingWentWrong}</h1>
             <ol className="uf-steps" aria-live="polite">
               {steps.map((s, i) => (
                 <li key={i} className={s.state}>
@@ -249,10 +253,10 @@ export function UploadFlow({ mode, onBack, onDone }: Props) {
                 <div className="row">
                   {project && (
                     <button className="primary" onClick={() => onDone(project.id, project)}>
-                      Abrir o projeto assim mesmo
+                      {t.openProjectAnyway}
                     </button>
                   )}
-                  <button onClick={onBack}>Voltar ao início</button>
+                  <button onClick={onBack}>{t.backToStart}</button>
                 </div>
               </>
             )}
@@ -266,6 +270,7 @@ export function UploadFlow({ mode, onBack, onDone }: Props) {
 }
 
 function Review({ graph, projectId, extracted, mode, oa, onGraph, onOpen }: { graph: CitationGraph; projectId: string; extracted?: { usable: number; total: number; numbered: boolean }; mode: FlowMode; oa: Record<string, OaState>; onGraph: (g: CitationGraph) => void; onOpen: () => void }) {
+  const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | undefined>();
   const bibPubs = useMemo(() => Object.values(graph.nodes).filter((n): n is PublicationNode => n.kind === 'publication' && n.inMainBibliography).sort((a, b) => a.label.localeCompare(b.label)), [graph]);
@@ -283,34 +288,34 @@ function Review({ graph, projectId, extracted, mode, oa, onGraph, onOpen }: { gr
     try {
       onGraph(await api.fileLink(projectId, fileId, pubId || null));
     } catch (e) {
-      setErr((e as Error).message);
+      setErr(translateRuntime(t, (e as Error).message));
     } finally {
       setBusy(false);
     }
   };
   const oaVals = Object.values(oa);
   const oaSummary = oaVals.length
-    ? `PDFs gratuitos: ${oaVals.filter((x) => x.kind === 'got').length} baixados, ${oaVals.filter((x) => x.kind === 'blocked').length} gratuitos com download manual, ${oaVals.filter((x) => x.kind === 'closed').length} sem versão gratuita, ${oaVals.filter((x) => x.kind === 'not_found' || x.kind === 'error').length} não identificados. `
+    ? t.oaSummary(oaVals.filter((x) => x.kind === 'got').length, oaVals.filter((x) => x.kind === 'blocked').length, oaVals.filter((x) => x.kind === 'closed').length, oaVals.filter((x) => x.kind === 'not_found' || x.kind === 'error').length)
     : '';
   return (
     <>
-      <h1>{mode === 'doc' ? 'Pronto: veja o que foi encontrado' : 'Revise as ligações'}</h1>
+      <h1>{mode === 'doc' ? t.reviewTitleDoc : t.reviewTitle}</h1>
       <p className="lp-lead">
-        {mode !== 'bib' && extracted ? `Encontrei ${extracted.total} entradas na lista de referências do documento (${extracted.usable} com autor e ano). ` : ''}
+        {mode !== 'bib' && extracted ? t.foundEntries(extracted.total, extracted.usable) : ''}
         {mode === 'doc' && oaSummary}
-        {refFiles.length > 0 && `${refFiles.length - loose.length} de ${refFiles.length} PDFs estão ligados a uma referência.`}
-        {loose.length === 0 && withoutPdf.length === 0 ? ' Está tudo ligado.' : ' Ligue à mão o que sobrou, se quiser; dá para fazer isso depois também.'}
+        {refFiles.length > 0 && t.pdfsLinked(refFiles.length - loose.length, refFiles.length)}
+        {loose.length === 0 && withoutPdf.length === 0 ? t.allLinked : t.linkLeftovers}
       </p>
       {err && <div className="notice error">{err}</div>}
       {loose.length > 0 && (
         <section>
-          <h3>PDFs sem referência ({loose.length})</h3>
+          <h3>{t.pdfsWithoutRef(loose.length)}</h3>
           <ul className="uf-review">
             {loose.map((f) => (
               <li key={f.id}>
                 <span>{f.originalName}</span>
-                <select disabled={busy} defaultValue="" onChange={(e) => void pair(f.id, e.target.value)} aria-label={`Referência de ${f.originalName}`}>
-                  <option value="">Escolher referência…</option>
+                <select disabled={busy} defaultValue="" onChange={(e) => void pair(f.id, e.target.value)} aria-label={t.referenceOf(f.originalName)}>
+                  <option value="">{t.chooseReference}</option>
                   {bibPubs.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.label}
@@ -324,8 +329,8 @@ function Review({ graph, projectId, extracted, mode, oa, onGraph, onOpen }: { gr
       )}
       {withoutPdf.length > 0 && (
         <section>
-          <h3>Referências sem PDF ({withoutPdf.length})</h3>
-          <p className="small muted">Estas fontes existem, só não temos o PDF. As citações delas ficam como “sem PDF” até você enviar o arquivo (dá para fazer depois, na aba Referências).</p>
+          <h3>{t.refsWithoutPdf(withoutPdf.length)}</h3>
+          <p className="small muted">{t.refsWithoutPdfHint}</p>
           <ul className="uf-review">
             {withoutPdf.map((p) => (
               <li key={p.id}>
@@ -339,7 +344,7 @@ function Review({ graph, projectId, extracted, mode, oa, onGraph, onOpen }: { gr
         </section>
       )}
       <button className="primary lp-btn" onClick={onOpen}>
-        Abrir no Fontexto
+        {t.openInFontexto}
       </button>
     </>
   );

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,10 +9,24 @@
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <link rel="manifest" href="/site.webmanifest" />
     <meta name="theme-color" content="#065F46" />
-    <title>Fontexto — cada citação ligada ao trecho da fonte</title>
+    <meta name="description" content="Fontexto links each citation in your document to the exact passage in the source. Upload a PDF, review the matches, and keep your files in the browser." />
+    <title>Fontexto — each citation linked to the passage in the source</title>
   </head>
   <body>
-    <div id="root"><div class="boot" role="status"><img src="/favicon.svg" alt="" width="72" height="72" /><p>Carregando o Fontexto…</p></div></div>
+    <div id="root"><div class="boot" role="status"><img src="/favicon.svg" alt="" width="72" height="72" /><p>Loading Fontexto…</p></div></div>
+    <script>
+      (function () {
+        var map = { en: 'en', 'en-us': 'en', 'en-gb': 'en', es: 'es', 'es-es': 'es', 'es-mx': 'es', 'es-ar': 'es', ru: 'ru', 'ru-ru': 'ru', pt: 'pt-BR', 'pt-br': 'pt-BR', 'pt-pt': 'pt-BR' };
+        var q = new URLSearchParams(location.search).get('lang');
+        var stored = null;
+        try { stored = localStorage.getItem('fontexto:lang'); } catch (e) {}
+        var lang = map[String(q || stored || 'en').toLowerCase()] || 'en';
+        document.documentElement.lang = lang;
+        var boot = { en: 'Loading Fontexto…', es: 'Cargando Fontexto…', ru: 'Загрузка Fontexto…', 'pt-BR': 'Carregando o Fontexto…' };
+        var el = document.querySelector('#root .boot p');
+        if (el) el.textContent = boot[lang] || boot.en;
+      })();
+    </script>
     <script type="module" src="./main.tsx"></script>
   </body>
 </html>

@@ -1,0 +1,170 @@
+import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { edition } from '../api';
+import { en, type Messages } from './en';
+import { es } from './es';
+import { ptBR } from './pt-BR';
+import { ru } from './ru';
+
+export type Locale = 'en' | 'es' | 'ru' | 'pt-BR';
+export type { Messages };
+
+export const LOCALES: Locale[] = ['en', 'es', 'ru', 'pt-BR'];
+export const DEFAULT_LOCALE: Locale = 'en';
+export const LANG_STORAGE_KEY = 'fontexto:lang';
+
+export const LOCALE_NATIVE: Record<Locale, string> = {
+  en: 'English',
+  es: 'Español',
+  ru: 'Русский',
+  'pt-BR': 'Português (Brasil)',
+};
+
+export const messages: Record<Locale, Messages> = { en, es, ru, 'pt-BR': ptBR };
+
+export const htmlLang: Record<Locale, string> = { en: 'en', es: 'es', ru: 'ru', 'pt-BR': 'pt-BR' };
+export const dateLocale: Record<Locale, string> = { en: 'en-US', es: 'es', ru: 'ru', 'pt-BR': 'pt-BR' };
+
+const ALIASES: Record<string, Locale> = {
+  en: 'en',
+  'en-us': 'en',
+  'en-gb': 'en',
+  eng: 'en',
+  es: 'es',
+  'es-es': 'es',
+  'es-mx': 'es',
+  'es-ar': 'es',
+  spa: 'es',
+  ru: 'ru',
+  'ru-ru': 'ru',
+  rus: 'ru',
+  pt: 'pt-BR',
+  'pt-br': 'pt-BR',
+  'pt-pt': 'pt-BR',
+  por: 'pt-BR',
+};
+
+export function parseLocale(raw: string | null | undefined): Locale | undefined {
+  if (!raw) return undefined;
+  return ALIASES[raw.trim().toLowerCase()];
+}
+
+export function detectLocale(search = typeof window === 'undefined' ? '' : window.location.search): Locale {
+  try {
+    const fromQuery = parseLocale(new URLSearchParams(search).get('lang'));
+    if (fromQuery) return fromQuery;
+    if (typeof localStorage !== 'undefined') {
+      const fromStore = parseLocale(localStorage.getItem(LANG_STORAGE_KEY));
+      if (fromStore) return fromStore;
+    }
+  } catch {
+    /* private mode or non-browser */
+  }
+  return DEFAULT_LOCALE;
+}
+
+export function persistLocale(locale: Locale): void {
+  try {
+    localStorage.setItem(LANG_STORAGE_KEY, locale);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function replaceSearch(patch: Record<string, string | null>): void {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === null || v === '') url.searchParams.delete(k);
+    else url.searchParams.set(k, v);
+  }
+  const next = url.pathname + url.search + url.hash;
+  if (next !== window.location.pathname + window.location.search + window.location.hash) {
+    history.replaceState(null, '', next);
+  }
+}
+
+export function applyDocumentMeta(locale: Locale, section?: string): void {
+  if (typeof document === 'undefined') return;
+  const t = messages[locale];
+  document.documentElement.lang = htmlLang[locale];
+  document.title = t.pageTitle(section);
+  let meta = document.querySelector('meta[name="description"]');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.setAttribute('name', 'description');
+    document.head.appendChild(meta);
+  }
+  meta.setAttribute('content', t.metaDescription);
+}
+
+export function formatDate(locale: Locale, iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(dateLocale[locale]);
+}
+
+export function formatDateTime(locale: Locale, iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString(dateLocale[locale]);
+}
+
+export function privacyNote(t: Messages): string {
+  return edition === 'web' ? t.privacyNoteWeb : t.privacyNote;
+}
+
+export function categoryLabel(t: Messages, name: string): string {
+  if (name === 'Documento principal') return t.mainDocument;
+  if (name === 'Sem categoria') return t.uncategorized;
+  return name;
+}
+
+interface I18nValue {
+  locale: Locale;
+  t: Messages;
+  setLocale: (locale: Locale) => void;
+}
+
+const I18nContext = createContext<I18nValue>({ locale: DEFAULT_LOCALE, t: en, setLocale: () => undefined });
+
+export function LocaleProvider({ children }: { children: ReactNode }) {
+  const [locale, setLocaleState] = useState<Locale>(() => detectLocale());
+  const setLocale = useCallback((next: Locale) => {
+    setLocaleState(next);
+    persistLocale(next);
+    replaceSearch({ lang: next });
+    applyDocumentMeta(next);
+  }, []);
+  useEffect(() => {
+    applyDocumentMeta(locale);
+  }, [locale]);
+  const value = useMemo(() => ({ locale, t: messages[locale], setLocale }), [locale, setLocale]);
+  return createElement(I18nContext.Provider, { value }, children);
+}
+
+export function useI18n(): I18nValue {
+  return useContext(I18nContext);
+}
+
+export function LanguageSwitcher() {
+  const { locale, setLocale, t } = useI18n();
+  return createElement(
+    'label',
+    { className: 'lang-switch' },
+    createElement('span', { className: 'visually-hidden' }, t.language),
+    createElement(
+      'select',
+      {
+        value: locale,
+        'aria-label': t.language,
+        onChange: (e: { target: { value: string } }) => {
+          const next = parseLocale(e.target.value);
+          if (next) setLocale(next);
+        },
+      },
+      LOCALES.map((code) => createElement('option', { key: code, value: code }, LOCALE_NATIVE[code])),
+    ),
+  );
+}
+
+export { translateRuntime, evidenceStatusText, refStatusText, reasonText, methodLabel, verificationLabel, verificationHelp, identityReason, reviewActionLabel } from './runtime';

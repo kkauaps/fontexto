@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import type { CitationGraph } from '../../core/model';
 import { api } from '../api';
+import { translateRuntime, useI18n } from '../i18n';
 
 type Role = 'main' | 'reference';
 
@@ -26,6 +27,7 @@ export function UploadButton({
   onBusy?: (busy: boolean) => void;
   onError?: (message: string | undefined) => void;
 }) {
+  const { t } = useI18n();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const pick = async (list: FileList | null) => {
@@ -38,7 +40,7 @@ export function UploadButton({
     try {
       onGraph((await api.upload(projectId, files, role, 'private')).graph);
     } catch (e) {
-      onError?.((e as Error).message);
+      onError?.(translateRuntime(t, (e as Error).message));
     } finally {
       setBusy(false);
       onBusy?.(false);
@@ -47,7 +49,7 @@ export function UploadButton({
   return (
     <>
       <button className={primary ? 'primary' : undefined} disabled={busy} onClick={() => input.current?.click()}>
-        {busy ? 'Processando…' : children}
+        {busy ? t.processingShort : children}
       </button>
       <input ref={input} type="file" hidden accept={accept} multiple={multiple} onChange={(e) => void pick(e.target.files)} />
     </>
@@ -56,6 +58,7 @@ export function UploadButton({
 
 /** The three inputs the app needs, with their state, and a button for each one. */
 export function SetupChecklist({ projectId, graph, onGraph }: { projectId: string; graph: CitationGraph; onGraph: (g: CitationGraph) => void }) {
+  const { t } = useI18n();
   const files = Object.values(graph.files);
   const main = files.find((f) => f.role === 'main');
   const bib = files.filter((f) => f.role === 'bibtex');
@@ -68,36 +71,36 @@ export function SetupChecklist({ projectId, graph, onGraph }: { projectId: strin
       <li className={main ? 'done' : ''}>
         <span className="step-no">{main ? '✓' : '1'}</span>
         <div className="step-body">
-          <strong>Documento principal (PDF)</strong>
-          <span className="small muted">{main ? main.originalName : 'O trabalho cujas citações você quer conferir (TCC, dissertação, artigo).'}</span>
+          <strong>{t.mainDocumentPdf}</strong>
+          <span className="small muted">{main ? main.originalName : t.mainDocumentHint}</span>
         </div>
         <UploadButton {...common} role="main" accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" primary={!main}>
-          {main ? 'Trocar PDF' : 'Escolher PDF'}
+          {main ? t.swapPdf : t.choosePdf}
         </UploadButton>
       </li>
       <li className={bib.length ? 'done' : ''}>
         <span className="step-no">{bib.length ? '✓' : '2'}</span>
         <div className="step-body">
-          <strong>Bibliografia (.bib)</strong>
-          <span className="small muted">{bib.length ? bib.map((b) => b.originalName).join(', ') : 'Liga cada citação do texto à sua referência (autor e ano).'}</span>
+          <strong>{t.bibliographyBib}</strong>
+          <span className="small muted">{bib.length ? bib.map((b) => b.originalName).join(', ') : t.bibliographyHint}</span>
         </div>
         <UploadButton {...common} role="reference" accept=".bib,text/plain" primary={Boolean(main) && !bib.length}>
-          {bib.length ? 'Trocar .bib' : 'Escolher .bib'}
+          {bib.length ? t.swapBib : t.chooseBib}
         </UploadButton>
       </li>
       <li className={refs.length ? 'done' : ''}>
         <span className="step-no">{refs.length ? '✓' : '3'}</span>
         <div className="step-body">
-          <strong>PDFs das referências</strong>
-          <span className="small muted">{refs.length ? `${refs.length} PDF(s) enviados` : 'Opcional, mas necessário para localizar o trecho citado em cada artigo.'}</span>
+          <strong>{t.referencePdfs}</strong>
+          <span className="small muted">{refs.length ? t.pdfsSent(refs.length) : t.referencePdfsHint}</span>
         </div>
         <UploadButton {...common} role="reference" accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" multiple>
-          {refs.length ? 'Enviar mais PDFs' : 'Escolher PDFs'}
+          {refs.length ? t.sendMorePdfs : t.choosePdfs}
         </UploadButton>
       </li>
       {busy && (
         <li className="setup-busy">
-          <span className="spinner" /> Enviando e processando… PDFs grandes podem levar alguns segundos.
+          <span className="spinner" /> {t.sendingAndProcessing}
         </li>
       )}
       {error && <li className="notice error">{error}</li>}
