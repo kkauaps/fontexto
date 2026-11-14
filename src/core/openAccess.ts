@@ -32,7 +32,7 @@ export interface OaResult {
 
 type Fetch = typeof fetch;
 /** Polite contact required by OpenAlex, Unpaywall and Crossref. */
-export const OA_CONTACT = 'kauapsilva03@gmail.com';
+export const OA_CONTACT = 'oa@fontexto.com';
 const UA = `Fontexto/1.0 (+https://fontexto.com; mailto:${OA_CONTACT})`;
 const withMail = (url: string) => `${url}${url.includes('?') ? '&' : '?'}mailto=${encodeURIComponent(OA_CONTACT)}`;
 export const MAX_PDF_BYTES = 40 * 1024 * 1024;
