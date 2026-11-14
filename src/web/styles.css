@@ -1917,3 +1917,54 @@ table.files select {
     max-width: 240px;
   }
 }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+}
+.lang-switch select {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 5px 8px;
+  background: var(--panel);
+  color: var(--ink);
+  cursor: pointer;
+  max-width: 11.5rem;
+}
+.lang-switch select:hover {
+  border-color: var(--brand-deep);
+}
+.lp-nav-right {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.lp-nav .lang-switch {
+  margin-left: 0;
+}
+.topbar .lang-switch {
+  margin-left: 2px;
+}
+@media (max-width: 720px) {
+  .lp-nav-right {
+    gap: 12px;
+  }
+  .lang-switch select {
+    max-width: 7.5rem;
+  }
+}

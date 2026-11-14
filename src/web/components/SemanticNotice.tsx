@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, edition } from '../api';
 import type { CitationGraph } from '../../core/model';
+import { translateRuntime, useI18n } from '../i18n';
 
 interface Props {
   projectId: string;
@@ -11,18 +12,14 @@ interface Props {
 
 type State = { kind: 'idle' } | { kind: 'running'; label: string; fraction: number } | { kind: 'error'; message: string };
 
-const PHASE: Record<string, string> = {
-  download: 'Baixando o modelo (só na primeira vez)',
-  init: 'Preparando o modelo',
-  analyze: 'Comparando as frases com os trechos',
-  apply: 'Aplicando',
-};
-
 /** Browser edition only: opt-in language-model re-ranking of the citation matches, run locally. */
 export function SemanticNotice({ projectId, method, onGraph }: Props) {
+  const { t } = useI18n();
   const [available, setAvailable] = useState(false);
   const [state, setState] = useState<State>({ kind: 'idle' });
   const active = method.includes('modelo de linguagem multilíngue');
+  const phaseOf = (phase: string) =>
+    phase === 'download' ? t.phaseDownload : phase === 'init' ? t.phaseInit : phase === 'analyze' ? t.phaseAnalyze : phase === 'apply' ? t.phaseApply : phase;
 
   useEffect(() => {
     if (edition !== 'web') return;
@@ -32,14 +29,14 @@ export function SemanticNotice({ projectId, method, onGraph }: Props) {
   if (edition !== 'web' || !available || active) return null;
 
   const run = async () => {
-    setState({ kind: 'running', label: PHASE.download, fraction: 0 });
+    setState({ kind: 'running', label: t.phaseDownload, fraction: 0 });
     try {
       const { runSemantic } = await import('../local/semanticClient');
-      await runSemantic(projectId, (p) => setState({ kind: 'running', label: `${PHASE[p.phase]}${p.detail ? ` · ${p.detail}` : ''}`, fraction: p.fraction }));
+      await runSemantic(projectId, (p) => setState({ kind: 'running', label: `${phaseOf(p.phase)}${p.detail ? ` · ${p.detail}` : ''}`, fraction: p.fraction }));
       onGraph(await api.graph(projectId));
       setState({ kind: 'idle' });
     } catch (e) {
-      setState({ kind: 'error', message: (e as Error).message });
+      setState({ kind: 'error', message: translateRuntime(t, (e as Error).message) });
     }
   };
 
@@ -52,9 +49,9 @@ export function SemanticNotice({ projectId, method, onGraph }: Props) {
         </>
       ) : (
         <>
-          Quer achar mais trechos? A busca semântica compara o <i>sentido</i> das frases (PT↔EN) com o texto das fontes. Roda só no seu computador: baixa um modelo de ~135&nbsp;MB uma vez e depois funciona offline.{' '}
+          {t.semanticPitch}{' '}
           <button className="primary" onClick={() => void run()}>
-            Ativar busca semântica
+            {t.enableSemantic}
           </button>
           {state.kind === 'error' && <span className="error"> {state.message}</span>}
         </>

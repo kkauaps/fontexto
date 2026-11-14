@@ -1,9 +1,10 @@
 import { useMemo, useRef, useState } from 'react';
 import type { EvidenceReport } from '../../core/evidence';
 import type { CitationGraph, PublicationNode } from '../../core/model';
-import { REF_STATUS_ORDER, REF_STATUS_TEXT, refRows, type RefRow, type RefStatus } from '../../core/refStatus';
+import { REF_STATUS_ORDER, refRows, type RefRow, type RefStatus } from '../../core/refStatus';
 import { api, type OaResult } from '../api';
 import type { OpenRequest } from './SidePanel';
+import { refStatusText, translateRuntime, useI18n } from '../i18n';
 
 /** Outcome of the free-PDF search for one reference (kept for the session only). */
 export type OaState =
@@ -62,45 +63,46 @@ export async function fetchOpenAccess(
 }
 
 export function OaCell({ state, pub }: { state?: OaState; pub: PublicationNode }) {
+  const { t } = useI18n();
   if (!state) return null;
   const link = (r: OaResult) => r.pdfUrls[0]?.url ?? r.landingUrl ?? doiUrl(r.doi ?? pub.doi);
   switch (state.kind) {
     case 'busy':
       return (
         <span className="muted small">
-          <span className="spinner" /> buscando…
+          <span className="spinner" /> {t.lookingUp}
         </span>
       );
     case 'got':
-      return <span className="oa-tag ok">PDF gratuito obtido ({state.source})</span>;
+      return <span className="oa-tag ok">{t.freePdfGot(state.source)}</span>;
     case 'blocked':
       return (
         <span className="oa-tag">
-          Gratuito, mas o site não permite download automático:{' '}
+          {t.freeButManual}{' '}
           <a href={link(state.result)} target="_blank" rel="noreferrer noopener">
-            baixar
-          </a>{' '}
-          e enviar aqui
+            {t.download}
+          </a>
+          {t.andSendHere}
         </span>
       );
     case 'closed':
       return (
         <span className="oa-tag">
-          Sem PDF gratuito
+          {t.noFreePdf}
           {link(state.result) && (
             <>
               {' · '}
               <a href={link(state.result)} target="_blank" rel="noreferrer noopener">
-                página da editora
+                {t.publisherPage}
               </a>
             </>
           )}
         </span>
       );
     case 'not_found':
-      return <span className="oa-tag">Não identificado nas bases abertas</span>;
+      return <span className="oa-tag">{t.notFoundInOpen}</span>;
     case 'error':
-      return <span className="oa-tag">Falha na busca: {state.message}</span>;
+      return <span className="oa-tag">{t.lookupFailed(translateRuntime(t, state.message))}</span>;
   }
 }
 
@@ -117,6 +119,7 @@ interface Props {
 }
 
 export function ReferencesView({ projectId, graph, evidence, oa, setOa, onGraph, onOpen, onShowInDocument, onShowInGraph }: Props) {
+  const { t } = useI18n();
   const rows = useMemo(() => refRows(graph, evidence), [graph, evidence]);
   const [filter, setFilter] = useState<RefStatus | 'all'>('all');
   const [busy, setBusy] = useState<string | undefined>();
@@ -133,9 +136,9 @@ export function ReferencesView({ projectId, graph, evidence, oa, setOa, onGraph,
     setMessage(undefined);
     try {
       const { got } = await fetchOpenAccess(projectId, withoutPdf.map((r) => r.pub), (id, s) => setOa((prev) => ({ ...prev, [id]: s })), onGraph);
-      setMessage(got ? `${got} PDF(s) gratuito(s) adicionados e verificados.` : 'Nenhum PDF gratuito pôde ser baixado automaticamente. Veja os links em cada linha.');
+      setMessage(got ? t.oaAdded(got) : t.oaNone);
     } catch (e) {
-      setMessage((e as Error).message);
+      setMessage(translateRuntime(t, (e as Error).message));
     } finally {
       setBusy(undefined);
     }
@@ -154,7 +157,7 @@ export function ReferencesView({ projectId, graph, evidence, oa, setOa, onGraph,
         return next;
       });
     } catch (e) {
-      setMessage((e as Error).message);
+      setMessage(translateRuntime(t, (e as Error).message));
     } finally {
       setBusy(undefined);
       if (fileInput.current) fileInput.current.value = '';
@@ -165,8 +168,8 @@ export function ReferencesView({ projectId, graph, evidence, oa, setOa, onGraph,
     return (
       <div className="refs-view">
         <div className="empty-card">
-          <h2>Nenhuma referência ainda</h2>
-          <p className="muted">Envie o PDF do seu documento: as referências da bibliografia aparecem aqui, com a situação de cada uma.</p>
+          <h2>{t.noReferencesYet}</h2>
+          <p className="muted">{t.noReferencesHint}</p>
         </div>
       </div>
     );
@@ -175,22 +178,22 @@ export function ReferencesView({ projectId, graph, evidence, oa, setOa, onGraph,
   return (
     <div className="refs-view">
       <div className="refs-head">
-        <div className="chip-row" role="group" aria-label="Filtrar por situação">
+        <div className="chip-row" role="group" aria-label={t.filterBySituation}>
           <button className={`chip-filter${filter === 'all' ? ' on' : ''}`} onClick={() => setFilter('all')}>
-            Todas <b>{rows.length}</b>
+            {t.all} <b>{rows.length}</b>
           </button>
           {REF_STATUS_ORDER.filter((s) => counts[s] > 0).map((s) => (
             <button key={s} className={`chip-filter rs-${s}${filter === s ? ' on' : ''}`} onClick={() => setFilter(s)}>
-              <i className={`dot rs-${s}`} /> {REF_STATUS_TEXT[s]} <b>{counts[s]}</b>
+              <i className={`dot rs-${s}`} /> {refStatusText(t, s)} <b>{counts[s]}</b>
             </button>
           ))}
         </div>
         {withoutPdf.length > 0 && (
           <div className="refs-oa">
             <button className="primary" disabled={Boolean(busy)} onClick={runOa}>
-              {busy === 'oa' ? 'Buscando PDFs gratuitos…' : `Buscar PDFs gratuitos (${withoutPdf.length} sem PDF)`}
+              {busy === 'oa' ? t.searchingFreePdfs : t.searchFreePdfs(withoutPdf.length)}
             </button>
-            <span className="muted small">Envia só DOI, título, ano e 1º autor para consultar OpenAlex, Semantic Scholar e arXiv. Seus arquivos não saem do navegador.</span>
+            <span className="muted small">{t.oaPrivacyHint}</span>
           </div>
         )}
       </div>
@@ -203,10 +206,10 @@ export function ReferencesView({ projectId, graph, evidence, oa, setOa, onGraph,
       <table className="refs-table">
         <thead>
           <tr>
-            <th>Referência</th>
-            <th>Situação</th>
-            <th title="Localizadas · com ressalva · não localizadas">Citações no texto</th>
-            <th>PDF da fonte</th>
+            <th>{t.colReference}</th>
+            <th>{t.colStatus}</th>
+            <th title={t.colCitationsTitle}>{t.colCitations}</th>
+            <th>{t.colSourcePdf}</th>
           </tr>
         </thead>
         <tbody>
@@ -232,6 +235,7 @@ export function ReferencesView({ projectId, graph, evidence, oa, setOa, onGraph,
 }
 
 function RefLine({ row, oa, busy, onUpload, onOpenPdf, onShowInDocument, onShowInGraph }: { row: RefRow; oa?: OaState; busy: boolean; onUpload: () => void; onOpenPdf: () => void; onShowInDocument: () => void; onShowInGraph: () => void }) {
+  const { t } = useI18n();
   const { pub, counts } = row;
   const authors = pub.authors.slice(0, 3).map((a) => a.family).join(', ') + (pub.authors.length > 3 ? ' et al.' : '');
   return (
@@ -251,29 +255,29 @@ function RefLine({ row, oa, busy, onUpload, onOpenPdf, onShowInDocument, onShowI
         </div>
       </td>
       <td>
-        <span className={`pill rs-${row.status}`}>{REF_STATUS_TEXT[row.status]}</span>
-        {row.manual > 0 && <span className="tag-manual" title="Você marcou à mão pelo menos uma citação desta fonte"> ✎ {row.manual}</span>}
+        <span className={`pill rs-${row.status}`}>{refStatusText(t, row.status)}</span>
+        {row.manual > 0 && <span className="tag-manual" title={t.youLabeledSome}> ✎ {row.manual}</span>}
       </td>
       <td className="ref-counts">
         {row.citations === 0 ? (
           <span className="muted small">—</span>
         ) : (
-          <button className="link-btn" onClick={onShowInDocument} title="Ver estas citações no documento">
+          <button className="link-btn" onClick={onShowInDocument} title={t.seeTheseInDocument}>
             <span className="cnt ok">{counts.localizado}</span> · <span className="cnt warn">{counts.ressalva}</span> · <span className="cnt nl">{counts.nao_localizado}</span>
-            {row.citations > counts.localizado + counts.ressalva + counts.nao_localizado && <span className="muted"> (+{row.citations - counts.localizado - counts.ressalva - counts.nao_localizado} sem PDF)</span>}
+            {row.citations > counts.localizado + counts.ressalva + counts.nao_localizado && <span className="muted">{t.extraNoPdf(row.citations - counts.localizado - counts.ressalva - counts.nao_localizado)}</span>}
           </button>
         )}
         <button className="link-btn small" onClick={onShowInGraph}>
-          grafo
+          {t.graphShort}
         </button>
       </td>
       <td>
         {row.hasPdf ? (
-          <button onClick={onOpenPdf}>Abrir PDF</button>
+          <button onClick={onOpenPdf}>{t.openPdf}</button>
         ) : (
           <div className="ref-pdf">
             <button disabled={busy} onClick={onUpload}>
-              {busy ? 'Enviando…' : 'Enviar PDF'}
+              {busy ? t.sending : t.sendPdf}
             </button>
             <OaCell state={oa} pub={pub} />
           </div>

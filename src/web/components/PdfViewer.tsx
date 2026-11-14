@@ -3,6 +3,7 @@ import type { ViewerTarget } from '../../core/anchors';
 import { api } from '../api';
 import { locatePhraseBoxes, openPdf, renderPage, type BoxRect, type PdfDoc } from '../pdfRender';
 import type { OpenRequest } from './SidePanel';
+import { translateRuntime, useI18n } from '../i18n';
 
 interface Props {
   projectId: string;
@@ -18,7 +19,8 @@ interface Props {
  * only when the server validated the extractor rectangles; otherwise it opens
  * the page and says that an exact highlight is unavailable.
  */
-export function PdfViewer({ projectId, request: initial, backLabel = 'Voltar', onClose }: Props) {
+export function PdfViewer({ projectId, request: initial, backLabel, onClose }: Props) {
+  const { t } = useI18n();
   const [request, setRequest] = useState<OpenRequest>(initial);
   useEffect(() => setRequest(initial), [initial]);
   const [target, setTarget] = useState<ViewerTarget | undefined>();
@@ -97,10 +99,10 @@ export function PdfViewer({ projectId, request: initial, backLabel = 'Voltar', o
   const sy = pageSize && ok?.pageSize ? pageSize.h / ok.pageSize.height : scale;
 
   return (
-    <div className="viewer" role="dialog" aria-label="Visualizador de PDF">
+    <div className="viewer" role="dialog" aria-label={t.pdfViewer}>
       <header className="viewer-bar">
         <button className="primary" onClick={onClose}>
-          ← {backLabel}
+          ← {backLabel ?? t.back}
         </button>
         <div className="viewer-title">
           <strong>{request.title}</strong>
@@ -113,7 +115,7 @@ export function PdfViewer({ projectId, request: initial, backLabel = 'Voltar', o
           <span>
             {doc ? (
               <>
-                p.{' '}
+                {t.pageAbbr}{' '}
                 <input
                   className="page-input"
                   type="number"
@@ -133,18 +135,18 @@ export function PdfViewer({ projectId, request: initial, backLabel = 'Voltar', o
           </button>
           <button onClick={() => setScale((s) => Math.max(0.5, s - 0.2))}>−</button>
           <button onClick={() => setScale((s) => Math.min(3, s + 0.2))}>+</button>
-          {ok && page !== ok.page && <button onClick={() => setPage(ok.page)}>Ir para p. {ok.page}</button>}
+          {ok && page !== ok.page && <button onClick={() => setPage(ok.page)}>{t.goToPage(ok.page)}</button>}
         </div>
       </header>
       {request.citing && (
         <div className="cite-ctx">
-          <span className="small muted">Frase que cita esta referência</span>
+          <span className="small muted">{t.citingSentence}</span>
           <div>{request.citing}</div>
         </div>
       )}
       {request.alternatives && request.alternatives.length > 1 && (
         <div className="alt-bar">
-          <span className="small muted">Passagens encontradas:</span>
+          <span className="small muted">{t.passagesFound}</span>
           {request.alternatives.map((a, i) => (
             <button key={i} className={i === (request.altIndex ?? 0) ? 'chip-filter on' : 'chip-filter'} onClick={() => setRequest({ ...a.request, alternatives: request.alternatives, altIndex: i })}>
               {a.label}
@@ -152,16 +154,16 @@ export function PdfViewer({ projectId, request: initial, backLabel = 'Voltar', o
           ))}
         </div>
       )}
-      {ok?.notice && request.anchor.text && !request.phrase && <div className="notice">{ok.notice}</div>}
+      {ok?.notice && request.anchor.text && !request.phrase && <div className="notice">{translateRuntime(t, ok.notice)}</div>}
       {request.phrase && phraseBoxes && phraseBoxes.boxes.length > 0 && (
-        <div className="notice ok">{phraseBoxes.exact ? 'Passagem destacada no texto da página.' : 'Início da passagem destacado (o resto do trecho foi extraído de forma diferente do texto da página).'}</div>
+        <div className="notice ok">{phraseBoxes.exact ? t.passageHighlighted : t.passageStartHighlighted}</div>
       )}
       {request.phrase && phraseBoxes && phraseBoxes.boxes.length === 0 && (
-        <div className="notice">Não foi possível marcar a passagem no texto desta página (provável diferença de extração). A página correta está aberta; a passagem procurada é: “{request.phrase}”</div>
+        <div className="notice">{t.couldNotMarkPassage(request.phrase)}</div>
       )}
       
-      {ok?.exactHighlight && <div className="notice ok">Trecho destacado a partir das coordenadas extraídas do PDF (nível de linha).</div>}
-      {error && <div className="notice error">{error}</div>}
+      {ok?.exactHighlight && <div className="notice ok">{t.lineLevelHighlight}</div>}
+      {error && <div className="notice error">{translateRuntime(t, error)}</div>}
       <div className="viewer-body">
         <div className="page-wrap" style={pageSize ? { width: pageSize.w, height: pageSize.h } : undefined}>
           <canvas ref={canvasRef} />

@@ -1,10 +1,10 @@
-import { REF_STATUS_TEXT, type RefRow } from '../../core/refStatus';
+import { type RefRow } from '../../core/refStatus';
 import { useState } from 'react';
 import { UNCATEGORIZED, type CategoryRule } from '../../core/categories';
 import type { Anchor, CitationGraph, GraphEdge, GraphNode, PublicationNode, ReviewAction } from '../../core/model';
 import { MAIN_DOCUMENT_ID } from '../../core/pipeline';
 import { citationLists, type ViewEdge } from '../../core/view';
-import { METHOD_LABEL, STATUS_HELP, STATUS_LABEL, UNAVAILABLE } from '../labels';
+import { categoryLabel, formatDateTime, methodLabel, refStatusText, reviewActionLabel, translateRuntime, useI18n, verificationHelp, verificationLabel } from '../i18n';
 import type { Selection } from './GraphCanvas';
 
 export interface OpenRequest {
@@ -41,26 +41,29 @@ interface Props {
 const label = (g: CitationGraph, id: string) => g.nodes[id]?.label ?? id;
 
 function Value({ v, children }: { v: unknown; children?: React.ReactNode }) {
-  if (v === undefined || v === null || v === '') return <span className="unavailable">{UNAVAILABLE}</span>;
+  const { t } = useI18n();
+  if (v === undefined || v === null || v === '') return <span className="unavailable">{t.unavailable}</span>;
   return <>{children ?? String(v)}</>;
 }
 
 function StatusBadge({ status }: { status: GraphEdge['status'] }) {
+  const { t } = useI18n();
   return (
-    <span className={`badge status-${status}`} title={STATUS_HELP[status]}>
-      {STATUS_LABEL[status]}
+    <span className={`badge status-${status}`} title={verificationHelp(t, status)}>
+      {verificationLabel(t, status)}
     </span>
   );
 }
 
 function EdgeLink({ g, e, dir, onSelect }: { g: CitationGraph; e: GraphEdge; dir: 'out' | 'in'; onSelect: Props['onSelect'] }) {
+  const { t } = useI18n();
   const other = dir === 'out' ? e.target : e.source;
   return (
     <li>
       <button className="linklike" onClick={() => onSelect({ type: 'node', id: other })}>
         {label(g, other)}
       </button>{' '}
-      <button className="linklike small" onClick={() => onSelect({ type: 'edge', id: e.id })} title="Ver evidência da relação">
+      <button className="linklike small" onClick={() => onSelect({ type: 'edge', id: e.id })} title={t.seeRelationEvidence}>
         <StatusBadge status={e.status} />
       </button>
     </li>
@@ -68,6 +71,7 @@ function EdgeLink({ g, e, dir, onSelect }: { g: CitationGraph; e: GraphEdge; dir
 }
 
 function PublicationDetails({ g, pub, props }: { g: CitationGraph; pub: PublicationNode; props: Props }) {
+  const { t, locale } = useI18n();
   const { cites, citedBy } = citationLists(g, pub.id);
   const related = Object.values(g.edges).filter((e) => e.kind === 'related_to' && (e.source === pub.id || e.target === pub.id) && e.status !== 'rejected');
   const docEdge = g.edges[`cites:${MAIN_DOCUMENT_ID}->${pub.id}`];
@@ -86,16 +90,16 @@ function PublicationDetails({ g, pub, props }: { g: CitationGraph; pub: Publicat
         const r = props.refRows!.get(pub.id)!;
         return (
           <div className="side-status">
-            <span className={`pill rs-${r.status}`}>{REF_STATUS_TEXT[r.status]}</span>{' '}
+            <span className={`pill rs-${r.status}`}>{refStatusText(t, r.status)}</span>{' '}
             {r.citations > 0 && (
               <span className="small">
-                {r.citations} citação(ões) no texto: {r.counts.localizado} localizada(s), {r.counts.ressalva} com ressalva, {r.counts.nao_localizado} não localizada(s)
+                {t.citationsInTextSummary(r.citations, r.counts.localizado, r.counts.ressalva, r.counts.nao_localizado)}
               </span>
             )}
             {r.citations > 0 && (
               <div>
                 <button className="primary" onClick={() => props.onShowInDocument(pub.id)}>
-                  Conferir no documento
+                  {t.checkInDocument}
                 </button>
               </div>
             )}
@@ -103,11 +107,11 @@ function PublicationDetails({ g, pub, props }: { g: CitationGraph; pub: Publicat
         );
       })()}
       <dl className="meta">
-        <dt>Autores</dt>
+        <dt>{t.authors}</dt>
         <dd>
           <Value v={pub.authors.length ? 1 : undefined}>{pub.authors.map((a) => a.raw).join('; ')}</Value>
         </dd>
-        <dt>Ano</dt>
+        <dt>{t.year}</dt>
         <dd>
           <Value v={pub.yearLabel ?? pub.year} />
         </dd>
@@ -119,72 +123,72 @@ function PublicationDetails({ g, pub, props }: { g: CitationGraph; pub: Publicat
             </a>
           </Value>
         </dd>
-        <dt>Veículo</dt>
+        <dt>{t.vehicle}</dt>
         <dd>
           <Value v={pub.venue} />
         </dd>
-        <dt>Resumo</dt>
+        <dt>{t.abstract}</dt>
         <dd className="abstract">
           <Value v={pub.abstract} />
         </dd>
-        <dt>Categoria</dt>
+        <dt>{t.category}</dt>
         <dd>
           <select
             value={pub.category?.value ?? UNCATEGORIZED}
             onChange={(e) => props.onCategory(pub.id, e.target.value === UNCATEGORIZED ? null : e.target.value)}
           >
-            <option value={UNCATEGORIZED}>{UNCATEGORIZED}</option>
+            <option value={UNCATEGORIZED}>{t.uncategorized}</option>
             {categoryOptions.map((c) => (
               <option key={c} value={c}>
-                {c}
+                {categoryLabel(t, c)}
               </option>
             ))}
           </select>
           {pub.category?.source === 'suggested' && (
-            <span className="badge suggested" title={`Palavras-chave: ${pub.category.matched?.join(', ')}`}>
-              sugerida
+            <span className="badge suggested" title={t.keywordsTitle(pub.category.matched?.join(', ') ?? '')}>
+              {t.suggestedBadge}
             </span>
           )}
           {pub.category?.source === 'user' && (
             <button className="linklike small" onClick={() => props.onCategory(pub.id, undefined)}>
-              restaurar sugestão
+              {t.restoreSuggestion}
             </button>
           )}
           <div className="row">
-            <input placeholder="Nova categoria" value={custom} onChange={(e) => setCustom(e.target.value)} />
+            <input placeholder={t.newCategory} value={custom} onChange={(e) => setCustom(e.target.value)} />
             <button disabled={!custom.trim()} onClick={() => props.onCategory(pub.id, custom.trim()).then(() => setCustom(''))}>
-              Definir
+              {t.setCategory}
             </button>
           </div>
         </dd>
-        <dt>Conexões</dt>
+        <dt>{t.connections}</dt>
         <dd>
-          cita {cites.length} · citado por {citedBy.length} (na rede disponível)
+          {t.citesCount(cites.length, citedBy.length)}
         </dd>
-        <dt>Fontes dos metadados</dt>
-        <dd className="small">{pub.metadataSources.map((s) => `${s.kind}${s.ref ? ` (${s.ref})` : ''}: ${s.fields.join(', ') || '—'}`).join(' · ') || UNAVAILABLE}</dd>
+        <dt>{t.metadataSources}</dt>
+        <dd className="small">{pub.metadataSources.map((s) => `${s.kind}${s.ref ? ` (${s.ref})` : ''}: ${s.fields.join(', ') || '—'}`).join(' · ') || t.unavailable}</dd>
       </dl>
 
       <div className="actions">
         {fileId ? (
           <button className="primary" onClick={() => props.onOpen({ anchor: { fileId, page: 1 }, title: pub.label })}>
-            Abrir PDF
+            {t.openPdf}
           </button>
         ) : (
-          <span className="muted small">Sem PDF desta fonte. Envie ou busque um PDF gratuito na aba Referências.</span>
+          <span className="muted small">{t.noPdfThisSource}</span>
         )}
       </div>
 
-      <h4>Cita ({cites.length})</h4>
-      {cites.length ? <ul className="list">{cites.map((e) => <EdgeLink key={e.id} g={g} e={e} dir="out" onSelect={props.onSelect} />)}</ul> : <p className="muted small">{fileId ? 'Nenhuma referência desta publicação foi localizada na rede.' : 'Bibliografia não analisada: PDF ausente.'}</p>}
+      <h4>{t.citesHeading(cites.length)}</h4>
+      {cites.length ? <ul className="list">{cites.map((e) => <EdgeLink key={e.id} g={g} e={e} dir="out" onSelect={props.onSelect} />)}</ul> : <p className="muted small">{fileId ? t.noRefsFoundInNetwork : t.bibliographyNotAnalyzed}</p>}
 
-      <h4>Citado por ({citedBy.length})</h4>
-      {citedBy.length ? <ul className="list">{citedBy.map((e) => <EdgeLink key={e.id} g={g} e={e} dir="in" onSelect={props.onSelect} />)}</ul> : <p className="muted small">Nenhum.</p>}
+      <h4>{t.citedByHeading(citedBy.length)}</h4>
+      {citedBy.length ? <ul className="list">{citedBy.map((e) => <EdgeLink key={e.id} g={g} e={e} dir="in" onSelect={props.onSelect} />)}</ul> : <p className="muted small">{t.none}</p>}
 
       {related.length > 0 && (
         <>
-          <h4>Relações temáticas sugeridas ({related.length})</h4>
-          <p className="hint">Não indicam citação.</p>
+          <h4>{t.thematicRelations(related.length)}</h4>
+          <p className="hint">{t.doNotIndicateCitation}</p>
           <ul className="list">
             {related.map((e) => (
               <EdgeLink key={e.id} g={g} e={e} dir={e.source === pub.id ? 'out' : 'in'} onSelect={props.onSelect} />
@@ -193,7 +197,7 @@ function PublicationDetails({ g, pub, props }: { g: CitationGraph; pub: Publicat
         </>
       )}
 
-      <h4>No documento principal</h4>
+      <h4>{t.inMainDocument}</h4>
       {claims.length > 0 && (
         <ul className="list">
           {claims.map((e) => (
@@ -203,34 +207,35 @@ function PublicationDetails({ g, pub, props }: { g: CitationGraph; pub: Publicat
       )}
       {!props.refRows && (props.docCitations?.get(pub.id) ?? 0) > 0 && (
         <button className="primary" onClick={() => props.onShowInDocument(pub.id)}>
-          Ver {props.docCitations!.get(pub.id)} citação(ões) no documento
+          {t.seeNCitations(props.docCitations!.get(pub.id)!)}
         </button>
       )}
       {markers.length > 0 ? (
         <>
-          <p className="small">Citado no texto em {new Set(markers.map((m) => m.page)).size} página(s):</p>
+          <p className="small">{t.citedOnPages(new Set(markers.map((m) => m.page)).size)}</p>
           <ul className="chips">
             {markers.map((m, i) => (
               <li key={i}>
                 <button
                   className="chip"
                   title={m.text}
-                  onClick={() => props.onOpen({ anchor: m, title: label(g, MAIN_DOCUMENT_ID), context: `Marcação de citação de ${pub.label}: ${m.text}` })}
+                  onClick={() => props.onOpen({ anchor: m, title: label(g, MAIN_DOCUMENT_ID), context: t.citationMarkOf(pub.label, m.text ?? "") })}
                 >
-                  p. {m.page}
+                  {t.pageAbbr} {m.page}
                 </button>
               </li>
             ))}
           </ul>
         </>
       ) : docEdge ? (
-        <p className="muted small">Nenhuma marcação no texto localizada {g.nodes[MAIN_DOCUMENT_ID]?.kind === 'document' && (g.nodes[MAIN_DOCUMENT_ID] as { fileId?: string }).fileId ? '' : '(PDF do documento principal ausente)'}.</p>
+        <p className="muted small">{t.noMarkerFound}{g.nodes[MAIN_DOCUMENT_ID]?.kind === 'document' && (g.nodes[MAIN_DOCUMENT_ID] as { fileId?: string }).fileId ? '' : t.mainPdfMissing}.</p>
       ) : null}
     </>
   );
 }
 
 function EdgeDetails({ g, edge, props }: { g: CitationGraph; edge: GraphEdge; props: Props }) {
+  const { t, locale } = useI18n();
   const [busy, setBusy] = useState(false);
   const review = async (a: ReviewAction) => {
     setBusy(true);
@@ -245,11 +250,11 @@ function EdgeDetails({ g, edge, props }: { g: CitationGraph; edge: GraphEdge; pr
   return (
     <>
       <h2>
-        {isCites ? 'Citação' : edge.kind === 'related_to' ? 'Relação temática' : edge.kind}
+        {isCites ? t.citation : edge.kind === 'related_to' ? t.thematicRelation : edge.kind}
       </h2>
       {docCount > 0 && (
         <button className="primary" onClick={() => props.onShowInDocument(edge.target)}>
-          Ver {docCount} citação(ões) no documento
+          {t.seeNCitations(docCount)}
         </button>
       )}
       <p className="edge-ends">
@@ -262,15 +267,15 @@ function EdgeDetails({ g, edge, props }: { g: CitationGraph; edge: GraphEdge; pr
         </button>
       </p>
       <p>
-        <StatusBadge status={edge.status} /> <span className="small muted">{STATUS_HELP[edge.status]}</span>
+        <StatusBadge status={edge.status} /> <span className="small muted">{verificationHelp(t, edge.status)}</span>
       </p>
 
-      <h4>Proveniência</h4>
+      <h4>{t.provenance}</h4>
       {edge.provenance.map((p, i) => (
         <div key={i} className="prov">
-          <div className="prov-method">{METHOD_LABEL[p.method]}</div>
-          {p.matchedBy?.length ? <div className="small">Campos coincidentes: {p.matchedBy.join(', ')}</div> : null}
-          {p.bibliographicId && <div className="small">Identificador: {p.bibliographicId}</div>}
+          <div className="prov-method">{methodLabel(t, p.method)}</div>
+          {p.matchedBy?.length ? <div className="small">{t.matchingFields(p.matchedBy.join(', '))}</div> : null}
+          {p.bibliographicId && <div className="small">{t.identifier}{p.bibliographicId}</div>}
           {p.referenceText && (
             <blockquote>
               {p.referenceText}
@@ -282,11 +287,11 @@ function EdgeDetails({ g, edge, props }: { g: CitationGraph; edge: GraphEdge; pr
                       props.onOpen({
                         anchor: p.referenceAnchor!,
                         title: label(g, edge.source),
-                        context: `Entrada na bibliografia de ${label(g, edge.source)} que corresponde a ${label(g, edge.target)}.`,
+                        context: t.bibEntryContext(label(g, edge.source), label(g, edge.target)),
                       })
                     }
                   >
-                    Abrir na bibliografia (p. {p.referenceAnchor.page})
+                    {t.openInBibliography(p.referenceAnchor.page)}
                   </button>
                 </div>
               )}
@@ -294,12 +299,12 @@ function EdgeDetails({ g, edge, props }: { g: CitationGraph; edge: GraphEdge; pr
           )}
           {p.citationAnchors?.length ? (
             <div>
-              <div className="small">Marcações no texto:</div>
+              <div className="small">{t.markersInText}</div>
               <ul className="chips">
                 {p.citationAnchors.map((a, j) => (
                   <li key={j}>
-                    <button className="chip" title={a.text} onClick={() => props.onOpen({ anchor: a, title: label(g, edge.source), context: `Marcação: ${a.text}` })}>
-                      p. {a.page}
+                    <button className="chip" title={a.text} onClick={() => props.onOpen({ anchor: a, title: label(g, edge.source), context: t.markerContext(a.text ?? "") })}>
+                      {t.pageAbbr} {a.page}
                     </button>
                   </li>
                 ))}
@@ -307,11 +312,11 @@ function EdgeDetails({ g, edge, props }: { g: CitationGraph; edge: GraphEdge; pr
             </div>
           ) : null}
           {p.method === 'bibliographic_coupling' && p.text && (
-            <div className="small">Referências em comum: {p.text.split(', ').map((id) => label(g, id)).join('; ')}</div>
+            <div className="small">{t.sharedReferences(p.text.split(', ').map((id) => label(g, id)).join('; '))}</div>
           )}
           {p.notes?.map((n, j) => (
             <div key={j} className="small muted">
-              {n}
+              {translateRuntime(t, n)}
             </div>
           ))}
         </div>
@@ -319,11 +324,11 @@ function EdgeDetails({ g, edge, props }: { g: CitationGraph; edge: GraphEdge; pr
 
       {edge.reviews?.length ? (
         <>
-          <h4>Revisões</h4>
+          <h4>{t.reviews}</h4>
           <ul className="list small">
             {edge.reviews.map((r, i) => (
               <li key={i}>
-                {new Date(r.at).toLocaleString()} — {r.action}: {STATUS_LABEL[r.from]} → {STATUS_LABEL[r.to]}
+                {t.reviewLine(formatDateTime(locale, r.at), reviewActionLabel(t, r.action), verificationLabel(t, r.from), verificationLabel(t, r.to))}
               </li>
             ))}
           </ul>
@@ -333,17 +338,17 @@ function EdgeDetails({ g, edge, props }: { g: CitationGraph; edge: GraphEdge; pr
       <div className="actions">
         {(edge.status === 'unverified' || edge.status === 'suggested' || (edge.status === 'rejected' && isCites)) && (
           <button className="primary" disabled={busy} onClick={() => review('confirm')}>
-            {edge.kind === 'related_to' ? 'Concordo (temática)' : 'Confirmar citação'}
+            {edge.kind === 'related_to' ? t.agreeThematic : t.confirmCitation}
           </button>
         )}
         {edge.status !== 'rejected' && edge.source !== MAIN_DOCUMENT_ID && (
           <button className="danger" disabled={busy} onClick={() => review('reject')}>
-            Rejeitar
+            {t.reject}
           </button>
         )}
         {edge.reviews?.length ? (
           <button disabled={busy} onClick={() => review('reset')}>
-            Desfazer revisões
+            {t.undoReviews}
           </button>
         ) : null}
       </div>
@@ -352,9 +357,10 @@ function EdgeDetails({ g, edge, props }: { g: CitationGraph; edge: GraphEdge; pr
 }
 
 function AggregatedEdge({ g, ve, props }: { g: CitationGraph; ve: ViewEdge; props: Props }) {
+  const { t } = useI18n();
   return (
     <>
-      <h2>{ve.count} relações agregadas</h2>
+      <h2>{t.aggregatedRelations(ve.count)}</h2>
       <ul className="list">
         {ve.memberIds.map((id) => {
           const e = g.edges[id];
@@ -373,6 +379,7 @@ function AggregatedEdge({ g, ve, props }: { g: CitationGraph; ve: ViewEdge; prop
 }
 
 export function SidePanel(props: Props) {
+  const { t } = useI18n();
   const { graph: g, selection } = props;
   if (!selection) return null;
   let body: React.ReactNode = null;
@@ -384,14 +391,14 @@ export function SidePanel(props: Props) {
       body = (
         <>
           <h2>{n.label}</h2>
-          <p className="small muted">Documento principal · {cites.length} referências declaradas</p>
+          <p className="small muted">{t.declaredReferences(cites.length)}</p>
           <div className="actions">
             {n.fileId ? (
               <button className="primary" onClick={() => props.onOpen({ anchor: { fileId: n.fileId!, page: 1 }, title: n.label })}>
-                Abrir PDF
+                {t.openPdf}
               </button>
             ) : (
-              <button disabled>PDF do documento principal indisponível</button>
+              <button disabled>{t.mainPdfUnavailable}</button>
             )}
           </div>
           <h4>Referências</h4>
@@ -399,7 +406,7 @@ export function SidePanel(props: Props) {
         </>
       );
     } else if (selection.id.startsWith('group:')) {
-      body = <p>Grupo recolhido. Use o botão “+” no nó ou a legenda para expandir.</p>;
+      body = <p>{t.collapsedGroup}</p>;
     }
   } else {
     const e = g.edges[selection.id];
@@ -409,10 +416,10 @@ export function SidePanel(props: Props) {
   }
   return (
     <aside className="sidepanel">
-      <button className="close" onClick={props.onClose} aria-label="Fechar painel">
+      <button className="close" onClick={props.onClose} aria-label={t.closePanel}>
         ×
       </button>
-      {body ?? <p className="muted">Elemento não encontrado.</p>}
+      {body ?? <p className="muted">{t.notFoundElement}</p>}
     </aside>
   );
 }

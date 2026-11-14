@@ -19,8 +19,9 @@ import { toPng, toSvg } from 'html-to-image';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CategoryRule } from '../../core/categories';
 import { neighbourhood, type ViewEdge, type ViewGraph, type ViewNode } from '../../core/view';
-import { REF_STATUS_COLOR, REF_STATUS_ORDER, REF_STATUS_TEXT, type RefStatus } from '../../core/refStatus';
+import { REF_STATUS_COLOR, REF_STATUS_ORDER, type RefStatus } from '../../core/refStatus';
 import { categoryColor } from '../labels';
+import { categoryLabel, refStatusText, useI18n } from '../i18n';
 import { layoutGraph, nodeSize, statusGridLayout, type Positioned } from '../layout';
 
 export type Selection = { type: 'node'; id: string } | { type: 'edge'; id: string } | undefined;
@@ -36,28 +37,30 @@ interface NodeData extends Record<string, unknown> {
 const handleStyle = { opacity: 0, width: 6, height: 6, border: 'none' };
 
 const PublicationNodeView = memo(({ data }: NodeProps<Node<NodeData>>) => {
+  const { t } = useI18n();
   const { vn, color, dim, selected } = data;
   const { width, height } = nodeSize(vn);
   return (
     <div
       className={`node-pub${dim ? ' dim' : ''}${selected ? ' selected' : ''}${vn.matchesSearch ? ' match' : ''}${vn.hasPdf ? '' : ' no-pdf'}`}
       style={{ width, height, borderColor: color, ['--cat' as string]: color }}
-      title={`${vn.title ?? vn.label}${vn.refStatus ? `\nSituação: ${REF_STATUS_TEXT[vn.refStatus]}` : ''}${vn.hasPdf ? '' : '\n(PDF da fonte não enviado)'}\nClique para ver detalhes`}
+      title={`${vn.title ?? vn.label}${vn.refStatus ? `\n${t.situationPrefix}${refStatusText(t, vn.refStatus)}` : ''}${vn.hasPdf ? '' : `\n${t.pdfNotSent}`}\n${t.clickForDetails}`}
     >
       <Handle type="target" position={Position.Left} style={handleStyle} />
       <span className="node-label">{vn.label}</span>
-      {vn.inDegree > 1 && <span className="node-badge" title="Citado por N nós visíveis">{vn.inDegree}</span>}
+      {vn.inDegree > 1 && <span className="node-badge" title={t.citedByVisible(vn.inDegree)}>{vn.inDegree}</span>}
       <Handle type="source" position={Position.Right} style={handleStyle} />
     </div>
   );
 });
 
 const DocumentNodeView = memo(({ data }: NodeProps<Node<NodeData>>) => {
+  const { t } = useI18n();
   const { vn, dim, selected } = data;
   const { width, height } = nodeSize(vn);
   return (
     <div className={`node-doc${dim ? ' dim' : ''}${selected ? ' selected' : ''}`} style={{ width, height }} title={vn.title ?? vn.label}>
-      <span className="node-kicker">Documento principal</span>
+      <span className="node-kicker">{t.mainDocument}</span>
       <span className="node-label">{vn.label}</span>
       <Handle type="source" position={Position.Right} style={handleStyle} />
       <Handle type="target" position={Position.Left} style={handleStyle} />
@@ -66,14 +69,15 @@ const DocumentNodeView = memo(({ data }: NodeProps<Node<NodeData>>) => {
 });
 
 const GroupNodeView = memo(({ data }: NodeProps<Node<NodeData>>) => {
+  const { t } = useI18n();
   const { vn, color, dim, selected, onToggleGroup } = data;
   const { width, height } = nodeSize(vn);
   return (
     <div className={`node-group${dim ? ' dim' : ''}${selected ? ' selected' : ''}`} style={{ width, height, borderColor: color, ['--cat' as string]: color }}>
       <Handle type="target" position={Position.Left} style={handleStyle} />
       <span className="node-label">{vn.label}</span>
-      <span className="node-sub">{vn.groupSize} publicações (recolhido)</span>
-      <button className="node-expand nodrag" onClick={(e) => (e.stopPropagation(), onToggleGroup?.(vn.category))} title="Expandir grupo">
+      <span className="node-sub">{t.collapsedPublications(vn.groupSize ?? 0)}</span>
+      <button className="node-expand nodrag" onClick={(e) => (e.stopPropagation(), onToggleGroup?.(vn.category))} title={t.expandGroup}>
         +
       </button>
       <Handle type="source" position={Position.Right} style={handleStyle} />
@@ -109,6 +113,7 @@ interface Props {
 }
 
 export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, layoutNonce, search, exportName, colorBy = 'category' }: Props) {
+  const { t } = useI18n();
   const rf = useReactFlow();
   const [positions, setPositions] = useState<Map<string, Positioned>>(new Map());
   const [layingOut, setLayingOut] = useState(false);
@@ -259,24 +264,24 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
       <Controls showInteractive={false} position="bottom-left" />
       <MiniMap pannable zoomable nodeColor={(n) => (n.data as NodeData).color} position="bottom-right" />
       {colorBy === 'status' && legend.length > 0 && (
-        <Panel position="top-left" className="graph-legend" aria-label="Legenda">
+        <Panel position="top-left" className="graph-legend" aria-label={t.legend}>
           {legend.map(({ s, n }) => (
             <span key={s}>
-              <i style={{ background: REF_STATUS_COLOR[s] }} /> {REF_STATUS_TEXT[s]} ({n})
+              <i style={{ background: REF_STATUS_COLOR[s] }} /> {refStatusText(t, s)} ({n})
             </span>
           ))}
-          <span className="muted">borda tracejada = PDF da fonte não enviado · clique num nó para detalhes</span>
+          <span className="muted">{t.dashedBorderHint}</span>
         </Panel>
       )}
       <Panel position="top-right" className="canvas-actions">
-        {layingOut && <span className="muted small">organizando…</span>}
-        <button onClick={() => rf.fitView({ padding: 0.12, duration: 300 })}>Centralizar</button>
+        {layingOut && <span className="muted small">{t.layingOut}</span>}
+        <button onClick={() => rf.fitView({ padding: 0.12, duration: 300 })}>{t.centerGraph}</button>
         <button onClick={() => doExport('svg')}>SVG</button>
         <button onClick={() => doExport('png')}>PNG</button>
       </Panel>
       {view.nodes.length === 0 && (
         <Panel position="top-center" className="empty-state">
-          Nenhum nó para exibir com os filtros atuais.
+          {t.noNodesForFilters}
         </Panel>
       )}
     </ReactFlow>

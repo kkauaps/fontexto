@@ -4,7 +4,7 @@ import { categoryOf, type CategoryRule } from '../core/categories';
 import type { CitationGraph, ReviewAction } from '../core/model';
 import { buildView, DEFAULT_FILTERS, type ViewFilters } from '../core/view';
 import { api, edition, type ProjectSummary } from './api';
-import { BRAND, pageTitle } from './brand';
+import { BRAND } from './brand';
 import { Landing, type FlowMode } from './components/Landing';
 import { UploadFlow } from './components/UploadFlow';
 import lockup from './assets/fontexto-lockup.svg';
@@ -19,6 +19,7 @@ import { ProjectPanel } from './components/ProjectPanel';
 import { SidePanel, type OpenRequest } from './components/SidePanel';
 import { ReferencesView, type OaState } from './components/ReferencesView';
 import { REF_STATUS_ORDER, refRows, refStatusMap, type RefStatus } from '../core/refStatus';
+import { LanguageSwitcher, replaceSearch, translateRuntime, useI18n } from './i18n';
 
 type Tab = 'doc' | 'refs' | 'graph';
 const INITIAL_FILTERS: ViewFilters = { ...DEFAULT_FILTERS, interSource: false, colorBy: 'status' };
@@ -26,6 +27,7 @@ const INITIAL_FILTERS: ViewFilters = { ...DEFAULT_FILTERS, interSource: false, c
 const LAST_PROJECT = 'fontexto:lastProject';
 
 export function App() {
+  const { t, locale } = useI18n();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [projectId, setProjectId] = useState<string | undefined>(
     () => new URLSearchParams(window.location.search).get('project') ?? undefined,
@@ -50,16 +52,19 @@ export function App() {
   const [flow, setFlow] = useState<FlowMode | undefined>();
 
   useEffect(() => {
-    api.health().then((h) => setExternalAvailable(h.externalMetadataAvailable), () => setError(edition === 'web' ? 'Seu navegador não conseguiu iniciar o processamento local. Atualize a página ou use um navegador recente.' : 'API indisponível. Inicie o servidor (npm run dev).'));
+    api.health().then(
+      (h) => setExternalAvailable(h.externalMetadataAvailable),
+      () => setError(edition === 'web' ? '__browser__' : '__api__'),
+    );
     api.listProjects().then(setProjects, () => undefined);
   }, []);
 
   useEffect(() => {
     if (!projectId) {
-      if (window.location.search) history.replaceState(null, '', window.location.pathname);
+      replaceSearch({ project: null });
       return;
     }
-    history.replaceState(null, '', `?project=${encodeURIComponent(projectId)}`);
+    replaceSearch({ project: projectId });
     setGraph(undefined);
     setEvidence(undefined);
     setSelection(undefined);
@@ -96,8 +101,8 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    document.title = pageTitle(projectId ? (projects.find((p) => p.id === projectId)?.name ?? undefined) : undefined);
-  }, [projectId, projects]);
+    document.title = t.pageTitle(projectId ? (projects.find((p) => p.id === projectId)?.name ?? undefined) : undefined);
+  }, [projectId, projects, t, locale]);
 
   const rows = useMemo(() => (graph ? refRows(graph, evidence) : []), [graph, evidence]);
   const statusMap = useMemo(() => refStatusMap(rows), [rows]);
@@ -146,6 +151,8 @@ export function App() {
     setFilters((f) => ({ ...f, mode: 'bibliographic' }));
   };
 
+  const backLabel = panelOpen ? t.backToFiles : tab === 'doc' ? t.backToDocument : tab === 'refs' ? t.backToReferences : t.backToGraph;
+
   if (!projectId) {
     if (flow) {
       return (
@@ -168,56 +175,60 @@ export function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <button className="brand-btn" onClick={() => setProjectId(undefined)} aria-label={`${BRAND.name}: voltar ao início`} title="Voltar ao início">
+        <button className="brand-btn" onClick={() => setProjectId(undefined)} aria-label={t.backHomeAria} title={t.backHomeTitle}>
           <img src={lockup} alt={BRAND.name} height={26} />
         </button>
-        <select value={projectId} onChange={(e) => setProjectId(e.target.value || undefined)} aria-label="Projeto">
+        <select value={projectId} onChange={(e) => setProjectId(e.target.value || undefined)} aria-label={t.project}>
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
             </option>
           ))}
-          <option value="">+ Projetos…</option>
+          <option value="">{t.moreProjects}</option>
         </select>
-        <nav className="tabs" role="tablist" aria-label="Visões">
-          <button role="tab" aria-selected={tab === 'doc'} className={tab === 'doc' ? 'on' : ''} onClick={() => setTab('doc')} title="Seu texto, com cada citação conferida">
-            Documento{evidence && evidence.summary.occurrences > 0 ? ` (${evidence.summary.occurrences} citações)` : ''}
+        <nav className="tabs" role="tablist" aria-label={t.views}>
+          <button role="tab" aria-selected={tab === 'doc'} className={tab === 'doc' ? 'on' : ''} onClick={() => setTab('doc')} title={t.tabDocumentTitle}>
+            {t.tabDocument}
+            {evidence && evidence.summary.occurrences > 0 ? ` (${t.tabCitations(evidence.summary.occurrences)})` : ''}
           </button>
-          <button role="tab" aria-selected={tab === 'refs'} className={tab === 'refs' ? 'on' : ''} onClick={() => setTab('refs')} title="Cada referência da bibliografia: situação, PDF e busca de PDF gratuito">
-            Referências{rows.length ? ` (${rows.length})` : ''}
+          <button role="tab" aria-selected={tab === 'refs'} className={tab === 'refs' ? 'on' : ''} onClick={() => setTab('refs')} title={t.tabReferencesTitle}>
+            {t.tabReferences}
+            {rows.length ? ` (${rows.length})` : ''}
           </button>
-          <button role="tab" aria-selected={tab === 'graph'} className={tab === 'graph' ? 'on' : ''} onClick={showGraph} title="Mapa das fontes, colorido pela situação">
-            Grafo
+          <button role="tab" aria-selected={tab === 'graph'} className={tab === 'graph' ? 'on' : ''} onClick={showGraph} title={t.tabGraphTitle}>
+            {t.tabGraph}
           </button>
         </nav>
         {tab === 'graph' && (
-        <input
-          className="search"
-          type="search"
-          placeholder="Pesquisar publicação, autor ou DOI"
-          value={filters.search ?? ''}
-          onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-        />
+          <input
+            className="search"
+            type="search"
+            placeholder={t.searchPlaceholder}
+            value={filters.search ?? ''}
+            onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+          />
         )}
         {stats && (
           <span className="stats small">
-            {stats.pubs} referências{stats.noPdf > 0 ? ` · ${stats.noPdf} sem PDF` : ''}
-            {stats.pending > 0 && <span className="badge warn"> {stats.pending} pendência(s)</span>}
+            {t.refsCount(stats.pubs)}
+            {stats.noPdf > 0 ? ` · ${t.withoutPdf(stats.noPdf)}` : ''}
+            {stats.pending > 0 && <span className="badge warn"> {t.pending(stats.pending)}</span>}
           </span>
         )}
-        {tab === 'graph' && <button onClick={() => setLayoutNonce((n) => n + 1)}>Reorganizar</button>}
+        {tab === 'graph' && <button onClick={() => setLayoutNonce((n) => n + 1)}>{t.relayout}</button>}
         <button className="primary" onClick={() => setPanelOpen(true)}>
-          Arquivos e revisão
+          {t.filesAndReview}
         </button>
+        <LanguageSwitcher />
       </header>
       {error && (
         <div className="notice error" onClick={() => setError(undefined)}>
-          {error}
+          {error === '__browser__' ? t.errorBrowser : error === '__api__' ? t.errorApiDown : translateRuntime(t, error)}
         </div>
       )}
       {docMode && !graph && (
         <div className="loading">
-          <span className="spinner" /> Carregando projeto…
+          <span className="spinner" /> {t.loadingProject}
         </div>
       )}
       {docMode && graph && (
@@ -257,65 +268,65 @@ export function App() {
         </div>
       )}
       {tab === 'graph' && (
-      <div className="main">
-        <FiltersPanel
-          filters={filters}
-          onChange={setFilters}
-          categories={categories}
-          rules={rules}
-          collapsed={collapsed}
-          onToggleGroup={toggleGroup}
-          years={years}
-          hiddenCount={view?.hiddenCount ?? 0}
-          refCounts={refCounts}
-        />
-        <div className="canvas">
-          {graph && view ? (
-            <ReactFlowProvider>
-              <GraphCanvas
-                view={view}
-                rules={rules}
-                selection={selection}
-                onSelect={setSelection}
-                onToggleGroup={toggleGroup}
-                layoutNonce={layoutNonce}
-                search={filters.search ?? ''}
-                exportName={projectId}
-                colorBy={filters.colorBy}
-              />
-            </ReactFlowProvider>
-          ) : (
-            <div className="loading">
-              <span className="spinner" /> Montando o grafo…
-            </div>
-          )}
-          {graph && Object.keys(graph.files).length === 0 && (
-            <div className="empty-card">
-              <h2>Comece enviando seus arquivos</h2>
-              <p className="muted">Com o PDF do documento, as abas Documento, Referências e Grafo são montadas automaticamente.</p>
-              <SetupChecklist projectId={projectId} graph={graph} onGraph={setGraph} />
-            </div>
+        <div className="main">
+          <FiltersPanel
+            filters={filters}
+            onChange={setFilters}
+            categories={categories}
+            rules={rules}
+            collapsed={collapsed}
+            onToggleGroup={toggleGroup}
+            years={years}
+            hiddenCount={view?.hiddenCount ?? 0}
+            refCounts={refCounts}
+          />
+          <div className="canvas">
+            {graph && view ? (
+              <ReactFlowProvider>
+                <GraphCanvas
+                  view={view}
+                  rules={rules}
+                  selection={selection}
+                  onSelect={setSelection}
+                  onToggleGroup={toggleGroup}
+                  layoutNonce={layoutNonce}
+                  search={filters.search ?? ''}
+                  exportName={projectId}
+                  colorBy={filters.colorBy}
+                />
+              </ReactFlowProvider>
+            ) : (
+              <div className="loading">
+                <span className="spinner" /> {t.buildingGraph}
+              </div>
+            )}
+            {graph && Object.keys(graph.files).length === 0 && (
+              <div className="empty-card">
+                <h2>{t.startByUploading}</h2>
+                <p className="muted">{t.startByUploadingHint}</p>
+                <SetupChecklist projectId={projectId} graph={graph} onGraph={setGraph} />
+              </div>
+            )}
+          </div>
+          {graph && selection && view && (
+            <SidePanel
+              graph={graph}
+              selection={selection}
+              viewEdges={view.edges}
+              rules={rules}
+              onClose={() => setSelection(undefined)}
+              onSelect={setSelection}
+              onOpen={setViewer}
+              docCitations={docCitations}
+              onShowInDocument={showInDocument}
+              onReview={onReview}
+              onCategory={onCategory}
+              refRows={rowsById}
+            />
           )}
         </div>
-        {graph && selection && view && (
-          <SidePanel
-            graph={graph}
-            selection={selection}
-            viewEdges={view.edges}
-            rules={rules}
-            onClose={() => setSelection(undefined)}
-            onSelect={setSelection}
-            onOpen={setViewer}
-            docCitations={docCitations}
-            onShowInDocument={showInDocument}
-            onReview={onReview}
-            onCategory={onCategory}
-            refRows={rowsById}
-          />
-        )}
-      </div>
       )}
-      {viewer && <PdfViewer projectId={projectId} request={viewer} backLabel={panelOpen ? 'Voltar aos arquivos' : tab === 'doc' ? 'Voltar ao documento' : tab === 'refs' ? 'Voltar às referências' : 'Voltar ao grafo'} onClose={() => setViewer(undefined)} />}
+      {viewer && <PdfViewer projectId={projectId} request={viewer} backLabel={backLabel} onClose={() => setViewer(undefined)} />}
       {panelOpen && graph && (
         <ProjectPanel
           projectId={projectId}
