@@ -11,7 +11,9 @@ import { CoreStore, MemoryDriver, NotFoundError, ValidationError, type StorageDr
 import { parseCuratedUpload } from '../../core/curated';
 import { redactEvidenceForSharing } from '../../core/evidence';
 import { evidenceCsv, redactForSharing, toGraphML } from '../../core/export';
+import { documentNeedsOcr, imageKind } from '../../core/ocr';
 import { textFromDocument, type PdfDocLike, type PdfJsLike } from '../../core/pdfjsText';
+import { wrapImageAsPdf } from './imagePdf';
 import type { Anchor, FileRecord, FileRole, ReviewAction, Visibility } from '../../core/model';
 import { IdbDriver } from './idbDriver';
 
@@ -20,8 +22,10 @@ import { IdbDriver } from './idbDriver';
 
 const origin = self.location.origin;
 
-async function extractText(data: Uint8Array) {
-  const task = pdfjs.getDocument({
+type ExtractProgress = (p: { stage: string; done: number; total: number; name?: string }) => void;
+
+async function openPdf(data: Uint8Array) {
+  return pdfjs.getDocument({
     data: new Uint8Array(data),
     verbosity: 0,
     isEvalSupported: false,
@@ -35,12 +39,35 @@ async function extractText(data: Uint8Array) {
     cMapPacked: true,
     iccUrl: `${origin}/pdfjs/iccs/`,
   } as Parameters<typeof pdfjs.getDocument>[0]);
+}
+
+async function extractText(data: Uint8Array, onProgress?: ExtractProgress) {
+  const kind = imageKind(data);
+  if (kind) {
+    data = new Uint8Array(await wrapImageAsPdf(data, kind));
+  }
+  const task = await openPdf(data);
   const doc = await task.promise;
   try {
-    return await textFromDocument(pdfjs as unknown as PdfJsLike, doc as unknown as PdfDocLike);
+    const text = await textFromDocument(pdfjs as unknown as PdfJsLike, doc as unknown as PdfDocLike);
+    if (!documentNeedsOcr(text)) return text;
+    const { ocrEmptyPdfPages } = await import('./ocr');
+    return await ocrEmptyPdfPages(pdfjs as unknown as PdfJsLike, doc as unknown as PdfDocLike, text, onProgress);
   } finally {
     await task.destroy();
   }
+}
+
+async function asStoredFile(file: File): Promise<{ data: Uint8Array; originalName: string }> {
+  let data = new Uint8Array(await file.arrayBuffer());
+  let originalName = file.name;
+  const kind = imageKind(data);
+  if (kind) {
+    data = new Uint8Array(await wrapImageAsPdf(data, kind));
+    originalName = originalName.replace(/\.(png|jpe?g|webp)$/i, '.pdf');
+    if (!/\.pdf$/i.test(originalName)) originalName += '.pdf';
+  }
+  return { data, originalName };
 }
 
 let persistent = true;
@@ -81,7 +108,10 @@ const methods: Record<string, Method> = {
     const r: FileRole = role === 'main' ? 'main' : 'reference';
     const v: Visibility = visibility === 'shareable' ? 'shareable' : 'private';
     const added: FileRecord[] = [];
-    for (const f of files as File[]) added.push(await s.addFile(p, { data: new Uint8Array(await f.arrayBuffer()), originalName: f.name, role: r, visibility: v }));
+    for (const f of files as File[]) {
+      const rec = await asStoredFile(f);
+      added.push(await s.addFile(p, { ...rec, role: r, visibility: v }));
+    }
     await s.ensureExtracted(p, (done, total, name) => progress({ stage: 'extract', done, total, name }));
     const graph = await s.rebuild(p);
     return { added: added.map(view), graph };
@@ -92,7 +122,7 @@ const methods: Record<string, Method> = {
     const links: [string, string][] = [];
     for (const it of items as { file: File; publicationId: string }[]) {
       if (!(it?.file instanceof Blob) || typeof it.publicationId !== 'string') throw new ValidationError('Invalid file');
-      const rec = await s.addFile(p, { data: new Uint8Array(await it.file.arrayBuffer()), originalName: it.file.name, role: 'reference', visibility: 'private' });
+      const rec = await s.addFile(p, { ...(await asStoredFile(it.file)), role: 'reference', visibility: 'private' });
       links.push([rec.id, it.publicationId]);
     }
     await s.ensureExtracted(p, (done, total, name) => progress({ stage: 'extract', done, total, name }));

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CitationOccurrence } from '../src/core/evidence';
-import { countByStatus, filterGroups, formatPassage, groupOccurrences, neighbourGroup, occurrencesByPublication } from '../src/core/evidenceView';
+import { countByStatus, filterGroups, formatPassage, passageParts, groupOccurrences, neighbourGroup, occurrencesByPublication } from '../src/core/evidenceView';
 
 const occ = (id: string, spanId: string, extra: Partial<CitationOccurrence> = {}): CitationOccurrence => ({
   id,
@@ -78,5 +78,14 @@ describe('formatPassage', () => {
   });
   it('rejoins hyphenated line wraps and keeps paragraph breaks', () => {
     expect(formatPassage('segmen-\ntation of wound\n\nNext paragraph.')).toBe('segmentation of wound\n\nNext paragraph.');
+  });
+});
+
+describe('passageParts', () => {
+  it('marks the focus sentence inside a formatted passage', () => {
+    const text = 'The application is left to present the result to its user in text form. The set of images was composed of 393 photos.';
+    const parts = passageParts(text, 'The set of images was composed of 393 photos.');
+    expect(parts.some((p) => p.highlight && /393 photos/.test(p.text))).toBe(true);
+    expect(parts.some((p) => !p.highlight && /application is left/.test(p.text))).toBe(true);
   });
 });

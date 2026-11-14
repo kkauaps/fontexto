@@ -21,6 +21,8 @@
  */
 import { DEFAULT_GLOSSARY } from './glossary.js';
 import { buildQuery, indexV2, lexicalCandidates, MATCH_PARAMS, windowText, type Candidate, type ClaimParts, type MatchParams } from './matching.js';
+import { claimSpanFor, isLeadingNarrative, numbersAttributedTo } from './attribution.js';
+import { authorsFromMarker, bestPassageFocus } from './passageFocus.js';
 import { extractMarkersFromText, isSelfCitation, resolveMarker, type MarkerReference } from './citations.js';
 import type { CitationGraph, FileRecord, PublicationNode, Rect } from './model.js';
 import { stripDiacritics } from './normalize.js';
@@ -95,9 +97,13 @@ export type EvidenceReason =
 
 export interface Passage {
   fileId: string;
-  /** 1-based physical page where the passage starts. */
+  /** 1-based physical page of the best-matching sentence in the passage (the chunk may start on another page). */
   page: number;
   text: string;
+  /** Exact best-matching sentence (anchors or sentence-level embeddings); highlighted in the card and in the PDF. */
+  focus?: string;
+  /** True when no sentence could be identified exactly (no anchors, no semantic model): the whole passage is highlighted. */
+  focusApproximate?: boolean;
   /** Weighted overlap 0..1. */
   score: number;
   region: 'resumo' | 'corpo';
@@ -138,6 +144,8 @@ export interface CitationOccurrence {
   claim: string;
   /** Clause around the marker (the part of the sentence the citation supports); absent for older reports. */
   localClaim?: string;
+  /** Checkable numbers uniquely attributed to this citation (not every number in the sentence). */
+  attributedNumbers?: string[];
   /** Neighbouring sentences (without markers), used as weak extra context. */
   context?: string;
   referenceFileId?: string;
@@ -521,27 +529,6 @@ function cleanClaim(raw: string, removals: Span[]): string {
     .trim();
 }
 
-/** The part of the sentence a citation supports: the clause before the marker (after it, for narrative citations). */
-function localClause(text: string, sent: Span, spansInSentence: { start: number; end: number }[], first: { start: number; end: number; narrative?: boolean }): string {
-  const spans = [...new Map(spansInSentence.map((m) => [m.start, m])).values()].sort((a, b) => a.start - b.start);
-  const narrative = Boolean(first.narrative) && first.start - sent.start < 60;
-  const inner = (from: number, to: number) => cleanClaim(text.slice(from, to), spans.filter((m) => m.start >= from && m.end <= to).map((m) => ({ start: m.start - from, end: m.end - from })));
-  let from: number;
-  let to: number;
-  if (narrative) {
-    from = first.end;
-    to = spans.find((m) => m.start >= first.end)?.start ?? sent.end;
-    const semi = text.indexOf(';', from);
-    if (semi >= 0 && semi < to) to = semi;
-    return inner(from, to);
-  }
-  to = first.start;
-  from = [...spans].reverse().find((m) => m.end <= first.start)?.end ?? sent.start;
-  const semi = text.lastIndexOf(';', to);
-  if (semi >= from) from = semi + 1;
-  const clause = inner(from, to);
-  return clause.split(/\s+/).filter((w) => w.length > 2).length >= 3 ? clause : inner(sent.start, sent.end);
-}
 
 const displaySentence = (s: string) => s.replace(/\s+/g, ' ').trim();
 
@@ -669,13 +656,14 @@ export function computeEvidence(input: ComputeEvidenceInput): EvidenceReport {
         .sort((a, b) => a.start - b.start)
         .filter((r, i, a) => i === 0 || r.start >= a[i - 1].end);
       let claim = cleanClaim(sentenceRaw, inside);
-      // Narrative citation at the start of the sentence ("Velloran et al. (2025) propose ..."): the content is often in the next sentence.
-      if (first.narrative && first.start - sentSpan.start < 60 && si >= 0 && si + 1 < sentences.length && flow.text.slice(sentences[si].end, sentences[si + 1].start).indexOf(PARA) === -1) {
+      const inSentence = markers.filter((m) => m.start >= sentSpan.start && m.end <= sentSpan.end);
+      // Leading narrative ("Velloran et al. (2025) propose ..."): the content is often in the next sentence.
+      if (isLeadingNarrative(flow.text, sentSpan, first) && si >= 0 && si + 1 < sentences.length && flow.text.slice(sentences[si].end, sentences[si + 1].start).indexOf(PARA) === -1) {
         const nx = sentences[si + 1];
         claim = `${claim} ${cleanClaim(flow.text.slice(nx.start, nx.end), markers.filter((m) => m.start >= nx.start && m.end <= nx.end).map((m) => ({ start: m.start - nx.start, end: m.end - nx.start })))}`.trim();
       }
-      const inSentence = markers.filter((m) => m.start >= sentSpan.start && m.end <= sentSpan.end);
-      const localClaim = displaySentence(localClause(flow.text, sentSpan, inSentence, first));
+      const localClaim = displaySentence(claimSpanFor(flow.text, sentSpan, inSentence, first).text);
+      const attributedNumbers = numbersAttributedTo(flow.text, sentSpan, inSentence, first, citedPages(first.raw) ?? []);
       const around = (j: number) => {
         if (j < 0 || j >= sentences.length) return '';
         const lo = Math.min(j, si);
@@ -703,6 +691,7 @@ export function computeEvidence(input: ComputeEvidenceInput): EvidenceReport {
           sentence: displaySentence(sentenceRaw),
           claim: displaySentence(claim),
           localClaim: localClaim || undefined,
+          attributedNumbers,
           context: context || undefined,
           notes: [],
           passages: [],
@@ -894,6 +883,8 @@ export interface PendingMatch {
   index: ReferenceIndex;
   parts: ClaimParts;
   candidates: Candidate[];
+  /** Sentence-level cosine similarity with the claim, filled when the multilingual model has run. */
+  sentenceSem?: Map<string, number>;
 }
 
 const zscores = (a: number[]) => {
@@ -963,7 +954,7 @@ const pct = (x: number) => `${Math.round(x * 100)}%`;
  * "Ressalva" is reserved for a concrete, checkable problem, each with its own reason:
  *  - the page given in the marker does not exist in the source PDF, or holds nothing similar (`pagina_citada`);
  *  - a direct quotation is not in the source (`citacao_direta`);
- *  - a number of the claim (decimal, or 3+ digits, not a year) occurs nowhere in the source (`numero_ausente`).
+ *  - a number attributed to this citation (decimal, or 3+ digits, not a year) occurs nowhere in the source (`numero_ausente`).
  * A passage below the similarity floor is "não localizado". Anything else that matched is "localizado", with its
  * similarity shown: a low similarity is common across languages (PT text citing EN sources) and is NOT a defect of
  * the citation, so it no longer produces a ressalva (that rule flagged 45 of 56 citations wrongly on the internal gold set).
@@ -1018,10 +1009,18 @@ export function finalizeV2(occ: CitationOccurrence, pm: PendingMatch, params: Ev
     } else occ.notes.push(`Não foi possível conferir a página citada (${label}): o PDF não traz a numeração impressa.`);
   }
 
+  const claimForFocus = occ.localClaim || occ.claim || '';
   occ.passages = ordered
     .slice(0, params.maxPassages)
     .filter((c, i) => i === 0 || c.score >= params.minShown)
-    .map((c) => ({ fileId: pm.fileId, page: c.page, text: c.text, score: round(c.score), region: c.region }));
+    .map((c) => {
+      const window = S.slice(c.start, c.start + c.len);
+      const focus = bestPassageFocus(window, claimForFocus, { authors: authorsFromMarker(occ.marker ?? ''), sentenceSem: pm.sentenceSem });
+      if (focus?.exact) {
+        return { fileId: pm.fileId, page: focus.page, text: c.text, focus: focus.text, score: round(c.score), region: c.region };
+      }
+      return { fileId: pm.fileId, page: c.page, text: c.text, focusApproximate: window.length > 1, score: round(c.score), region: c.region };
+    });
   const best = ordered[0];
   occ.score = best ? round(best.score) : 0;
 
@@ -1038,7 +1037,9 @@ export function finalizeV2(occ: CitationOccurrence, pm: PendingMatch, params: Ev
       return [v, v * 100, v / 100].some((w) => Math.abs(u - w) < 0.051 * Math.max(1, Math.abs(w) / 100) && u.toString().length >= 3);
     });
   };
-  const absent = checkableNumbers(occ.localClaim ?? occ.claim ?? '', pages).filter((n) => !present(n));
+  // Only numbers uniquely attributed to this citation (never every number in the sentence).
+  const toCheck = occ.attributedNumbers ?? checkableNumbers(occ.localClaim ?? '', pages);
+  const absent = toCheck.filter((n) => !present(n));
 
   if (quoteOk === false) {
     occ.status = 'ressalva';
@@ -1126,7 +1127,7 @@ export function redactEvidenceForSharing(report: EvidenceReport, files: Record<s
       context: mainPrivate ? undefined : o.context,
       rects: mainPrivate ? [] : o.rects,
       notes: o.notes,
-      passages: o.passages.map((p) => ({ ...p, text: isPrivate(p.fileId) ? REDACTED_TEXT : p.text })),
+      passages: o.passages.map((p) => ({ ...p, text: isPrivate(p.fileId) ? REDACTED_TEXT : p.text, focus: isPrivate(p.fileId) ? undefined : p.focus, focusApproximate: isPrivate(p.fileId) ? undefined : p.focusApproximate })),
     })),
   };
 }

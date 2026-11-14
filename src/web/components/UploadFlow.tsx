@@ -20,7 +20,7 @@ interface Step {
   detail?: string;
 }
 
-const isPdf = (f: File) => /\.pdf$/i.test(f.name);
+const isPdf = (f: File) => /\.(pdf|png|jpe?g|webp)$/i.test(f.name);
 const isBib = (f: File) => /\.(bib|bibtex)$/i.test(f.name);
 
 /** Files from a drop, walking dropped folders. */
@@ -112,7 +112,7 @@ export function UploadFlow({ mode, onBack, onDone }: Props) {
       'Criando o projeto',
       'Enviando o documento',
       ...(mode === 'bib' ? ['Enviando o .bib'] : []),
-      ...(refs.length ? [`Enviando ${refs.length} PDF(s) de referências`] : []),
+      ...(refs.length ? [`Enviando ${refs.length} arquivo(s) de referências`] : []),
       ...(readsList ? ['Lendo a lista de referências do documento'] : []),
       ...(mode === 'doc' ? ['Buscando PDFs gratuitos das referências'] : []),
       'Conferindo as citações',
@@ -123,7 +123,7 @@ export function UploadFlow({ mode, onBack, onDone }: Props) {
     let i = 0;
     try {
       setStep(i, { state: 'run' });
-      const p = await api.createProject(name.trim() || main[0].name.replace(/\.pdf$/i, ''));
+      const p = await api.createProject(name.trim() || main[0].name.replace(/\.(pdf|png|jpe?g|webp)$/i, ''));
       setProject(p);
       setStep(i++, { state: 'ok' });
       setStep(i, { state: 'run' });
@@ -205,13 +205,13 @@ export function UploadFlow({ mode, onBack, onDone }: Props) {
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: TCC 2026" />
             </label>
             <div className="uf-grid">
-              <DropZone id="uf-main" title="1 · Seu documento (PDF)" hint="O texto que cita as fontes. Só um arquivo." accept="application/pdf,.pdf" files={main} onFiles={(f) => setMain(f.filter(isPdf).slice(0, 1))} />
+              <DropZone id="uf-main" title="1 · Seu documento" hint="PDF, foto ou scan (PNG/JPG). Só um arquivo." accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" files={main} onFiles={(f) => setMain(f.filter(isPdf).slice(0, 1))} />
               {mode === 'bib' && <DropZone id="uf-bib" title="2 · Bibliografia (.bib)" hint="O arquivo BibTeX do artigo." accept=".bib,.bibtex" files={bib} onFiles={(f) => setBib(f.filter(isBib).slice(0, 1))} />}
               <DropZone
                 id="uf-refs"
                 title={`${mode === 'bib' ? '3' : '2'} · PDFs das referências${mode === 'doc' ? ' (opcional)' : ''}`}
                 hint={mode === 'doc' ? 'Já tem alguns PDFs (ex.: os pagos)? Envie aqui; o resto é buscado.' : 'Arraste os PDFs ou uma pasta inteira. Subpastas também valem.'}
-                accept="application/pdf,.pdf"
+                accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
                 multiple
                 folder
                 files={refs}

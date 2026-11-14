@@ -199,7 +199,7 @@ export function ReferencesView({ projectId, graph, evidence, oa, setOa, onGraph,
           {message}
         </div>
       )}
-      <input ref={fileInput} type="file" accept="application/pdf,.pdf" hidden onChange={(e) => onPick(e.target.files)} />
+      <input ref={fileInput} type="file" accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" hidden onChange={(e) => onPick(e.target.files)} />
       <table className="refs-table">
         <thead>
           <tr>

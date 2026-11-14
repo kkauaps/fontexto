@@ -88,7 +88,7 @@ export function ProjectPanel({ projectId, graph, externalAvailable, onGraph, onO
         <div className="upload-grid">
           <label className="upload">
             <span>Documento principal (PDF)</span>
-            <input type="file" accept="application/pdf,.pdf" onChange={(e) => upload(e.target.files, 'main')} disabled={Boolean(busy)} />
+            <input type="file" accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" onChange={(e) => upload(e.target.files, 'main')} disabled={Boolean(busy)} />
           </label>
           <label className="upload">
             <span>Bibliografia (.bib)</span>
@@ -96,7 +96,7 @@ export function ProjectPanel({ projectId, graph, externalAvailable, onGraph, onO
           </label>
           <label className="upload">
             <span>PDFs das referências</span>
-            <input type="file" accept="application/pdf,.pdf" multiple onChange={(e) => upload(e.target.files, 'reference')} disabled={Boolean(busy)} />
+            <input type="file" accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" multiple onChange={(e) => upload(e.target.files, 'reference')} disabled={Boolean(busy)} />
           </label>
         </div>
         <div className="row">

@@ -8,7 +8,8 @@
  */
 import type { Anchor, FileRecord, Rect } from './model.js';
 import { stripDiacritics } from './normalize.js';
-import type { PdfText } from './text.js';
+import type { PdfText, PageText } from './text.js';
+import { findPhrase } from './textsearch.js';
 
 export interface AnchorCheck {
   valid: boolean;
@@ -80,6 +81,15 @@ export type ViewerTarget =
  * Converts an anchor into what the PDF viewer should do. Falls back to
  * "open the page, no exact highlight" whenever the anchor is not fully trusted.
  */
+
+/** Line boxes on a page that contain `phrase` (used when the pdf.js text layer is empty, e.g. OCR). */
+export function lineRectsForPhrase(page: PageText, phrase: string): Rect[] {
+  if (!phrase.trim() || page.lines.length === 0) return [];
+  const m = findPhrase(page.lines.map((l) => l.text), phrase, { minWords: 1 });
+  if (!m) return [];
+  return page.lines.slice(m.start.seg, m.end.seg + 1).map((l) => l.rect);
+}
+
 export function viewerTarget(anchor: Anchor, file: Pick<FileRecord, 'id' | 'pageCount'> | undefined, text?: PdfText): ViewerTarget {
   if (!file) return { ok: false, reason: 'missing_pdf', message: 'O PDF desta fonte não está disponível.' };
   const check = checkAnchor(anchor, file, text);
@@ -87,13 +97,16 @@ export function viewerTarget(anchor: Anchor, file: Pick<FileRecord, 'id' | 'page
   if (!check.pageExists) {
     return { ok: false, reason: 'invalid_page', message: `A página ${anchor.page} não existe neste PDF.` };
   }
-  const exact = check.rectsValid && check.textFound !== false;
+  const page = text?.pages.find((pg) => pg.page === anchor.page);
+  const fromText = (!anchor.rects || anchor.rects.length === 0) && check.textFound !== false && page && anchor.text ? lineRectsForPhrase(page, anchor.text) : [];
+  const exact = (check.rectsValid || fromText.length > 0) && check.textFound !== false;
+  const highlights = exact ? (check.rectsValid ? anchor.rects! : fromText) : [];
   return {
     ok: true,
     fileId: file.id,
     page: anchor.page,
-    highlights: exact ? anchor.rects! : [],
-    pageSize: anchor.pageSize,
+    highlights,
+    pageSize: anchor.pageSize ?? (page ? { width: page.width, height: page.height } : undefined),
     exactHighlight: exact,
     searchText: check.textFound === false ? undefined : anchor.text,
     notice: exact ? undefined : 'Destaque exato indisponível: abrindo apenas a página.',

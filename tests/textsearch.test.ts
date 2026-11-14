@@ -37,4 +37,25 @@ describe('findPhrase', () => {
     expect(findPhrase(segs, 'completely absent sentence about nothing')).toBeUndefined();
     expect(findPhrase(segs, '   ')).toBeUndefined();
   });
+  it('does not start a match mid-word ("the wound" inside "breathe wound")', () => {
+    expect(findPhrase(['Please breathe wound dressings carefully.'], 'the wound')).toBeUndefined();
+    const ok = findPhrase(['Please treat the wound carefully.'], 'the wound')!;
+    expect(ok.start).toEqual({ seg: 0, offset: 'Please treat '.length });
+    expect(ok.end.offset).toBe('Please treat the wound'.length);
+  });
+
+  it('maps ligatures and soft hyphens to the source character, not a mid-glyph offset', () => {
+    const segs = ['The \uFB01ne\u00ADtuning step works.'];
+    const m = findPhrase(segs, 'fine-tuning step')!;
+    expect(m.exact).toBe(true);
+    expect(m.start).toEqual({ seg: 0, offset: 4 });
+    expect(segs[0].slice(m.start.offset, m.end.offset).normalize('NFKD').replace(/[\u0300-\u036f\u00ad]/g, '')).toMatch(/tuning step/i);
+  });
+
+  it('normalises extra whitespace and punctuation between words', () => {
+    const m = findPhrase(['The   wound,   neatly  closed.'], 'the wound neatly closed')!;
+    expect(m.exact).toBe(true);
+    expect(m.start.offset).toBe(0);
+    expect(m.end.offset).toBe('The   wound,   neatly  closed'.length);
+  });
 });

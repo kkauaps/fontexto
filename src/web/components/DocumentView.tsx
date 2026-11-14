@@ -334,7 +334,7 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
         {hasBib && refsWithoutPdf > 0 && (
           <div className="notice">
             {refsWithoutPdf} citação(ões) sem o PDF da referência; sem ele não há trecho para mostrar.{' '}
-            <UploadButton projectId={projectId} role="reference" accept="application/pdf,.pdf" multiple onGraph={onGraph}>
+            <UploadButton projectId={projectId} role="reference" accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" multiple onGraph={onGraph}>
               Buscar ou enviar PDFs das referências
             </UploadButton>
           </div>

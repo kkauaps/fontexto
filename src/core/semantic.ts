@@ -41,6 +41,10 @@ export function planSemantic(pendings: Iterable<PendingMatch>, occurrences: Map<
     const sentence = pm.parts.sentence.slice(0, MAX_CLAIM_CHARS);
     const local = (pm.parts.local || pm.parts.sentence).slice(0, MAX_CLAIM_CHARS);
     items.push({ occId: pm.occId, claim: idx(cIdx, claims, sentence), local: idx(cIdx, claims, local), cands: pm.candidates.map((c) => idx(pIdx, passages, c.text)) });
+    // Individual sentences of each window, so the model can pick a focus sentence (PT claim ↔ EN source).
+    for (const c of pm.candidates) {
+      for (const s of pm.index.sentences.slice(c.start, c.start + c.len)) idx(pIdx, passages, s.text);
+    }
   }
   return { claims, passages, items };
 }
@@ -67,10 +71,17 @@ export function applySemantic(
     const pm = pendings.get(it.occId);
     const occ = byId.get(it.occId);
     if (!pm || !occ) continue;
+    const byText = new Map(plan.passages.map((t, i) => [t, passageVecs[i]]));
+    const sentenceSem = new Map<string, number>();
     pm.candidates.forEach((c, k) => {
       const v = passageVecs[it.cands[k]];
       c.sem = (dot(claimVecs[it.claim], v) + dot(claimVecs[it.local], v)) / 2;
+      for (const s of pm.index.sentences.slice(c.start, c.start + c.len)) {
+        const sv = byText.get(s.text);
+        if (sv) sentenceSem.set(s.text, (dot(claimVecs[it.claim], sv) + dot(claimVecs[it.local], sv)) / 2);
+      }
     });
+    pm.sentenceSem = sentenceSem;
     finalizeV2(occ, pm, params);
   }
   let out: EvidenceReport = { ...report, method: SEMANTIC_METHOD, occurrences, summary: summarizeOccurrences(occurrences) };

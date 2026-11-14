@@ -910,6 +910,11 @@ table.files select {
   background: #ffe9a8;
   padding: 0 2px;
 }
+.cit-panel blockquote .passage-focus {
+  font-weight: 650;
+  background: #e7f5ee;
+  box-shadow: inset 0 -2px 0 #86c4a8;
+}
 .occ {
   border: 1px solid var(--line);
   border-radius: 8px;

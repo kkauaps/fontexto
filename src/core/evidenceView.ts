@@ -40,6 +40,39 @@ export function formatPassage(text: string): string {
   return s.replace(/([.!?…])\s+(?=[A-ZÁÉÍÓÚÀÂÊÔÃÕÄÖÜÇ“"'])/g, '$1\n\n').trim();
 }
 
+/** Splits a formatted passage so the exact focus sentence can be marked. */
+export function passageParts(text: string, focus?: string): { text: string; highlight: boolean }[] {
+  const formatted = formatPassage(text);
+  if (!formatted) return [];
+  if (!focus) return [{ text: formatted, highlight: false }];
+  const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+  const needle = fold(formatPassage(focus));
+  if (!needle) return [{ text: formatted, highlight: false }];
+  let folded = '';
+  const map: number[] = [];
+  for (let i = 0; i < formatted.length; ) {
+    const ch = formatted[i];
+    const piece = fold(ch);
+    for (const c of piece) {
+      folded += c;
+      map.push(i);
+    }
+    i += ch.length;
+  }
+  const at = folded.indexOf(needle);
+  if (at < 0) return [{ text: formatted, highlight: false }];
+  const start = map[at];
+  const last = map[at + needle.length - 1];
+  const end = last + ([...formatted.slice(last)][0]?.length ?? 1);
+  const out: { text: string; highlight: boolean }[] = [];
+  if (start > 0) out.push({ text: formatted.slice(0, start), highlight: false });
+  out.push({ text: formatted.slice(start, end), highlight: true });
+  if (end < formatted.length) out.push({ text: formatted.slice(end), highlight: false });
+  return out;
+}
+
+
+
 /** Occurrences sharing one marker (a parenthetical with several references), in document order. */
 export function groupOccurrences(report: Pick<EvidenceReport, 'occurrences'>): CitationGroup[] {
   const groups = new Map<string, CitationGroup>();
