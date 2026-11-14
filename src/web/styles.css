@@ -2585,6 +2585,14 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 :root:not([data-theme="light"]) .cnt.nl { color: var(--muted); }
 :root:not([data-theme="light"]) .doc-pages { background: var(--well); }
 
+/* Desktop and tablet: the top bar grows to a second row instead of pushing the
+   language picker out of view (graph tab, long translations). */
+@media (min-width: 761px) {
+  .topbar { height: auto; min-height: 56px; padding-top: 8px; padding-bottom: 8px; gap: 8px; }
+  .topbar .search { flex: 1 1 0; min-width: 100px; }
+  .topbar .stats, .topbar .tabs button, .topbar > button { white-space: nowrap; }
+}
+
 /* ------------------------------------------------------------------ Phones (≤ 760px)
    One centred column, 44px tap targets, no sideways page scroll. */
 @media (max-width: 760px) {
