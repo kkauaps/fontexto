@@ -1,9 +1,8 @@
 {
-  "name": "citation-tracer",
+  "name": "fontexto",
   "version": "0.1.0",
-  "private": true,
   "description": "Fontexto: bibliographic citation graph and evidence navigation for academic documents (local-first).",
-  "license": "UNLICENSED",
+  "license": "AGPL-3.0-or-later",
   "type": "module",
   "engines": {
     "node": ">=20.10"
