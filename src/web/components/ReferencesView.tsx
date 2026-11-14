@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { EvidenceReport } from '../../core/evidence';
 import type { CitationGraph, PublicationNode } from '../../core/model';
 import { REF_STATUS_ORDER, refRows, type RefRow, type RefStatus } from '../../core/refStatus';
@@ -75,8 +75,8 @@ function candidateTitle(t: Messages, c: OaCandidate) {
 function CandidateLink({ c, children }: { c: OaCandidate; children?: React.ReactNode }) {
   const { t } = useI18n();
   return (
-    <a className="oa-copy" href={c.url} target="_blank" rel="noreferrer noopener" title={candidateTitle(t, c)}>
-      {children ?? candidateLabel(t, c)}
+    <a className="oa-copy" href={c.url} target="_blank" rel="noreferrer noopener" title={`${candidateLabel(t, c)} · ${candidateTitle(t, c)}`}>
+      <span className="oa-copy-text">{children ?? candidateLabel(t, c)}</span>
       <span className={`oa-chip oa-${c.host}`}>{t.oaHost[c.host]}</span>
     </a>
   );
@@ -92,10 +92,10 @@ function NoFreeCopyActions({ result, pub }: { result?: OaResult; pub: Publicatio
   const mail = askAuthorMailto(t, { title: result?.title ?? pub.title, year: result?.year ?? pub.year, doi, email: result?.contactEmail, name: result?.contactEmail ? author : undefined });
   if (!lib && !mail) return null;
   return (
-    <span className="oa-actions">
+    <>
       {lib && (
         <a className="oa-btn" href={lib} target="_blank" rel="noreferrer noopener">
-          {t.libraryLink}
+          🏛 {t.libraryLink}
         </a>
       )}
       {mail && (
@@ -103,131 +103,184 @@ function NoFreeCopyActions({ result, pub }: { result?: OaResult; pub: Publicatio
           ✉ {t.askAuthor}
         </a>
       )}
-    </span>
+    </>
   );
 }
 
+/**
+ * Result of the free-PDF lookup for one entry, always in the same two lines:
+ * one muted line saying what was found, then the secondary actions as small pills on one line.
+ */
 export function OaCell({ state, pub }: { state?: OaState; pub: PublicationNode }) {
   const { t } = useI18n();
   if (!state) return null;
+  const cell = (info: React.ReactNode, actions?: React.ReactNode, title?: string) => (
+    <div className="oa-cell">
+      <div className="oa-src" title={title}>
+        {info}
+      </div>
+      {actions && <div className="oa-actions">{actions}</div>}
+    </div>
+  );
   switch (state.kind) {
     case 'busy':
-      return (
-        <span className="muted small">
+      return cell(
+        <>
           <span className="spinner" /> {t.lookingUp}
-        </span>
+        </>,
       );
     case 'got':
-      return (
-        <span className="oa-tag ok">
-          {t.freePdfGot(state.version ? candidateLabel(t, { source: state.source, version: state.version }) : state.source)}
-        </span>
-      );
+      return cell(<span className="oa-ok">{t.freePdfGot(state.version ? candidateLabel(t, { source: state.source, version: state.version }) : state.source)}</span>);
     case 'blocked': {
       const r = state.result;
       const best = r.pdfUrls[0] ?? r.readUrls?.[0];
       const rest = [...r.pdfUrls, ...(r.readUrls ?? [])].filter((c) => c !== best).slice(0, 4);
-      return (
-        <span className="oa-cell">
-          <span className="oa-tag">
-            {t.freeButManual}{' '}
-            <a href={best?.url ?? r.landingUrl ?? doiUrl(r.doi ?? pub.doi)} target="_blank" rel="noreferrer noopener">
-              {r.pdfUrls[0] ? t.download : t.oaReadOnline}
+      const href = best?.url ?? r.landingUrl ?? doiUrl(r.doi ?? pub.doi);
+      return cell(
+        best ? (
+          <>
+            <span className="oa-src-k">{t.freeCopyFrom}</span> <CandidateLink c={best} />
+          </>
+        ) : (
+          t.freeCopyManual
+        ),
+        <>
+          {href && (
+            <a className="oa-btn" href={href} target="_blank" rel="noreferrer noopener" title={t.freeCopyManual}>
+              ⬇ {r.pdfUrls[0] ? t.downloadPdf : t.oaReadOnline}
             </a>
-            {t.andSendHere}
-          </span>
-          {best && <CandidateLink c={best} />}
+          )}
           {rest.length > 0 && (
             <details className="oa-more">
-              <summary>{t.oaOtherCopies(rest.length)}</summary>
-              {rest.map((c) => (
-                <CandidateLink key={c.url} c={c} />
-              ))}
+              <summary className="oa-btn">{t.oaOtherCopies(rest.length)}</summary>
+              <div className="oa-more-list">
+                {rest.map((c) => (
+                  <CandidateLink key={c.url} c={c} />
+                ))}
+              </div>
             </details>
           )}
-        </span>
+        </>,
+        t.freeCopyManual,
       );
     }
     case 'closed': {
       const link = state.result.landingUrl ?? doiUrl(state.result.doi ?? pub.doi);
-      return (
-        <span className="oa-cell">
-          <span className="oa-tag">
-            {t.noFreePdf}
-            {link && (
-              <>
-                {' · '}
-                <a href={link} target="_blank" rel="noreferrer noopener">
-                  {t.publisherPage}
-                </a>
-              </>
-            )}
-          </span>
+      return cell(
+        t.noFreePdf,
+        <>
+          {link && (
+            <a className="oa-btn" href={link} target="_blank" rel="noreferrer noopener">
+              ↗ {t.publisherPage}
+            </a>
+          )}
           <NoFreeCopyActions result={state.result} pub={pub} />
-        </span>
+        </>,
       );
     }
     case 'not_found':
-      return (
-        <span className="oa-cell">
-          <span className="oa-tag">{t.notFoundInOpen}</span>
-          <NoFreeCopyActions result={state.result} pub={pub} />
-        </span>
-      );
+      return cell(t.notFoundInOpen, <NoFreeCopyActions result={state.result} pub={pub} />);
     case 'error':
-      return <span className="oa-tag">{t.lookupFailed(translateRuntime(t, state.message))}</span>;
+      return cell(<span className="oa-bad">{t.lookupFailed(translateRuntime(t, state.message))}</span>);
   }
 }
 
-/** Optional library/EZproxy prefix, stored in this browser only. */
-export function LibraryAccess() {
+/**
+ * Optional library/EZproxy prefix, stored in this browser only.
+ * `popover`: the settings float under the button (References toolbar) instead of pushing the page down.
+ */
+export function LibraryAccess({ popover = false }: { popover?: boolean }) {
   const { t } = useI18n();
   const prefix = useLibraryPrefix();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(prefix ?? '');
   const [note, setNote] = useState<{ ok: boolean; text: string } | undefined>();
+  const root = useRef<HTMLDivElement>(null);
+  const toggle = useRef<HTMLButtonElement>(null);
   const save = (v: string) => {
     const ok = saveLibraryPrefix(v);
     setNote(ok ? (v.trim() ? { ok, text: t.librarySaved } : undefined) : { ok, text: t.libraryInvalid });
     if (ok && !v.trim()) setValue('');
   };
+  useEffect(() => {
+    if (!popover || !open) return;
+    const onDown = (e: PointerEvent) => {
+      if (root.current && !root.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setOpen(false);
+      toggle.current?.focus();
+    };
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [popover, open]);
   return (
-    <div className="library-access">
-      <button className="soft small-btn" aria-expanded={open} onClick={() => { setOpen((o) => !o); setValue(prefix ?? ''); setNote(undefined); }}>
+    <div ref={root} className={`library-access${popover ? ' is-popover' : ''}`}>
+      <button
+        ref={toggle}
+        className={`${popover ? '' : 'soft '}small-btn${open ? ' on' : ''}`}
+        aria-expanded={open}
+        aria-controls="library-panel"
+        onClick={() => {
+          setOpen((o) => !o);
+          setValue(prefix ?? '');
+          setNote(undefined);
+        }}
+      >
         🏛 {t.libraryAccess}
         {prefix && <span className="oa-dot" aria-hidden />}
       </button>
       {open && (
         <form
+          id="library-panel"
           className="library-panel"
+          role={popover ? 'dialog' : undefined}
+          aria-label={popover ? t.libraryTitle : undefined}
           onSubmit={(e) => {
             e.preventDefault();
             save(value);
           }}
         >
-          <label htmlFor="library-prefix">{t.libraryTitle}</label>
-          <input
-            id="library-prefix"
-            type="url"
-            inputMode="url"
-            autoComplete="off"
-            spellCheck={false}
-            placeholder={t.libraryPlaceholder}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-          />
-          <span className="muted small">{t.libraryHint}</span>
-          <span className="library-row">
+          <div className="library-head">
+            <label htmlFor="library-prefix">{t.libraryTitle}</label>
+            {popover && (
+              <button type="button" className="library-x" aria-label={t.close} title={t.close} onClick={() => setOpen(false)}>
+                ×
+              </button>
+            )}
+          </div>
+          <div className="library-input-row">
+            <input
+              id="library-prefix"
+              type="url"
+              inputMode="url"
+              autoComplete="off"
+              spellCheck={false}
+              autoFocus={popover}
+              placeholder={t.libraryPlaceholder}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+            />
             <button type="submit" className="primary">
               {t.librarySave}
             </button>
-            {prefix && (
-              <button type="button" onClick={() => save('')}>
-                {t.libraryRemove}
-              </button>
-            )}
-            {note && <span className={`small ${note.ok ? 'oa-ok' : 'oa-bad'}`} role="status">{note.text}</span>}
-          </span>
+          </div>
+          <span className="muted small">{t.libraryHint}</span>
+          {(prefix || note) && (
+            <span className="library-row">
+              {prefix && (
+                <button type="button" className="link-btn small" onClick={() => save('')}>
+                  {t.libraryRemove}
+                </button>
+              )}
+              {note && <span className={`small ${note.ok ? 'oa-ok' : 'oa-bad'}`} role="status">{note.text}</span>}
+            </span>
+          )}
         </form>
       )}
     </div>
@@ -305,7 +358,7 @@ export function ReferencesView({ projectId, graph, evidence, oa, setOa, onGraph,
 
   return (
     <div className="refs-view">
-      <div className="refs-head">
+      <div className="refs-toolbar">
         <div className="chip-row" role="group" aria-label={t.filterBySituation}>
           <button className={`chip-filter${filter === 'all' ? ' on' : ''}`} onClick={() => setFilter('all')}>
             {t.all} <b>{rows.length}</b>
@@ -318,16 +371,23 @@ export function ReferencesView({ projectId, graph, evidence, oa, setOa, onGraph,
         </div>
         {withoutPdf.length > 0 && (
           <div className="refs-oa">
-            <button className="primary" disabled={Boolean(busy)} onClick={runOa}>
+            <LibraryAccess popover />
+            <button className="primary refs-oa-btn" disabled={Boolean(busy)} onClick={runOa} aria-describedby="oa-privacy">
               {busy === 'oa' ? t.searchingFreePdfs : t.searchFreePdfs(withoutPdf.length)}
             </button>
-            <span className="muted small">{t.oaPrivacyHint}</span>
-            <LibraryAccess />
+            <span className="info-tip">
+              <button type="button" className="info-tip-btn" aria-label={t.oaPrivacyLabel} aria-describedby="oa-privacy">
+                i
+              </button>
+              <span id="oa-privacy" role="tooltip" className="info-tip-body">
+                {t.oaPrivacyHint}
+              </span>
+            </span>
           </div>
         )}
       </div>
       {message && (
-        <div className="notice ok" onClick={() => setMessage(undefined)}>
+        <div className="notice ok refs-banner" role="status" onClick={() => setMessage(undefined)}>
           {message}
         </div>
       )}
@@ -335,10 +395,12 @@ export function ReferencesView({ projectId, graph, evidence, oa, setOa, onGraph,
       <table className="refs-table">
         <thead>
           <tr>
-            <th>{t.colReference}</th>
-            <th>{t.colStatus}</th>
-            <th title={t.colCitationsTitle}>{t.colCitations}</th>
-            <th>{t.colSourcePdf}</th>
+            <th className="col-ref">{t.colReference}</th>
+            <th className="col-status">{t.colStatus}</th>
+            <th className="col-cites" title={t.colCitationsTitle}>
+              {t.colCitations}
+            </th>
+            <th className="col-pdf">{t.colSourcePdf}</th>
           </tr>
         </thead>
         <tbody>
@@ -400,17 +462,19 @@ function RefLine({ row, oa, busy, onUpload, onOpenPdf, onShowInDocument, onShowI
           {t.graphShort}
         </button>
       </td>
-      <td>
-        {row.hasPdf ? (
-          <button onClick={onOpenPdf}>{t.openPdf}</button>
-        ) : (
-          <div className="ref-pdf">
-            <button disabled={busy} onClick={onUpload}>
+      <td className="ref-pdf-cell">
+        <div className="ref-pdf">
+          {row.hasPdf ? (
+            <button className="ref-pdf-main" onClick={onOpenPdf}>
+              {t.openPdf}
+            </button>
+          ) : (
+            <button className="ref-pdf-main" disabled={busy} onClick={onUpload}>
               {busy ? t.sending : t.sendPdf}
             </button>
-            <OaCell state={oa} pub={pub} />
-          </div>
-        )}
+          )}
+          {(!row.hasPdf || oa?.kind === 'got') && <OaCell state={oa} pub={pub} />}
+        </div>
       </td>
     </tr>
   );
