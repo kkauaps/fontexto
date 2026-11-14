@@ -2905,4 +2905,5 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   .lp-steps li, .lp-steps ol > li { align-items: center; }
   html, body { overflow-x: clip; }
   .uf-chip { text-align: left; }
+  .notice button { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 44px; margin-top: 8px; padding: 0 16px; }
 }
