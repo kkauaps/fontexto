@@ -1405,7 +1405,7 @@ table.files select {
 .uf {
   min-height: 100%;
   overflow-y: auto;
-  background: #fff;
+  background: transparent;
   color: var(--ink);
   font-size: 16px;
   line-height: 1.6;
@@ -2222,6 +2222,7 @@ button.primary:hover, .primary:hover { background: var(--accent-hover); }
   display: flex;
   flex-direction: column;
   gap: 0;
+  background: transparent;
 }
 .lp-nav {
   display: flex;
@@ -2344,7 +2345,7 @@ button.primary:hover, .primary:hover { background: var(--accent-hover); }
 .lp-footer .fx-mark-tile img { width: 14px; height: 12px; }
 
 /* Upload */
-.uf { min-height: 100vh; display: flex; flex-direction: column; }
+.uf { min-height: 100vh; display: flex; flex-direction: column; background: transparent; }
 .uf-main, .uf-body {
   flex: 1;
   display: flex;

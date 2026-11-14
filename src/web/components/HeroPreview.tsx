@@ -1,6 +1,6 @@
 import { useI18n } from '../i18n';
 
-/** Themed HTML stand-in for the document view; follows data-theme. */
+/** Themed HTML stand-in for the document view; follows data-theme. Generic placeholder copy only. */
 export function HeroPreview() {
   const { t } = useI18n();
   return (
@@ -8,35 +8,35 @@ export function HeroPreview() {
       <div className="mini-app">
         <div className="mini-paper">
           <div className="mini-sheet">
-            <div className="mini-kicker">Universidade Estadual de Montes Claros</div>
-            <div className="ttl">Segmentação de feridas em imagens clínicas</div>
+            <div className="mini-kicker">Sample University</div>
+            <div className="ttl">An example paper on climate data</div>
             <p>
-              A identificação dos tecidos presentes no leito e nas bordas de feridas crônicas integra a avaliação clínica{' '}
-              <span className="hl-warn hl-sel">(Velloran et al., 2025)</span>. Essa avaliação baseia-se, em geral, no exame visual.
+              Recent assessments of regional temperature records show a consistent warming trend over the last fifty years{' '}
+              <span className="hl-warn hl-sel">(Silva et al., 2024)</span>. These records are typically compiled from weather stations and satellite observations.
             </p>
             <p>
-              A segmentação e a quantificação manuais são descritas como demoradas <span className="hl-ok">(Velloran et al., 2025)</span>, e
-              produzir máscaras em nível de pixel exige tempo especializado <span className="hl-ok">(Kettavainen et al., 2026)</span>.
+              Manual review of station metadata is described as time-consuming <span className="hl-ok">(Silva et al., 2024)</span>, and
+              producing quality-controlled series requires specialized work <span className="hl-ok">(Doe &amp; Lee, 2023)</span>.
             </p>
             <p>
-              Métodos de segmentação por aprendizado profundo têm sido investigados para delimitar a ferida{' '}
-              <span className="hl-ok">(Ravikandar et al., 2022; Brevald et al., 2026)</span>.
+              Automated methods have been investigated to flag outliers in climate series{' '}
+              <span className="hl-ok">(Chen et al., 2022; Park, 2021)</span>.
             </p>
           </div>
         </div>
         <div className="mini-side">
           <div className="k">{t.allCitations}</div>
           <div className="mini-card">
-            <b>Velloran (2025)</b>
-            <p>p. 7 — A identificação dos tecidos presentes no leito e nas bordas…</p>
+            <b>Silva et al. (2024)</b>
+            <p>p. 7 — Recent assessments of regional temperature…</p>
           </div>
           <div className="mini-card">
-            <b>Kettavainen (2026)</b>
-            <p>p. 7 — A segmentação e a quantificação manuais…</p>
+            <b>Doe &amp; Lee (2023)</b>
+            <p>p. 7 — Manual review of station metadata…</p>
           </div>
           <div className="mini-card">
-            <b>Ravikandar (2022)</b>
-            <p>p. 7 — Nesse contexto, métodos de segmentação…</p>
+            <b>Chen et al. (2022)</b>
+            <p>p. 7 — Automated methods have been investigated…</p>
           </div>
         </div>
       </div>
