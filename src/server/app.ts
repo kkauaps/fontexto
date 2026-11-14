@@ -57,7 +57,7 @@ export function createApp(cfg: AppConfig) {
   // Open-access lookup/proxy (same code as the Pages Function). Only DOI/title/year/author arrive here.
   for (const route of ['/api/oa/lookup', '/api/oa/pdf']) {
     app.get(route, h(async (req, res) => {
-      const r = await handleOaRequest(new URL(req.originalUrl, 'http://localhost'));
+      const r = await handleOaRequest(new URL(req.originalUrl, 'http://localhost'), fetch, { env: { CORE_API_KEY: process.env.CORE_API_KEY, S2_API_KEY: process.env.S2_API_KEY } });
       res.status(r.status);
       r.headers.forEach((v, k) => res.setHeader(k, v));
       if (!r.body) return void res.end();

@@ -1,4 +1,4 @@
 // Cloudflare Pages Function: GET /api/oa/lookup?doi=... | ?title=...&year=...&author=...  (see src/core/openAccess.ts)
-import { handleOaRequest } from '../../../src/core/openAccess';
+import { serveOa, type OaContext } from './_shared';
 
-export const onRequestGet = ({ request }: { request: Request }) => handleOaRequest(new URL(request.url));
+export const onRequestGet = (ctx: OaContext) => serveOa(ctx);
