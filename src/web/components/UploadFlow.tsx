@@ -345,7 +345,8 @@ function Review({ graph, projectId, extracted, mode, oa, onGraph, onOpen }: { gr
   };
   const oaVals = Object.values(oa);
   const oaSummary = oaVals.length
-    ? t.oaSummary(oaVals.filter((x) => x.kind === 'got').length, oaVals.filter((x) => x.kind === 'blocked').length, oaVals.filter((x) => x.kind === 'closed').length, oaVals.filter((x) => x.kind === 'not_found' || x.kind === 'error').length)
+    ? t.oaSummary(oaVals.filter((x) => x.kind === 'got').length, oaVals.filter((x) => x.kind === 'blocked').length, oaVals.filter((x) => x.kind === 'closed').length, oaVals.filter((x) => x.kind === 'not_found').length) +
+      (oaVals.some((x) => x.kind === 'error') ? t.oaLookupsBusy(oaVals.filter((x) => x.kind === 'error').length) : '')
     : '';
   return (
     <>

@@ -5,6 +5,7 @@ import { REF_STATUS_ORDER, refRows, type RefRow, type RefStatus } from '../../co
 import { api, type OaCandidate, type OaHost, type OaResult, type OaVersion } from '../api';
 import type { OpenRequest } from './SidePanel';
 import { refStatusText, translateRuntime, useI18n, type Messages } from '../i18n';
+import { OA_CATALOGS_BUSY } from '../i18n/runtime';
 import { libraryLink, saveLibraryPrefix, useLibraryPrefix } from '../library';
 import { askAuthorMailto } from '../askAuthor';
 
@@ -18,6 +19,31 @@ export type OaState =
   | { kind: 'error'; message: string };
 
 const CONCURRENCY = 3;
+/** /api/oa/* allows 20 requests per 10 s per IP; starting one every 550 ms keeps a long list under it (≈18/10 s). */
+const OA_MIN_GAP_MS = 550;
+
+/** Spaces out request starts shared by all workers, so concurrency never bursts past the site's rate limit. */
+export function makePacer(gapMs: number, now = () => Date.now(), sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))) {
+  let next = 0;
+  return async () => {
+    const t = now();
+    const at = Math.max(t, next);
+    next = at + gapMs;
+    if (at > t) await sleep(at - t);
+  };
+}
+
+/** Retries a lookup that hit the site's or a catalogue's rate limit (429) or a 5xx, with backoff (2 s, 6 s). */
+export async function withRetry<T>(run: () => Promise<T>, waits: number[] = [2000, 6000], sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await run();
+    } catch (e) {
+      if (attempt >= waits.length || !/^(?:429|5\d\d)\b/.test((e as Error).message)) throw e;
+      await sleep(waits[attempt]);
+    }
+  }
+}
 
 function query(pub: PublicationNode) {
   return { doi: pub.doi, title: pub.title, year: pub.year, author: pub.authors[0]?.family };
@@ -40,17 +66,20 @@ export async function fetchOpenAccess(
   for (const p of pubs) if (!queue.includes(p)) onState(p.id, { kind: 'not_found' });
   const files: { file: File; publicationId: string }[] = [];
   let i = 0;
+  const pace = makePacer(OA_MIN_GAP_MS);
   const worker = async () => {
     while (i < queue.length) {
       const pub = queue[i++];
       onState(pub.id, { kind: 'busy' });
       try {
-        const r = await api.oaFetchPdf(query(pub), safeName(pub));
+        const r = await withRetry(async () => (await pace(), api.oaFetchPdf(query(pub), safeName(pub))));
         if (r.file) {
           files.push({ file: r.file, publicationId: pub.id });
           onState(pub.id, { kind: 'got', source: r.source, host: r.host, version: r.version });
         } else if (r.result.status === 'oa') onState(pub.id, { kind: 'blocked', result: r.result });
         else if (r.result.status === 'closed') onState(pub.id, { kind: 'closed', result: r.result });
+        // "not found" while catalogues were throttled or down is not an answer: say so instead of "not identified"
+        else if (r.result.sources?.some((x) => x.status === 'rate_limited' || x.status === 'timeout' || x.status === 'error')) onState(pub.id, { kind: 'error', message: OA_CATALOGS_BUSY });
         else onState(pub.id, { kind: 'not_found', result: r.result });
       } catch (e) {
         onState(pub.id, { kind: 'error', message: (e as Error).message });
