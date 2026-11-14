@@ -22,6 +22,7 @@ interface Step {
 }
 
 const isPdf = (f: File) => /\.(pdf|png|jpe?g|webp)$/i.test(f.name);
+const DOC_TYPES = ['PDF', 'PNG', 'JPG', 'WEBP'];
 const isBib = (f: File) => /\.(bib|bibtex)$/i.test(f.name);
 
 /** Files from a drop, walking dropped folders. */
@@ -46,45 +47,101 @@ async function filesFromDrop(e: DragEvent): Promise<File[]> {
   return [...e.dataTransfer.files];
 }
 
-function DropZone({ id, title, hint, accept, multiple, folder, files, onFiles }: { id: string; title: string; hint: string; accept: string; multiple?: boolean; folder?: boolean; files: File[]; onFiles: (f: File[]) => void }) {
+const fmtSize = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
+
+function UploadIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 15V4" />
+      <path d="m7 9 5-5 5 5" />
+      <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+    </svg>
+  );
+}
+
+function FileIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+      <path d="M14 3v5h5" />
+    </svg>
+  );
+}
+
+const MAX_CHIPS = 6;
+
+function DropZone({ id, title, hint, accept, types, multiple, folder, files, onFiles, onRemove }: { id: string; title: string; hint: string; accept: string; types: string[]; multiple?: boolean; folder?: boolean; files: File[]; onFiles: (f: File[]) => void; onRemove: (index: number) => void }) {
   const { t } = useI18n();
   const [over, setOver] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
+  const shown = files.slice(0, MAX_CHIPS);
   return (
     <div
       className={`uf-drop${over ? ' over' : ''}${files.length ? ' filled' : ''}`}
+      role="group"
+      aria-labelledby={`${id}-title`}
       onDragOver={(e) => {
         e.preventDefault();
         setOver(true);
       }}
-      onDragLeave={() => setOver(false)}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false);
+      }}
       onDrop={async (e) => {
         e.preventDefault();
         setOver(false);
         onFiles(await filesFromDrop(e));
       }}
     >
-      <label htmlFor={id} className="uf-drop-title">
-        {title}
-      </label>
-      <p className="small muted">{hint}</p>
-      <div className="row">
-        <button type="button" onClick={() => input.current?.click()}>
-          {multiple ? t.chooseFiles : t.chooseFile}
+      <button type="button" className="uf-drop-hit" onClick={() => input.current?.click()} aria-describedby={`${id}-hint`}>
+        <span className="uf-drop-icon">
+          <UploadIcon />
+        </span>
+        <span id={`${id}-title`} className="uf-drop-title">
+          {title}
+        </span>
+        <span id={`${id}-hint`} className="uf-drop-hint">
+          {hint}
+        </span>
+        <span className="uf-drop-cta">{multiple ? t.dropHereMany : t.dropHereOne}</span>
+        <span className="uf-drop-types" aria-hidden="true">
+          {types.map((ty) => (
+            <span key={ty}>{ty}</span>
+          ))}
+        </span>
+      </button>
+      {folder && (
+        <button type="button" className="linklike uf-drop-folder" onClick={() => folderInput.current?.click()}>
+          {t.chooseFolder}
         </button>
-        {folder && (
-          <button type="button" onClick={() => folderInput.current?.click()}>
-            {t.chooseFolder}
-          </button>
-        )}
-      </div>
-      <input id={id} ref={input} type="file" accept={accept} multiple={multiple} hidden onChange={(e) => onFiles([...(e.target.files ?? [])])} />
-      {folder && <input ref={folderInput} type="file" hidden multiple {...({ webkitdirectory: '' } as object)} onChange={(e) => onFiles([...(e.target.files ?? [])])} />}
+      )}
+      <input id={id} ref={input} type="file" accept={accept} multiple={multiple} hidden aria-label={title} onChange={(e) => {
+        onFiles([...(e.target.files ?? [])]);
+        e.target.value = '';
+      }} />
+      {folder && <input ref={folderInput} type="file" hidden multiple {...({ webkitdirectory: '' } as object)} onChange={(e) => {
+        onFiles([...(e.target.files ?? [])]);
+        e.target.value = '';
+      }} />}
       {files.length > 0 && (
-        <p className="uf-picked small" aria-live="polite">
-          {t.filesSelected(files.length, files[0].name)}
-        </p>
+        <ul className="uf-chips" aria-live="polite" aria-label={t.filesSelected(files.length, files[0].name)}>
+          {shown.map((f, i) => (
+            <li key={`${f.name}-${f.size}-${i}`} className="uf-chip">
+              <FileIcon />
+              <span className="uf-chip-name" title={f.name}>
+                {f.name}
+              </span>
+              <span className="uf-chip-size">{fmtSize(f.size)}</span>
+              <button type="button" className="uf-chip-x" aria-label={t.removeFile(f.name)} title={t.removeFile(f.name)} onClick={() => onRemove(i)}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6 6 18" />
+                </svg>
+              </button>
+            </li>
+          ))}
+          {files.length > MAX_CHIPS && <li className="uf-chip uf-chip-more">+{files.length - MAX_CHIPS}</li>}
+        </ul>
       )}
     </div>
   );
@@ -209,17 +266,19 @@ export function UploadFlow({ mode, onBack, onDone }: Props) {
               <span className="small muted">{t.projectNameOptional}</span>
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t.projectNamePlaceholder} />
             </label>
-            <div className="uf-grid">
-              <DropZone id="uf-main" title={t.dropYourDocument} hint={t.dropYourDocumentHint} accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" files={main} onFiles={(f) => setMain(f.filter(isPdf).slice(0, 1))} />
-              {mode === 'bib' && <DropZone id="uf-bib" title={t.dropBib} hint={t.dropBibHint} accept=".bib,.bibtex" files={bib} onFiles={(f) => setBib(f.filter(isBib).slice(0, 1))} />}
+            <div className={`uf-grid${mode === 'bib' ? ' three' : ''}`}>
+              <DropZone id="uf-main" title={t.dropYourDocument} hint={t.dropYourDocumentHint} accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" types={DOC_TYPES} files={main} onFiles={(f) => setMain(f.filter(isPdf).slice(0, 1))} onRemove={() => setMain([])} />
+              {mode === 'bib' && <DropZone id="uf-bib" title={t.dropBib} hint={t.dropBibHint} accept=".bib,.bibtex" types={['.bib']} files={bib} onFiles={(f) => setBib(f.filter(isBib).slice(0, 1))} onRemove={() => setBib([])} />}
               <DropZone
                 id="uf-refs"
                 title={t.dropRefs(mode === 'bib' ? '3' : '2', mode === 'doc')}
                 hint={mode === 'doc' ? t.dropRefsHintDoc : t.dropRefsHint}
                 accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
+                types={DOC_TYPES}
                 multiple
                 folder
                 files={refs}
+                onRemove={(i) => setRefs((prev) => prev.filter((_, j) => j !== i))}
                 onFiles={(f) => setRefs((prev) => [...prev, ...f.filter(isPdf)].filter((x, i, a) => a.findIndex((y) => y.name === x.name && y.size === x.size) === i))}
               />
             </div>
@@ -227,7 +286,7 @@ export function UploadFlow({ mode, onBack, onDone }: Props) {
               {privacyNote(t)}
               {mode === 'doc' && t.privacyOaNote}
             </p>
-            <button className="primary lp-btn" disabled={!ready} onClick={() => void start()}>
+            <button className="primary lp-btn uf-cta" disabled={!ready} onClick={() => void start()}>
               {t.processAndOpen}
             </button>
             {!ready && <p className="small muted">{t.missingPrefix}{missing.join(', ')}.</p>}

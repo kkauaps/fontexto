@@ -27,16 +27,25 @@ export function HeroPreview() {
         <div className="mini-side">
           <div className="k">{t.allCitations}</div>
           <div className="mini-card">
-            <b>Silva et al. (2024)</b>
-            <p>p. 7 — Recent assessments of regional temperature…</p>
+            <div className="mini-card-h">
+              <b>Silva et al. (2024)</b>
+              <span className="mini-pill warn">{t.statusCaveat}</span>
+            </div>
+            <p>“consistent warming trend” · p. 3</p>
           </div>
           <div className="mini-card">
-            <b>Doe &amp; Lee (2023)</b>
-            <p>p. 7 — Manual review of station metadata…</p>
+            <div className="mini-card-h">
+              <b>Doe &amp; Lee (2023)</b>
+              <span className="mini-pill ok">{t.statusLocated}</span>
+            </div>
+            <p>“quality-controlled series” · p. 5</p>
           </div>
           <div className="mini-card">
-            <b>Chen et al. (2022)</b>
-            <p>p. 7 — Automated methods have been investigated…</p>
+            <div className="mini-card-h">
+              <b>Chen et al. (2022)</b>
+              <span className="mini-pill ok">{t.statusLocated}</span>
+            </div>
+            <p>“flag outliers” · p. 2</p>
           </div>
         </div>
       </div>
