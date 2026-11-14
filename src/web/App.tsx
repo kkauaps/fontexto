@@ -6,7 +6,7 @@ import { buildView, DEFAULT_FILTERS, type ViewFilters } from '../core/view';
 import { api, edition, type ProjectSummary } from './api';
 import { Landing, type FlowMode } from './components/Landing';
 import { UploadFlow } from './components/UploadFlow';
-import { AppearanceSwitcher } from './components/AppearanceSwitcher';
+import { BackPill, HeaderControls } from './components/HeaderControls';
 import { BrandMark } from './components/BrandMark';
 import { SetupChecklist } from './components/SetupChecklist';
 import { occurrencesByPublication } from '../core/evidenceView';
@@ -19,7 +19,7 @@ import { ProjectPanel } from './components/ProjectPanel';
 import { SidePanel, type OpenRequest } from './components/SidePanel';
 import { ReferencesView, type OaState } from './components/ReferencesView';
 import { REF_STATUS_ORDER, refRows, refStatusMap, type RefStatus } from '../core/refStatus';
-import { LanguageSwitcher, replaceSearch, translateRuntime, useI18n } from './i18n';
+import { replaceSearch, translateRuntime, useI18n } from './i18n';
 
 type Tab = 'doc' | 'refs' | 'graph';
 const INITIAL_FILTERS: ViewFilters = { ...DEFAULT_FILTERS, interSource: false, colorBy: 'status' };
@@ -178,7 +178,8 @@ export function App() {
         <button className="brand-btn" onClick={() => setProjectId(undefined)} aria-label={t.backHomeAria} title={t.backHomeTitle}>
           <BrandMark />
         </button>
-        <select value={projectId} onChange={(e) => setProjectId(e.target.value || undefined)} aria-label={t.project}>
+        <BackPill className="topbar-back" onClick={() => setProjectId(undefined)} label={t.backToStart} />
+        <select className="hdr-project" value={projectId} onChange={(e) => setProjectId(e.target.value || undefined)} aria-label={t.project}>
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
@@ -219,10 +220,7 @@ export function App() {
         <button className="primary" onClick={() => setPanelOpen(true)}>
           {t.filesAndReview}
         </button>
-        <>
-          <AppearanceSwitcher />
-          <LanguageSwitcher />
-        </>
+        <HeaderControls />
       </header>
       {error && (
         <div className="notice error" onClick={() => setError(undefined)}>

@@ -1,3 +1,4 @@
+import { BackPill } from './HeaderControls';
 import type { CitationOccurrence, EvidenceStatus } from '../../core/evidence';
 import type { CitationGraph, PublicationNode } from '../../core/model';
 import { passageParts, occurrenceStatus, type CitationGroup } from '../../core/evidenceView';
@@ -186,9 +187,7 @@ export function CitationPanel(props: PanelProps) {
   const { group, graph } = props;
   return (
     <div className="cit-panel">
-      <button className="linklike" onClick={props.onBack}>
-        ← {t.allCitations}
-      </button>
+      <BackPill className="hdr-back-inline" onClick={props.onBack} label={t.allCitations} />
       <h3>
         {group.marker} <span className="small muted">· {t.pageAbbr} {group.page}</span>
       </h3>

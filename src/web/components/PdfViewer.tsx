@@ -1,3 +1,4 @@
+import { BackPill } from './HeaderControls';
 import { useEffect, useRef, useState } from 'react';
 import type { ViewerTarget } from '../../core/anchors';
 import { api } from '../api';
@@ -111,9 +112,7 @@ export function PdfViewer({ projectId, request: initial, backLabel, onClose }: P
   return (
     <div className="viewer" role="dialog" aria-label={t.pdfViewer}>
       <header className="viewer-bar">
-        <button className="primary" onClick={onClose}>
-          ← {backLabel ?? t.back}
-        </button>
+        <BackPill onClick={onClose} label={backLabel ?? t.back} />
         <div className="viewer-title">
           <strong>{request.title}</strong>
           {request.context && <span className="small muted">{request.context}</span>}

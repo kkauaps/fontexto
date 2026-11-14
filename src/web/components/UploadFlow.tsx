@@ -2,10 +2,10 @@ import { useMemo, useRef, useState, type DragEvent } from 'react';
 import type { CitationGraph, PublicationNode } from '../../core/model';
 import { api } from '../api';
 import type { FlowMode } from './Landing';
-import { fetchOpenAccess, OaCell, type OaState } from './ReferencesView';
-import { AppearanceSwitcher } from './AppearanceSwitcher';
+import { fetchOpenAccess, LibraryAccess, OaCell, type OaState } from './ReferencesView';
+import { BackPill, HeaderControls } from './HeaderControls';
 import { BrandMark } from './BrandMark';
-import { LanguageSwitcher, privacyNote, translateRuntime, useI18n } from '../i18n';
+import { privacyNote, translateRuntime, useI18n } from '../i18n';
 
 interface Props {
   mode: FlowMode;
@@ -70,11 +70,14 @@ function FileIcon() {
 
 const MAX_CHIPS = 6;
 
-function DropZone({ id, title, hint, accept, types, multiple, folder, files, onFiles, onRemove }: { id: string; title: string; hint: string; accept: string; types: string[]; multiple?: boolean; folder?: boolean; files: File[]; onFiles: (f: File[]) => void; onRemove: (index: number) => void }) {
+/**
+ * One drop zone. Every zone has the same structure: the whole card is the click target (file picker) and the drop
+ * target; dropped folders are walked (filesFromDrop), so the reference zone takes files and folders alike.
+ */
+function DropZone({ id, title, hint, accept, types, multiple, files, onFiles, onRemove }: { id: string; title: string; hint: string; accept: string; types: string[]; multiple?: boolean; files: File[]; onFiles: (f: File[]) => void; onRemove: (index: number) => void }) {
   const { t } = useI18n();
   const [over, setOver] = useState(false);
   const input = useRef<HTMLInputElement>(null);
-  const folderInput = useRef<HTMLInputElement>(null);
   const shown = files.slice(0, MAX_CHIPS);
   return (
     <div
@@ -111,19 +114,10 @@ function DropZone({ id, title, hint, accept, types, multiple, folder, files, onF
           ))}
         </span>
       </button>
-      {folder && (
-        <button type="button" className="linklike uf-drop-folder" onClick={() => folderInput.current?.click()}>
-          {t.chooseFolder}
-        </button>
-      )}
       <input id={id} ref={input} type="file" accept={accept} multiple={multiple} hidden aria-label={title} onChange={(e) => {
         onFiles([...(e.target.files ?? [])]);
         e.target.value = '';
       }} />
-      {folder && <input ref={folderInput} type="file" hidden multiple {...({ webkitdirectory: '' } as object)} onChange={(e) => {
-        onFiles([...(e.target.files ?? [])]);
-        e.target.value = '';
-      }} />}
       {files.length > 0 && (
         <ul className="uf-chips" aria-live="polite" aria-label={t.filesSelected(files.length, files[0].name)}>
           {shown.map((f, i) => (
@@ -247,12 +241,9 @@ export function UploadFlow({ mode, onBack, onDone }: Props) {
         <button className="linklike brand-btn" onClick={onBack} aria-label={t.backToStart}>
           <BrandMark />
         </button>
+        <BackPill onClick={onBack} label={t.back} />
         <div className="lp-nav-right">
-          <button className="linklike" onClick={onBack}>
-            ← {t.back}
-          </button>
-          <AppearanceSwitcher />
-          <LanguageSwitcher />
+          <HeaderControls />
         </div>
       </header>
       <main className="uf-main">
@@ -276,7 +267,6 @@ export function UploadFlow({ mode, onBack, onDone }: Props) {
                 accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
                 types={DOC_TYPES}
                 multiple
-                folder
                 files={refs}
                 onRemove={(i) => setRefs((prev) => prev.filter((_, j) => j !== i))}
                 onFiles={(f) => setRefs((prev) => [...prev, ...f.filter(isPdf)].filter((x, i, a) => a.findIndex((y) => y.name === x.name && y.size === x.size) === i))}
@@ -391,6 +381,7 @@ function Review({ graph, projectId, extracted, mode, oa, onGraph, onOpen }: { gr
         <section>
           <h3>{t.refsWithoutPdf(withoutPdf.length)}</h3>
           <p className="small muted">{t.refsWithoutPdfHint}</p>
+          <LibraryAccess />
           <ul className="uf-review">
             {withoutPdf.map((p) => (
               <li key={p.id}>

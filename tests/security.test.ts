@@ -59,7 +59,8 @@ describe('no third-party code or network use in the web app', () => {
   });
   // doi.org is only a clickable link (target=_blank, rel=noreferrer noopener), never fetched.
   it('references no external origin in source, styles or the HTML shell', () => {
-    const allowed = /^https?:\/\/(www\.w3\.org\/|doi\.org\/|127\.0\.0\.1|localhost)/;
+    // RFC 2606 example domains are placeholders in UI text, never contacted
+    const allowed = /^https?:\/\/(www\.w3\.org\/|doi\.org\/|127\.0\.0\.1|localhost|([a-z0-9-]+\.)*example\.(com|org|edu|net)\/)/;
     for (const f of webFiles) {
       const src = readFileSync(f, 'utf8').split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
       for (const m of src.matchAll(/https?:\/\/[^\s'"`)<>]+/g)) expect(m[0], `${f}: ${m[0]}`).toMatch(allowed);

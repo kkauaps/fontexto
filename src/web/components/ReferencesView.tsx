@@ -2,17 +2,19 @@ import { useMemo, useRef, useState } from 'react';
 import type { EvidenceReport } from '../../core/evidence';
 import type { CitationGraph, PublicationNode } from '../../core/model';
 import { REF_STATUS_ORDER, refRows, type RefRow, type RefStatus } from '../../core/refStatus';
-import { api, type OaResult } from '../api';
+import { api, type OaCandidate, type OaHost, type OaResult, type OaVersion } from '../api';
 import type { OpenRequest } from './SidePanel';
-import { refStatusText, translateRuntime, useI18n } from '../i18n';
+import { refStatusText, translateRuntime, useI18n, type Messages } from '../i18n';
+import { libraryLink, saveLibraryPrefix, useLibraryPrefix } from '../library';
+import { askAuthorMailto } from '../askAuthor';
 
 /** Outcome of the free-PDF search for one reference (kept for the session only). */
 export type OaState =
   | { kind: 'busy' }
-  | { kind: 'got'; source: string }
+  | { kind: 'got'; source: string; host?: OaHost; version?: OaVersion }
   | { kind: 'blocked'; result: OaResult }
   | { kind: 'closed'; result: OaResult }
-  | { kind: 'not_found' }
+  | { kind: 'not_found'; result?: OaResult }
   | { kind: 'error'; message: string };
 
 const CONCURRENCY = 3;
@@ -46,10 +48,10 @@ export async function fetchOpenAccess(
         const r = await api.oaFetchPdf(query(pub), safeName(pub));
         if (r.file) {
           files.push({ file: r.file, publicationId: pub.id });
-          onState(pub.id, { kind: 'got', source: r.source });
+          onState(pub.id, { kind: 'got', source: r.source, host: r.host, version: r.version });
         } else if (r.result.status === 'oa') onState(pub.id, { kind: 'blocked', result: r.result });
         else if (r.result.status === 'closed') onState(pub.id, { kind: 'closed', result: r.result });
-        else onState(pub.id, { kind: 'not_found' });
+        else onState(pub.id, { kind: 'not_found', result: r.result });
       } catch (e) {
         onState(pub.id, { kind: 'error', message: (e as Error).message });
       }
@@ -62,10 +64,52 @@ export async function fetchOpenAccess(
   return { got: files.length, graph };
 }
 
+/** "Europe PMC · published version" (tooltip: host type and the catalogues that found it). */
+function candidateLabel(t: Messages, c: Pick<OaCandidate, 'source' | 'version'>) {
+  return `${c.source} · ${t.oaVersion[c.version]}`;
+}
+function candidateTitle(t: Messages, c: OaCandidate) {
+  return `${t.oaHost[c.host]} · ${t.oaFoundVia(c.via.join(', '))}${c.license ? ` · ${c.license}` : ''}`;
+}
+
+function CandidateLink({ c, children }: { c: OaCandidate; children?: React.ReactNode }) {
+  const { t } = useI18n();
+  return (
+    <a className="oa-copy" href={c.url} target="_blank" rel="noreferrer noopener" title={candidateTitle(t, c)}>
+      {children ?? candidateLabel(t, c)}
+      <span className={`oa-chip oa-${c.host}`}>{t.oaHost[c.host]}</span>
+    </a>
+  );
+}
+
+/** Library link + "ask the author" for a work with no free copy (or none we could fetch). */
+function NoFreeCopyActions({ result, pub }: { result?: OaResult; pub: PublicationNode }) {
+  const { t } = useI18n();
+  const prefix = useLibraryPrefix();
+  const doi = result?.doi ?? pub.doi;
+  const lib = libraryLink(prefix, { url: result?.landingUrl ?? doiUrl(doi), doi });
+  const author = result?.contactName ?? result?.authors?.[0] ?? [pub.authors[0]?.given, pub.authors[0]?.family].filter(Boolean).join(' ');
+  const mail = askAuthorMailto(t, { title: result?.title ?? pub.title, year: result?.year ?? pub.year, doi, email: result?.contactEmail, name: result?.contactEmail ? author : undefined });
+  if (!lib && !mail) return null;
+  return (
+    <span className="oa-actions">
+      {lib && (
+        <a className="oa-btn" href={lib} target="_blank" rel="noreferrer noopener">
+          {t.libraryLink}
+        </a>
+      )}
+      {mail && (
+        <a className="oa-btn" href={mail} title={result?.contactEmail ? t.askAuthorWithEmail : t.askAuthorNoEmail}>
+          ✉ {t.askAuthor}
+        </a>
+      )}
+    </span>
+  );
+}
+
 export function OaCell({ state, pub }: { state?: OaState; pub: PublicationNode }) {
   const { t } = useI18n();
   if (!state) return null;
-  const link = (r: OaResult) => r.pdfUrls[0]?.url ?? r.landingUrl ?? doiUrl(r.doi ?? pub.doi);
   switch (state.kind) {
     case 'busy':
       return (
@@ -74,36 +118,120 @@ export function OaCell({ state, pub }: { state?: OaState; pub: PublicationNode }
         </span>
       );
     case 'got':
-      return <span className="oa-tag ok">{t.freePdfGot(state.source)}</span>;
-    case 'blocked':
       return (
-        <span className="oa-tag">
-          {t.freeButManual}{' '}
-          <a href={link(state.result)} target="_blank" rel="noreferrer noopener">
-            {t.download}
-          </a>
-          {t.andSendHere}
+        <span className="oa-tag ok">
+          {t.freePdfGot(state.version ? candidateLabel(t, { source: state.source, version: state.version }) : state.source)}
         </span>
       );
-    case 'closed':
+    case 'blocked': {
+      const r = state.result;
+      const best = r.pdfUrls[0] ?? r.readUrls?.[0];
+      const rest = [...r.pdfUrls, ...(r.readUrls ?? [])].filter((c) => c !== best).slice(0, 4);
       return (
-        <span className="oa-tag">
-          {t.noFreePdf}
-          {link(state.result) && (
-            <>
-              {' · '}
-              <a href={link(state.result)} target="_blank" rel="noreferrer noopener">
-                {t.publisherPage}
-              </a>
-            </>
+        <span className="oa-cell">
+          <span className="oa-tag">
+            {t.freeButManual}{' '}
+            <a href={best?.url ?? r.landingUrl ?? doiUrl(r.doi ?? pub.doi)} target="_blank" rel="noreferrer noopener">
+              {r.pdfUrls[0] ? t.download : t.oaReadOnline}
+            </a>
+            {t.andSendHere}
+          </span>
+          {best && <CandidateLink c={best} />}
+          {rest.length > 0 && (
+            <details className="oa-more">
+              <summary>{t.oaOtherCopies(rest.length)}</summary>
+              {rest.map((c) => (
+                <CandidateLink key={c.url} c={c} />
+              ))}
+            </details>
           )}
         </span>
       );
+    }
+    case 'closed': {
+      const link = state.result.landingUrl ?? doiUrl(state.result.doi ?? pub.doi);
+      return (
+        <span className="oa-cell">
+          <span className="oa-tag">
+            {t.noFreePdf}
+            {link && (
+              <>
+                {' · '}
+                <a href={link} target="_blank" rel="noreferrer noopener">
+                  {t.publisherPage}
+                </a>
+              </>
+            )}
+          </span>
+          <NoFreeCopyActions result={state.result} pub={pub} />
+        </span>
+      );
+    }
     case 'not_found':
-      return <span className="oa-tag">{t.notFoundInOpen}</span>;
+      return (
+        <span className="oa-cell">
+          <span className="oa-tag">{t.notFoundInOpen}</span>
+          <NoFreeCopyActions result={state.result} pub={pub} />
+        </span>
+      );
     case 'error':
       return <span className="oa-tag">{t.lookupFailed(translateRuntime(t, state.message))}</span>;
   }
+}
+
+/** Optional library/EZproxy prefix, stored in this browser only. */
+export function LibraryAccess() {
+  const { t } = useI18n();
+  const prefix = useLibraryPrefix();
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState(prefix ?? '');
+  const [note, setNote] = useState<{ ok: boolean; text: string } | undefined>();
+  const save = (v: string) => {
+    const ok = saveLibraryPrefix(v);
+    setNote(ok ? (v.trim() ? { ok, text: t.librarySaved } : undefined) : { ok, text: t.libraryInvalid });
+    if (ok && !v.trim()) setValue('');
+  };
+  return (
+    <div className="library-access">
+      <button className="soft small-btn" aria-expanded={open} onClick={() => { setOpen((o) => !o); setValue(prefix ?? ''); setNote(undefined); }}>
+        🏛 {t.libraryAccess}
+        {prefix && <span className="oa-dot" aria-hidden />}
+      </button>
+      {open && (
+        <form
+          className="library-panel"
+          onSubmit={(e) => {
+            e.preventDefault();
+            save(value);
+          }}
+        >
+          <label htmlFor="library-prefix">{t.libraryTitle}</label>
+          <input
+            id="library-prefix"
+            type="url"
+            inputMode="url"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder={t.libraryPlaceholder}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+          />
+          <span className="muted small">{t.libraryHint}</span>
+          <span className="library-row">
+            <button type="submit" className="primary">
+              {t.librarySave}
+            </button>
+            {prefix && (
+              <button type="button" onClick={() => save('')}>
+                {t.libraryRemove}
+              </button>
+            )}
+            {note && <span className={`small ${note.ok ? 'oa-ok' : 'oa-bad'}`} role="status">{note.text}</span>}
+          </span>
+        </form>
+      )}
+    </div>
+  );
 }
 
 interface Props {
@@ -194,6 +322,7 @@ export function ReferencesView({ projectId, graph, evidence, oa, setOa, onGraph,
               {busy === 'oa' ? t.searchingFreePdfs : t.searchFreePdfs(withoutPdf.length)}
             </button>
             <span className="muted small">{t.oaPrivacyHint}</span>
+            <LibraryAccess />
           </div>
         )}
       </div>

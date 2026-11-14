@@ -72,20 +72,12 @@ describe('appearance', () => {
     expect(parseAccent('pink')).toBeUndefined();
   });
 
-  it('defaults to glass on a dark scheme, and to light on a light scheme', () => {
-    stubMatchMedia({ colorScheme: 'dark' });
-    expect(fallbackTheme()).toBe('glass');
-    expect(detectAppearance()).toEqual({ theme: 'glass', accent: 'emerald' });
-    stubMatchMedia({ colorScheme: 'light' });
-    expect(fallbackTheme()).toBe('light');
-    expect(detectAppearance().theme).toBe('light');
-  });
-
-  it('forces a solid theme when the user prefers reduced transparency', () => {
-    stubMatchMedia({ colorScheme: 'dark', reduceTransparency: true });
-    expect(fallbackTheme()).toBe('dark-solid');
-    stubMatchMedia({ colorScheme: 'light', reduceTransparency: true });
-    expect(fallbackTheme()).toBe('light');
+  it('defaults to light for new visitors, whatever the system scheme or transparency setting', () => {
+    for (const flags of [{ colorScheme: 'dark' }, { colorScheme: 'light' }, { colorScheme: 'dark', reduceTransparency: true }] as const) {
+      stubMatchMedia(flags);
+      expect(fallbackTheme()).toBe('light');
+      expect(detectAppearance()).toEqual({ theme: 'light', accent: 'emerald' });
+    }
   });
 
   it('honours a saved choice, but not glass when transparency is reduced', () => {

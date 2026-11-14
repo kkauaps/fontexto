@@ -1,9 +1,9 @@
 import type { ProjectSummary } from '../api';
 import { BRAND } from '../brand';
-import { AppearanceSwitcher } from './AppearanceSwitcher';
+import { HeaderControls } from './HeaderControls';
 import { BrandMark } from './BrandMark';
 import { HeroPreview } from './HeroPreview';
-import { LanguageSwitcher, formatDate, privacyNote, useI18n } from '../i18n';
+import { formatDate, privacyNote, useI18n } from '../i18n';
 
 export type FlowMode = 'doc' | 'bib' | 'nobib';
 
@@ -31,8 +31,7 @@ export function Landing({ projects, error, onStart, onOpen }: Props) {
             <a href="#privacidade">{t.navPrivacy}</a>
             {projects.length > 0 && <a href="#projetos">{t.navOpenProject}</a>}
           </nav>
-          <AppearanceSwitcher />
-          <LanguageSwitcher />
+          <HeaderControls />
         </div>
       </header>
 

@@ -31,12 +31,9 @@ function mediaPrefers(query: string): boolean {
   }
 }
 
-/** Theme used when the user has not saved a choice. */
+/** Theme used when the user has not saved a choice: light for every new visitor. */
 export function fallbackTheme(): Theme {
-  const reduce = mediaPrefers('(prefers-reduced-transparency: reduce)');
-  const light = mediaPrefers('(prefers-color-scheme: light)');
-  if (reduce) return light ? 'light' : 'dark-solid';
-  return light ? 'light' : 'glass';
+  return 'light';
 }
 
 export function detectAppearance(): Appearance {

@@ -2,6 +2,7 @@ import type { ViewerTarget } from '../core/anchors';
 import type { CategoryRule } from '../core/categories';
 import type { EvidenceReport } from '../core/evidence';
 import type { Anchor, CitationGraph, ReviewAction } from '../core/model';
+import type { OaHost, OaResult, OaVersion } from '../core/openAccess';
 
 export interface ProjectSummary {
   id: string;
@@ -42,14 +43,8 @@ const json = (body: unknown, method = 'POST'): RequestInit => ({
 const base = (p: string) => `/api/projects/${encodeURIComponent(p)}`;
 
 /** What the open-access proxy said about one reference (same-origin: /api/oa/*). */
-export interface OaResult {
-  status: 'oa' | 'closed' | 'not_found';
-  doi?: string;
-  title?: string;
-  landingUrl?: string;
-  pdfUrls: { url: string; source: string }[];
-}
-export type OaFetch = { file: File; source: string } | { file?: undefined; result: OaResult; error?: string };
+export type { OaCandidate, OaHost, OaResult, OaVersion } from '../core/openAccess';
+export type OaFetch = { file: File; source: string; host?: OaHost; version?: OaVersion } | { file?: undefined; result: OaResult; error?: string };
 
 /** Asks the proxy for a free PDF of one reference. Only DOI/title/year/first author leave the browser. */
 async function oaFetchPdf(q: { doi?: string; title?: string; year?: number; author?: string }, name: string, signal?: AbortSignal): Promise<OaFetch> {
@@ -62,7 +57,9 @@ async function oaFetchPdf(q: { doi?: string; title?: string; year?: number; auth
   const type = res.headers.get('content-type') ?? '';
   if (res.ok && type.startsWith('application/pdf')) {
     const blob = await res.blob();
-    return { file: new File([blob], name, { type: 'application/pdf' }), source: decodeURIComponent(res.headers.get('x-fontexto-source') ?? '') };
+    const host = res.headers.get('x-fontexto-host') as OaHost | null;
+    const version = res.headers.get('x-fontexto-version') as OaVersion | null;
+    return { file: new File([blob], name, { type: 'application/pdf' }), source: decodeURIComponent(res.headers.get('x-fontexto-source') ?? ''), host: host ?? undefined, version: version ?? undefined };
   }
   if (type.includes('json')) {
     const body = (await res.json()) as { error?: string; result?: OaResult };

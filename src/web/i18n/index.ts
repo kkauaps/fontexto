@@ -146,25 +146,4 @@ export function useI18n(): I18nValue {
   return useContext(I18nContext);
 }
 
-export function LanguageSwitcher() {
-  const { locale, setLocale, t } = useI18n();
-  return createElement(
-    'label',
-    { className: 'lang-switch' },
-    createElement('span', { className: 'visually-hidden' }, t.language),
-    createElement(
-      'select',
-      {
-        value: locale,
-        'aria-label': t.language,
-        onChange: (e: { target: { value: string } }) => {
-          const next = parseLocale(e.target.value);
-          if (next) setLocale(next);
-        },
-      },
-      LOCALES.map((code) => createElement('option', { key: code, value: code }, LOCALE_NATIVE[code])),
-    ),
-  );
-}
-
 export { translateRuntime, evidenceStatusText, refStatusText, reasonText, methodLabel, verificationLabel, verificationHelp, identityReason, reviewActionLabel } from './runtime';
