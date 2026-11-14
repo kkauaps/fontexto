@@ -66,6 +66,11 @@ export interface OaEnv {
   CORE_API_KEY?: string;
   /** Semantic Scholar API key (optional, higher rate limit). */
   S2_API_KEY?: string;
+  /**
+   * OpenAlex API key (free at openalex.org/settings/api). Without it every keyless request from the same IP shares
+   * $0.10/day, i.e. about 100 title searches, and the proxy falls back to Crossref for the rest of the day.
+   */
+  OPENALEX_API_KEY?: string;
 }
 
 /** Tiny async key/value cache: in-memory by default, the Cache API on Cloudflare. */
@@ -88,6 +93,10 @@ type Fetch = typeof fetch;
 export const OA_CONTACT = 'oa@fontexto.com';
 const UA = `Fontexto/1.0 (+https://fontexto.com; mailto:${OA_CONTACT})`;
 const withMail = (url: string) => `${url}${url.includes('?') ? '&' : '?'}mailto=${encodeURIComponent(OA_CONTACT)}`;
+const withOpenAlexKey = (ctx: { env: OaEnv }, url: string) => {
+  const u = withMail(url);
+  return ctx.env.OPENALEX_API_KEY ? `${u}&api_key=${encodeURIComponent(ctx.env.OPENALEX_API_KEY)}` : u;
+};
 export const MAX_PDF_BYTES = 40 * 1024 * 1024;
 export const DEFAULT_TIMEOUT_MS = 6000;
 // no whitespace, '?', '#', '%' or '\\', and no '..' segment: the DOI is put in catalogue URL paths as is
@@ -95,14 +104,24 @@ const DOI_RE = /^10\.\d{4,9}\/(?!(?:.*\/)?\.\.(?:\/|$))[^\s?#%\\]{1,200}$/;
 const TTL_FOUND = 7 * 24 * 3600;
 const TTL_MISS = 12 * 3600;
 
+// Unicode-aware: Cyrillic, Greek, CJK... must survive (a-z only turned every Russian or Chinese title into "").
 const fold = (s: string) =>
   s
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .normalize('NFKD')
+    .replace(/\p{M}+/gu, '')
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
-const tokens = (s: string) => new Set(fold(s).split(' ').filter((w) => w.length > 2));
+const HAN = /\p{Script=Han}|\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Hangul}/u;
+/** Words of 3+ letters; CJK runs (no spaces between words) become character bigrams. */
+const tokens = (s: string) => {
+  const out = new Set<string>();
+  for (const w of fold(s).split(' ')) {
+    if (HAN.test(w)) for (let i = 0; i + 1 < w.length; i++) out.add(w.slice(i, i + 2));
+    else if (w.length > 2) out.add(w);
+  }
+  return out;
+};
 export function titleSimilarity(a: string, b: string): number {
   const x = tokens(a);
   const y = tokens(b);
@@ -128,7 +147,7 @@ export function parseOaQuery(params: URLSearchParams): OaQuery | undefined {
 /* ------------------------------------------------------------------------------------------------------------ */
 
 /** Per-catalogue cool-down after a 429 (honours Retry-After, capped), shared by requests of this isolate/process. */
-const cooldownUntil = new Map<OaSourceName, number>();
+const cooldownUntil = new Map<string, number>();
 /** Minimum spacing between calls to catalogues that ask for it (arXiv: one request every 3 s). */
 const MIN_GAP: Partial<Record<OaSourceName, number>> = { arXiv: 3000, 'Semantic Scholar': 1000 };
 const lastCall = new Map<OaSourceName, number>();
@@ -152,9 +171,9 @@ interface Ctx {
   now: () => number;
 }
 
-async function call(ctx: Ctx, name: OaSourceName, url: string, headers: Record<string, string> = {}): Promise<Response | undefined> {
+async function call(ctx: Ctx, name: OaSourceName, url: string, headers: Record<string, string> = {}, bucket: string = name): Promise<Response | undefined> {
   const now = ctx.now();
-  if ((cooldownUntil.get(name) ?? 0) > now) throw new RateLimited();
+  if ((cooldownUntil.get(bucket) ?? 0) > now) throw new RateLimited();
   const gap = MIN_GAP[name];
   if (gap) {
     const wait = (lastCall.get(name) ?? 0) + gap - now;
@@ -175,7 +194,7 @@ async function call(ctx: Ctx, name: OaSourceName, url: string, headers: Record<s
     const r = await f(url, { headers: { 'User-Agent': UA, Accept: 'application/json', ...headers }, signal: ac.signal });
     if (r.status === 429) {
       const ra = Number(r.headers.get('retry-after'));
-      cooldownUntil.set(name, ctx.now() + Math.min(Number.isFinite(ra) && ra > 0 ? ra * 1000 : 60_000, 10 * 60_000));
+      cooldownUntil.set(bucket, ctx.now() + Math.min(Number.isFinite(ra) && ra > 0 ? ra * 1000 : 60_000, 10 * 60_000));
       void r.body?.cancel();
       throw new RateLimited();
     }
@@ -193,8 +212,8 @@ async function call(ctx: Ctx, name: OaSourceName, url: string, headers: Record<s
   }
 }
 
-async function callJson<T>(ctx: Ctx, name: OaSourceName, url: string, headers?: Record<string, string>): Promise<T | undefined> {
-  const r = await call(ctx, name, url, headers);
+async function callJson<T>(ctx: Ctx, name: OaSourceName, url: string, headers?: Record<string, string>, bucket?: string): Promise<T | undefined> {
+  const r = await call(ctx, name, url, headers, bucket);
   if (!r) return undefined;
   try {
     return (await r.json()) as T;
@@ -259,7 +278,8 @@ export function edgeCache(cache: EdgeCacheStore, l1: OaCache = memoryCache()): O
 }
 
 let defaultCache = memoryCache();
-export const oaCacheKey = (q: OaQuery) => (q.doi ? `v2|doi|${q.doi}` : `v2|t|${fold(q.title ?? '')}|${q.year ?? ''}|${fold(q.author ?? '')}`);
+// v3: v2 folded non-Latin titles to "", so every Russian/Chinese title of one year shared a cache entry
+export const oaCacheKey = (q: OaQuery) => (q.doi ? `v3|doi|${q.doi}` : `v3|t|${fold(q.title ?? '')}|${q.year ?? ''}|${fold(q.author ?? '')}`);
 
 /* ------------------------------------------------------------------------------------------------------------ */
 /* Candidates: classification, dedupe, ranking                                                                    */
@@ -462,12 +482,13 @@ async function findWorkCrossref(ctx: Ctx, q: OaQuery): Promise<OpenAlexWork | un
 
 async function findWorkOpenAlex(ctx: Ctx, q: OaQuery): Promise<OpenAlexWork | undefined> {
   if (q.doi) {
-    const w = await callJson<OpenAlexWork>(ctx, 'OpenAlex', withMail(`https://api.openalex.org/works/doi:${encodeURIComponent(q.doi)}`));
+    // singleton lookups are free: they get their own cool-down, so an exhausted search budget does not block them
+    const w = await callJson<OpenAlexWork>(ctx, 'OpenAlex', withOpenAlexKey(ctx, `https://api.openalex.org/works/doi:${encodeURIComponent(q.doi)}`), undefined, 'OpenAlex:get');
     if (w) return w;
   }
   if (!q.title) return undefined;
   const filter = q.year ? `&filter=publication_year:${q.year - 1}-${q.year + 1}` : '';
-  const res = await callJson<{ results: OpenAlexWork[] }>(ctx, 'OpenAlex', withMail(`https://api.openalex.org/works?search=${encodeURIComponent(q.title)}${filter}&per-page=8`));
+  const res = await callJson<{ results: OpenAlexWork[] }>(ctx, 'OpenAlex', withOpenAlexKey(ctx, `https://api.openalex.org/works?search=${encodeURIComponent(q.title)}${filter}&per-page=8`), undefined, 'OpenAlex:search');
   return bestMatch(res?.results ?? [], q, (w) => w.title ?? w.display_name ?? '', (w) => (w.authorships ?? []).map((a) => a.author?.display_name ?? ''), (w) => w.publication_year);
 }
 
