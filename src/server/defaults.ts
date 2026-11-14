@@ -8,34 +8,33 @@ import type { CategoryRule } from '../core/categories.js';
 export const DEFAULT_CATEGORY_RULES: CategoryRule[] = [];
 
 /**
- * The rules new projects used to start with (written for one specific thesis about wound segmentation).
- * Kept as an example for the categories editor; new projects start empty so unrelated papers are not
- * colored by keywords that make no sense for them.
+ * Optional sample rules for the categories editor. New projects start empty so
+ * unrelated papers are not colored by keywords that make no sense for them.
  */
 export const EXAMPLE_CATEGORY_RULES: CategoryRule[] = [
   {
-    name: 'Segmentação de feridas',
-    color: '#c2569b',
-    keywords: ['wound', 'wounds', 'ulcer', 'ulcers', 'ferida', 'feridas', 'úlcera', 'tissue segmentation', 'granulation', 'slough', 'burn', 'diabetic foot'],
-  },
-  {
-    name: 'Redes neurais e arquiteturas',
-    color: '#3a7bd5',
-    keywords: ['neural network', 'neural networks', 'convolutional', 'transformer', 'transformers', 'u-net', 'unet', 'deep learning', 'encoder decoder', 'self supervised', 'segmentation model', 'architecture', 'architectures'],
-  },
-  {
-    name: 'Métricas e avaliação',
+    name: 'Climate records',
     color: '#2a9d8f',
-    keywords: ['metric', 'metrics', 'evaluation', 'validation', 'benchmark', 'agreement', 'dice', 'reliability'],
+    keywords: ['climate', 'temperature', 'warming', 'weather station', 'satellite', 'precipitation', 'anomaly'],
   },
   {
-    name: 'Anotação de imagens',
+    name: 'Methods and models',
+    color: '#3a7bd5',
+    keywords: ['model', 'models', 'regression', 'machine learning', 'statistical', 'forecast', 'algorithm'],
+  },
+  {
+    name: 'Metrics and evaluation',
+    color: '#c2569b',
+    keywords: ['metric', 'metrics', 'evaluation', 'validation', 'benchmark', 'uncertainty', 'error', 'reliability'],
+  },
+  {
+    name: 'Data and quality control',
     color: '#e9a23b',
-    keywords: ['annotation', 'annotations', 'annotated', 'labeling', 'labelling', 'anotação', 'cvat', 'database', 'dataset'],
+    keywords: ['dataset', 'database', 'quality control', 'metadata', 'homogenization', 'outlier', 'missing data'],
   },
   {
-    name: 'Metodologia e reprodutibilidade',
+    name: 'Methods and reproducibility',
     color: '#8e6bbf',
-    keywords: ['reproducibility', 'leakage', 'methodology', 'metodologia', 'pesquisa', 'trabalho científico', 'research methods'],
+    keywords: ['reproducibility', 'methodology', 'open data', 'research methods', 'protocol'],
   },
 ];
