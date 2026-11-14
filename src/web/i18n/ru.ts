@@ -553,6 +553,7 @@ export const ru: Messages = {
   localeInvalidRules: 'Недопустимые правила категорий',
   localeNoExtractableOffline: 'Нет извлекаемого текста (сканированный PDF? Офлайн-OCR недоступен).',
   localeNoBibFromPdf: 'Файл .bib не был отправлен: источники взяты из списка в PDF основного документа (название и авторы могут отсутствовать).',
+  localeArticleNoText: 'Не удалось прочитать текст PDF статьи.',
   localePdfNoTextNamed: (name: string, status: string) => `В PDF «${name}» нет извлекаемого текста (${status}).`,
   localeMissingNumbersInPassage: (nums: string) => `Числа из предложения, которых нет во фрагменте: ${nums}.`,
   localeSimilarOnCitedPage: (label: string) => `На указанной странице (${label}) есть похожий фрагмент.`,

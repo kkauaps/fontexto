@@ -9,6 +9,7 @@ import { CitationList, CitationPanel } from './CitationPanel';
 import { SetupChecklist, UploadButton } from './SetupChecklist';
 import type { OpenRequest } from './SidePanel';
 import { evidenceStatusText, translateRuntime, useI18n } from '../i18n';
+import { phoneFitScale } from '../fit';
 
 export interface DocumentFocus {
   pubId?: string;
@@ -189,8 +190,10 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
         task = openPdf(source);
         const d = await task.promise;
         const p1 = await d.getPage(1);
-        const vp = p1.getViewport({ scale });
+        const fit = phoneFitScale(p1.getViewport({ scale: 1 }).width, scroller?.clientWidth);
+        const vp = p1.getViewport({ scale: fit ?? scale });
         if (cancelled) return;
+        if (fit) setScale(fit);
         setSize({ w: vp.width, h: vp.height });
         setDoc(d);
       })
@@ -317,7 +320,7 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
             <button onClick={() => step(1)} disabled={filtered.length === 0} title={t.nextCitation}>
               ›
             </button>
-            <button onClick={() => setScale((s) => Math.max(0.7, +(s - 0.15).toFixed(2)))} title={t.zoomOut}>
+            <button onClick={() => setScale((s) => Math.max(0.4, +(s - 0.15).toFixed(2)))} title={t.zoomOut}>
               −
             </button>
             <button onClick={() => setScale((s) => Math.min(2.4, +(s + 0.15).toFixed(2)))} title={t.zoomIn}>

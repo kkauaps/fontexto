@@ -541,6 +541,7 @@ export const ptBR: Messages = {
   localeInvalidRules: 'Regras de categorias inválidas',
   localeNoExtractableOffline: 'Sem texto extraível (PDF digitalizado? O OCR não está disponível offline).',
   localeNoBibFromPdf: 'Nenhum .bib foi enviado: as referências vieram da lista do PDF do documento principal (título e autores podem faltar).',
+  localeArticleNoText: 'Não foi possível ler o texto do PDF do artigo.',
   localePdfNoTextNamed: (name: string, status: string) => `O PDF “${name}” não tem texto extraível (${status}).`,
   localeMissingNumbersInPassage: (nums: string) => `Número(s) da frase ausente(s) da passagem: ${nums}.`,
   localeSimilarOnCitedPage: (label: string) => `Há um trecho parecido na página citada (${label}).`,

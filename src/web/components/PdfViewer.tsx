@@ -4,6 +4,7 @@ import { api } from '../api';
 import { locatePhraseBoxes, openPdf, renderPage, type BoxRect, type PdfDoc } from '../pdfRender';
 import type { OpenRequest } from './SidePanel';
 import { translateRuntime, useI18n } from '../i18n';
+import { phoneFitScale } from '../fit';
 
 interface Props {
   projectId: string;
@@ -30,6 +31,8 @@ export function PdfViewer({ projectId, request: initial, backLabel, onClose }: P
   const [scale, setScale] = useState(1.3);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const layerRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const fitted = useRef(false);
   const [phraseBoxes, setPhraseBoxes] = useState<{ boxes: BoxRect[]; exact: boolean } | undefined>();
   const [pageSize, setPageSize] = useState<{ w: number; h: number; base: { width: number; height: number } }>();
 
@@ -48,7 +51,14 @@ export function PdfViewer({ projectId, request: initial, backLabel, onClose }: P
         }
         setPage(t.page);
         const d = await openPdf(await api.pdfSource(projectId, t.fileId)).promise;
-        if (!cancelled) setDoc(d);
+        if (cancelled) return;
+        if (!fitted.current) {
+          fitted.current = true;
+          const fit = phoneFitScale((await d.getPage(t.page)).getViewport({ scale: 1 }).width, bodyRef.current?.clientWidth);
+          if (cancelled) return;
+          if (fit) setScale(fit);
+        }
+        setDoc(d);
       })
       .catch((e: Error) => !cancelled && setError(e.message));
     return () => {
@@ -133,8 +143,8 @@ export function PdfViewer({ projectId, request: initial, backLabel, onClose }: P
           <button disabled={!doc || page >= doc.numPages} onClick={() => setPage((p) => p + 1)}>
             ›
           </button>
-          <button onClick={() => setScale((s) => Math.max(0.5, s - 0.2))}>−</button>
-          <button onClick={() => setScale((s) => Math.min(3, s + 0.2))}>+</button>
+          <button onClick={() => setScale((s) => Math.max(0.4, +(s - 0.2).toFixed(2)))}>−</button>
+          <button onClick={() => setScale((s) => Math.min(3, +(s + 0.2).toFixed(2)))}>+</button>
           {ok && page !== ok.page && <button onClick={() => setPage(ok.page)}>{t.goToPage(ok.page)}</button>}
         </div>
       </header>
@@ -164,7 +174,7 @@ export function PdfViewer({ projectId, request: initial, backLabel, onClose }: P
       
       {ok?.exactHighlight && <div className="notice ok">{t.lineLevelHighlight}</div>}
       {error && <div className="notice error">{translateRuntime(t, error)}</div>}
-      <div className="viewer-body">
+      <div className="viewer-body" ref={bodyRef}>
         <div className="page-wrap" style={pageSize ? { width: pageSize.w, height: pageSize.h } : undefined}>
           <canvas ref={canvasRef} />
           <div ref={layerRef} className="ct-textlayer" />

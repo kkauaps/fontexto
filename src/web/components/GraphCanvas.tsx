@@ -23,6 +23,7 @@ import { REF_STATUS_COLOR, REF_STATUS_ORDER, type RefStatus } from '../../core/r
 import { categoryColor } from '../labels';
 import { categoryLabel, refStatusText, useI18n } from '../i18n';
 import { layoutGraph, nodeSize, statusGridLayout, type Positioned } from '../layout';
+import { isPhoneWidth } from '../fit';
 
 export type Selection = { type: 'node'; id: string } | { type: 'edge'; id: string } | undefined;
 
@@ -32,13 +33,15 @@ interface NodeData extends Record<string, unknown> {
   dim: boolean;
   selected: boolean;
   onToggleGroup?: (category: string) => void;
+  /** Phone star layout: edges leave the bottom of the document and enter the top of each source. */
+  vertical?: boolean;
 }
 
 const handleStyle = { opacity: 0, width: 6, height: 6, border: 'none' };
 
 const PublicationNodeView = memo(({ data }: NodeProps<Node<NodeData>>) => {
   const { t } = useI18n();
-  const { vn, color, dim, selected } = data;
+  const { vn, color, dim, selected, vertical } = data;
   const { width, height } = nodeSize(vn);
   return (
     <div
@@ -46,41 +49,41 @@ const PublicationNodeView = memo(({ data }: NodeProps<Node<NodeData>>) => {
       style={{ width, height, borderColor: color, ['--cat' as string]: color }}
       title={`${vn.title ?? vn.label}${vn.refStatus ? `\n${t.situationPrefix}${refStatusText(t, vn.refStatus)}` : ''}${vn.hasPdf ? '' : `\n${t.pdfNotSent}`}\n${t.clickForDetails}`}
     >
-      <Handle type="target" position={Position.Left} style={handleStyle} />
+      <Handle type="target" position={vertical ? Position.Top : Position.Left} style={handleStyle} />
       <span className="node-label">{vn.label}</span>
       {vn.inDegree > 1 && <span className="node-badge" title={t.citedByVisible(vn.inDegree)}>{vn.inDegree}</span>}
-      <Handle type="source" position={Position.Right} style={handleStyle} />
+      <Handle type="source" position={vertical ? Position.Bottom : Position.Right} style={handleStyle} />
     </div>
   );
 });
 
 const DocumentNodeView = memo(({ data }: NodeProps<Node<NodeData>>) => {
   const { t } = useI18n();
-  const { vn, dim, selected } = data;
+  const { vn, dim, selected, vertical } = data;
   const { width, height } = nodeSize(vn);
   return (
     <div className={`node-doc${dim ? ' dim' : ''}${selected ? ' selected' : ''}`} style={{ width, height }} title={vn.title ?? vn.label}>
       <span className="node-kicker">{t.mainDocument}</span>
       <span className="node-label">{vn.label}</span>
-      <Handle type="source" position={Position.Right} style={handleStyle} />
-      <Handle type="target" position={Position.Left} style={handleStyle} />
+      <Handle type="source" position={vertical ? Position.Bottom : Position.Right} style={handleStyle} />
+      <Handle type="target" position={vertical ? Position.Top : Position.Left} style={handleStyle} />
     </div>
   );
 });
 
 const GroupNodeView = memo(({ data }: NodeProps<Node<NodeData>>) => {
   const { t } = useI18n();
-  const { vn, color, dim, selected, onToggleGroup } = data;
+  const { vn, color, dim, selected, onToggleGroup, vertical } = data;
   const { width, height } = nodeSize(vn);
   return (
     <div className={`node-group${dim ? ' dim' : ''}${selected ? ' selected' : ''}`} style={{ width, height, borderColor: color, ['--cat' as string]: color }}>
-      <Handle type="target" position={Position.Left} style={handleStyle} />
+      <Handle type="target" position={vertical ? Position.Top : Position.Left} style={handleStyle} />
       <span className="node-label">{vn.label}</span>
       <span className="node-sub">{t.collapsedPublications(vn.groupSize ?? 0)}</span>
       <button className="node-expand nodrag" onClick={(e) => (e.stopPropagation(), onToggleGroup?.(vn.category))} title={t.expandGroup}>
         +
       </button>
-      <Handle type="source" position={Position.Right} style={handleStyle} />
+      <Handle type="source" position={vertical ? Position.Bottom : Position.Right} style={handleStyle} />
     </div>
   );
 });
@@ -117,6 +120,7 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
   const rf = useReactFlow();
   const [positions, setPositions] = useState<Map<string, Positioned>>(new Map());
   const [layingOut, setLayingOut] = useState(false);
+  const [vertical, setVertical] = useState(false);
   const structureKey = useMemo(() => view.nodes.map((n) => n.id).join('|') + '#' + view.edges.map((e) => e.id).join('|'), [view]);
   // Latest view, read by the layout effect, which only re-runs when the structure changes
   // (not on search/selection), so the user's viewport and drags are preserved.
@@ -129,11 +133,13 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
     const v = viewRef.current;
     const docIds = new Set(v.nodes.filter((n) => n.kind === 'document').map((n) => n.id));
     const starOnly = v.edges.every((e) => docIds.has(e.source) && e.kind !== 'related_to');
-    (starOnly ? Promise.resolve(statusGridLayout(v)) : layoutGraph(v))
+    const narrow = starOnly && isPhoneWidth();
+    (starOnly ? Promise.resolve(statusGridLayout(v, { narrow })) : layoutGraph(v))
       .then((pos) => {
         if (cancelled) return;
+        setVertical(narrow);
         setPositions(pos);
-        requestAnimationFrame(() => rf.fitView({ padding: 0.12, duration: 300 }));
+        requestAnimationFrame(() => rf.fitView({ padding: isPhoneWidth() ? 0.2 : 0.12, duration: 300 }));
       })
       .finally(() => !cancelled && setLayingOut(false));
     return () => {
@@ -165,11 +171,12 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
             dim: Boolean(focus && !focus.nodes.has(vn.id)),
             selected: selection?.type === 'node' && selection.id === vn.id,
             onToggleGroup,
+            vertical,
           },
           hidden: !p,
         };
       }),
-    [view, positions, rules, focus, selection, onToggleGroup, colorBy],
+    [view, positions, rules, focus, selection, onToggleGroup, colorBy, vertical],
   );
 
   const edges: Edge[] = useMemo(
@@ -275,7 +282,7 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
       )}
       <Panel position="top-right" className="canvas-actions">
         {layingOut && <span className="muted small">{t.layingOut}</span>}
-        <button onClick={() => rf.fitView({ padding: 0.12, duration: 300 })}>{t.centerGraph}</button>
+        <button onClick={() => rf.fitView({ padding: isPhoneWidth() ? 0.2 : 0.12, duration: 300 })}>{t.centerGraph}</button>
         <button onClick={() => doExport('svg')}>SVG</button>
         <button onClick={() => doExport('png')}>PNG</button>
       </Panel>
