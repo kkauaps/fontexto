@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="glass" data-accent="emerald">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,7 +8,7 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <link rel="manifest" href="/site.webmanifest" />
-    <meta name="theme-color" content="#065F46" />
+    <meta name="theme-color" content="#10141C" />
     <meta name="description" content="Fontexto links each citation in your document to the exact passage in the source. Upload a PDF, review the matches, and keep your files in the browser." />
     <title>Fontexto — each citation linked to the passage in the source</title>
   </head>
@@ -18,13 +18,33 @@
       (function () {
         var map = { en: 'en', 'en-us': 'en', 'en-gb': 'en', es: 'es', 'es-es': 'es', 'es-mx': 'es', 'es-ar': 'es', ru: 'ru', 'ru-ru': 'ru', pt: 'pt-BR', 'pt-br': 'pt-BR', 'pt-pt': 'pt-BR' };
         var q = new URLSearchParams(location.search).get('lang');
-        var stored = null;
-        try { stored = localStorage.getItem('fontexto:lang'); } catch (e) {}
-        var lang = map[String(q || stored || 'en').toLowerCase()] || 'en';
+        var storedLang = null;
+        try { storedLang = localStorage.getItem('fontexto:lang'); } catch (e) {}
+        var lang = map[String(q || storedLang || 'en').toLowerCase()] || 'en';
         document.documentElement.lang = lang;
         var boot = { en: 'Loading Fontexto…', es: 'Cargando Fontexto…', ru: 'Загрузка Fontexto…', 'pt-BR': 'Carregando o Fontexto…' };
         var el = document.querySelector('#root .boot p');
         if (el) el.textContent = boot[lang] || boot.en;
+        var themes = { glass: 1, 'dark-solid': 1, light: 1 };
+        var theme = 'glass';
+        var accent = 'emerald';
+        try {
+          var raw = localStorage.getItem('fontexto.appearance');
+          if (raw) {
+            var a = JSON.parse(raw);
+            if (a && themes[a.theme]) theme = a.theme;
+            if (a && typeof a.accent === 'string' && a.accent) accent = a.accent;
+          } else {
+            var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-transparency: reduce)').matches;
+            var light = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+            theme = reduce ? (light ? 'light' : 'dark-solid') : (light ? 'light' : 'glass');
+          }
+        } catch (e) {}
+        var root = document.documentElement;
+        root.setAttribute('data-theme', theme);
+        root.setAttribute('data-accent', accent);
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', theme === 'light' ? '#ECEEF1' : theme === 'dark-solid' ? '#121417' : '#10141C');
       })();
     </script>
     <script type="module" src="./main.tsx"></script>
