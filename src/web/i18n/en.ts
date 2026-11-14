@@ -557,6 +557,7 @@ export const en = {
   localeInvalidRules: 'Invalid category rules',
   localeNoExtractableOffline: 'No extractable text (scanned PDF? OCR is not available offline).',
   localeNoBibFromPdf: 'No .bib was provided: references were taken from the main document’s PDF list (title and authors may be missing).',
+  localeArticleNoText: 'Couldn’t read the text of the article PDF.',
   localePdfNoTextNamed: (name: string, status: string) => `The PDF “${name}” has no extractable text (${status}).`,
   localeMissingNumbersInPassage: (nums: string) => `Number(s) from the sentence missing in the passage: ${nums}.`,
   localeSimilarOnCitedPage: (label: string) => `There is a similar passage on the cited page (${label}).`,

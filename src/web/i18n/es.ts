@@ -543,6 +543,7 @@ export const es: Messages = {
   localeInvalidRules: 'Reglas de categorías no válidas',
   localeNoExtractableOffline: 'No hay texto extraíble (¿PDF escaneado? El OCR no está disponible sin conexión).',
   localeNoBibFromPdf: 'No se envió un .bib: las referencias se tomaron de la lista del PDF del documento principal (pueden faltar el título y los autores).',
+  localeArticleNoText: 'No se pudo leer el texto del PDF del artículo.',
   localePdfNoTextNamed: (name: string, status: string) => `El PDF “${name}” no tiene texto extraíble (${status}).`,
   localeMissingNumbersInPassage: (nums: string) => `Número(s) de la frase ausentes en el pasaje: ${nums}.`,
   localeSimilarOnCitedPage: (label: string) => `Hay un pasaje parecido en la página citada (${label}).`,

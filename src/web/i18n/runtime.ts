@@ -141,6 +141,7 @@ function exactMap(t: Messages): Record<string, string> {
     'OffscreenCanvas indisponível para OCR': t.localeNoOffscreenOcr,
     'OffscreenCanvas indisponível': t.localeNoOffscreen,
     'IndexedDB indisponível': t.localeNoIdb,
+    'Não foi possível ler o texto do PDF do artigo.': t.localeArticleNoText,
     'Erro desconhecido': t.localeUnknownError,
     'A consulta de metadados públicos não existe na versão web: nada sai do seu navegador.': t.localeNoEnrichWeb,
     'Modelo semântico não incluído nesta versão.': t.localeModelMissing,
