@@ -37,6 +37,13 @@ export function createApp(cfg: AppConfig) {
   const store = new ProjectStore(cfg.dataDir);
   const app = express();
   app.disable('x-powered-by');
+  // Loopback app: refuse other Host names (DNS rebinding) and cross-site writes (CSRF from any page the user opens).
+  app.use((req, res, next) => {
+    if (!isLoopbackHost(req.headers.host)) return res.status(403).json({ error: 'Forbidden host' });
+    const origin = req.headers.origin;
+    if (req.method !== 'GET' && req.method !== 'HEAD' && origin && !isLoopbackOrigin(origin)) return res.status(403).json({ error: 'Forbidden origin' });
+    next();
+  });
   app.use(express.json({ limit: '2mb' }));
   // Same policy as the public site (minus HTTPS-only parts) whenever the UI is served from here.
   if (cfg.webDir) {
@@ -361,4 +368,20 @@ export function createApp(cfg: AppConfig) {
 
 function publicFileView(f: { id: string; originalName: string; role: string; visibility: string; pageCount?: number; extraction: unknown; addedAt: string; storage: { kind: string } }) {
   return { id: f.id, originalName: f.originalName, role: f.role, visibility: f.visibility, pageCount: f.pageCount, extraction: f.extraction, addedAt: f.addedAt, storage: f.storage.kind };
+}
+
+const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]']);
+/** "127.0.0.1:5174", "localhost", "[::1]:5174" -> allowed; anything else (a rebinding domain) -> refused. */
+export function isLoopbackHost(host: string | undefined): boolean {
+  if (!host) return false;
+  const m = /^(\[[^\]]+\]|[^:]+)(?::\d+)?$/.exec(host.trim().toLowerCase());
+  return Boolean(m && LOOPBACK.has(m[1]));
+}
+export function isLoopbackOrigin(origin: string): boolean {
+  try {
+    const u = new URL(origin);
+    return (u.protocol === 'http:' || u.protocol === 'https:') && LOOPBACK.has(u.hostname);
+  } catch {
+    return false;
+  }
 }

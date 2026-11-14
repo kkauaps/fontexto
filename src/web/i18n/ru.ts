@@ -333,7 +333,7 @@ export const ru: Messages = {
   filterBySituation: 'Фильтр по статусу',
   searchFreePdfs: (n: number) => `Искать бесплатные PDF (${n} без PDF)`,
   searchingFreePdfs: 'Ищем бесплатные PDF…',
-  oaPrivacyHint: 'В открытые каталоги (OpenAlex, Unpaywall, Semantic Scholar, Europe PMC, arXiv) отправляются только DOI, название, год и первый автор. Ваши файлы из браузера не уходят.',
+  oaPrivacyHint: 'В открытые каталоги (OpenAlex, Crossref, Unpaywall, Semantic Scholar, Europe PMC, CORE, arXiv) отправляются только DOI, название, год и первый автор. Ваши файлы из браузера не уходят.',
   oaAdded: (n: number) => `Добавлено и проверено бесплатных PDF: ${n}.`,
   oaNone: 'Автоматически скачать бесплатный PDF не удалось. Смотрите ссылки в каждой строке.',
   colReference: 'Источник',

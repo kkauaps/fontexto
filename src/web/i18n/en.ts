@@ -333,7 +333,7 @@ export const en = {
   filterBySituation: 'Filter by status',
   searchFreePdfs: (n: number) => `Look up free PDFs (${n} without a PDF)`,
   searchingFreePdfs: 'Looking up free PDFs…',
-  oaPrivacyHint: 'Only the DOI, title, year and first author are sent to the open catalogues (OpenAlex, Unpaywall, Semantic Scholar, Europe PMC, arXiv). Your files never leave the browser.',
+  oaPrivacyHint: 'Only the DOI, title, year and first author are sent to the open catalogues (OpenAlex, Crossref, Unpaywall, Semantic Scholar, Europe PMC, CORE, arXiv). Your files never leave the browser.',
   oaAdded: (n: number) => `${n} free PDF${n === 1 ? '' : 's'} added and checked.`,
   oaNone: 'No free PDF could be downloaded automatically. See the links on each row.',
   colReference: 'Reference',

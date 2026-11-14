@@ -90,7 +90,8 @@ const UA = `Fontexto/1.0 (+https://fontexto.com; mailto:${OA_CONTACT})`;
 const withMail = (url: string) => `${url}${url.includes('?') ? '&' : '?'}mailto=${encodeURIComponent(OA_CONTACT)}`;
 export const MAX_PDF_BYTES = 40 * 1024 * 1024;
 export const DEFAULT_TIMEOUT_MS = 6000;
-const DOI_RE = /^10\.\d{4,9}\/\S{1,200}$/;
+// no whitespace, '?', '#', '%' or '\\', and no '..' segment: the DOI is put in catalogue URL paths as is
+const DOI_RE = /^10\.\d{4,9}\/(?!(?:.*\/)?\.\.(?:\/|$))[^\s?#%\\]{1,200}$/;
 const TTL_FOUND = 7 * 24 * 3600;
 const TTL_MISS = 12 * 3600;
 
@@ -710,7 +711,7 @@ export async function lookupOpenAccess(q: OaQuery, f: Fetch = fetch, opts: OaOpt
       doi: doi || undefined,
       year: work?.publication_year ?? q.year ?? undefined,
       openalexId: work?.id ? work.id.replace('https://openalex.org/', '') || undefined : undefined,
-      landingUrl: doi ? `https://doi.org/${doi}` : (work?.primary_location?.landing_page_url ?? undefined),
+      landingUrl: doi ? `https://doi.org/${doi}` : httpUrlOrUndefined(work?.primary_location?.landing_page_url),
       pdfUrls: pdfList.slice(0, 8),
       readUrls: readList.slice(0, 4),
       authors: authors.length ? authors : undefined,
@@ -722,6 +723,17 @@ export async function lookupOpenAccess(q: OaQuery, f: Fetch = fetch, opts: OaOpt
   const degraded = sources.some((s) => s.status === 'error' || s.status === 'timeout' || s.status === 'rate_limited');
   if (!degraded || result.pdfUrls.length) await cache.put(key, result, result.status === 'not_found' || result.status === 'closed' ? TTL_MISS : TTL_FOUND);
   return result;
+}
+
+/** Catalogue data is untrusted: only http(s) links reach the UI (never javascript:, data:, ...). */
+export function httpUrlOrUndefined(raw: string | null | undefined): string | undefined {
+  if (!raw) return undefined;
+  try {
+    const u = new URL(raw);
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.toString() : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Public http(s) URL only (no IP literals of private ranges, no credentials, no odd ports). */
@@ -843,10 +855,19 @@ export async function arxivByTitle(title: string, f: Fetch = fetch, author?: str
   return set.list()[0]?.url;
 }
 
+/** Pages `_headers` rules do not apply to Functions responses: the API sets its own (no sniffing, never rendered as a page). */
+const API_SAFETY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'Cross-Origin-Resource-Policy': 'same-origin',
+} as const;
+/** JSON is data only. (Not on the PDF: Chrome refuses to show a PDF under a sandbox CSP.) */
+const JSON_CSP = { 'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'; sandbox" } as const;
+
 /** Full request handling, shared by the Pages Function and the local server. */
 export async function handleOaRequest(url: URL, f: Fetch = fetch, opts: OaOptions = {}): Promise<Response> {
   const q = parseOaQuery(url.searchParams);
-  const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
+  const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...API_SAFETY_HEADERS, ...JSON_CSP } });
   if (!q) return json({ error: 'Informe um DOI ou um título.' }, 400);
   const result = await lookupOpenAccess(q, f, opts);
   if (url.pathname.endsWith('/pdf')) {
@@ -866,6 +887,7 @@ export async function handleOaRequest(url: URL, f: Fetch = fetch, opts: OaOption
       headers: {
         'Content-Type': 'application/pdf',
         'Cache-Control': 'no-store',
+        ...API_SAFETY_HEADERS,
         'X-Fontexto-Source': encodeURIComponent(opened.source),
         'X-Fontexto-Url': encodeURIComponent(opened.url),
         'X-Fontexto-Host': opened.candidate.host,

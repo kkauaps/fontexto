@@ -324,7 +324,7 @@ export const es: Messages = {
   filterBySituation: 'Filtrar por situación',
   searchFreePdfs: (n: number) => `Buscar PDFs gratuitos (${n} sin PDF)`,
   searchingFreePdfs: 'Buscando PDFs gratuitos…',
-  oaPrivacyHint: 'Solo se envían DOI, título, año y primer autor a los catálogos abiertos (OpenAlex, Unpaywall, Semantic Scholar, Europe PMC, arXiv). Tus archivos no salen del navegador.',
+  oaPrivacyHint: 'Solo se envían DOI, título, año y primer autor a los catálogos abiertos (OpenAlex, Crossref, Unpaywall, Semantic Scholar, Europe PMC, CORE, arXiv). Tus archivos no salen del navegador.',
   oaAdded: (n: number) => `${n} PDF${n === 1 ? '' : 's'} gratuito${n === 1 ? '' : 's'} añadido${n === 1 ? '' : 's'} y verificado${n === 1 ? '' : 's'}.`,
   oaNone: 'No se pudo descargar automáticamente ningún PDF gratuito. Mira los enlaces de cada fila.',
   colReference: 'Referencia',

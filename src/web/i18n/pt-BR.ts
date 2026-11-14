@@ -322,7 +322,7 @@ export const ptBR: Messages = {
   filterBySituation: 'Filtrar por situação',
   searchFreePdfs: (n: number) => `Buscar PDFs gratuitos (${n} sem PDF)`,
   searchingFreePdfs: 'Buscando PDFs gratuitos…',
-  oaPrivacyHint: 'Envia só DOI, título, ano e 1º autor aos catálogos abertos (OpenAlex, Unpaywall, Semantic Scholar, Europe PMC, arXiv). Seus arquivos não saem do navegador.',
+  oaPrivacyHint: 'Envia só DOI, título, ano e 1º autor aos catálogos abertos (OpenAlex, Crossref, Unpaywall, Semantic Scholar, Europe PMC, CORE, arXiv). Seus arquivos não saem do navegador.',
   oaAdded: (n: number) => `${n} PDF(s) gratuito(s) adicionados e verificados.`,
   oaNone: 'Nenhum PDF gratuito pôde ser baixado automaticamente. Veja os links em cada linha.',
   colReference: 'Referência',

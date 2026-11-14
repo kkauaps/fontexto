@@ -119,8 +119,10 @@ export function toGraphML(graph: CitationGraph): string {
 export function evidenceCsv(report: import('./evidence.js').EvidenceReport, graph: CitationGraph): string {
   const STATUS: Record<string, string> = { localizado: 'Localizado', ressalva: 'Ressalva', nao_localizado: 'Não localizado' };
   const esc = (v: unknown) => {
-    const s = v === undefined || v === null ? '' : String(v);
-    return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    let s = v === undefined || v === null ? '' : String(v);
+    // text from PDFs must not run as a spreadsheet formula (CSV injection): prefix =, +, -, @, tab, CR with '
+    if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+    return /[",;\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const head = ['pagina', 'marcador', 'referencia', 'status', 'marcado_por_voce', 'status_automatico', 'motivo', 'similaridade', 'pagina_do_trecho', 'frase'];
   const rows = report.occurrences.map((o) => {
