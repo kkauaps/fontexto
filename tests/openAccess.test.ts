@@ -223,6 +223,16 @@ describe('lookupOpenAccess cascade', () => {
     expect(r2.sources?.find((s) => s.name === 'Semantic Scholar')?.status).toBe('rate_limited');
   });
 
+  it('calls fetch unbound (Workers throw "Illegal invocation" otherwise)', async () => {
+    const { f } = mockFetch(openalex(WORK), s2none);
+    const strict = function (this: unknown, input: RequestInfo | URL, init?: RequestInit) {
+      if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
+      return f(input, init);
+    } as typeof fetch;
+    const r = await lookupOpenAccess({ doi: DOI }, strict);
+    expect(r.sources?.find((s) => s.name === 'OpenAlex')?.status).toBe('found');
+  });
+
   it('caches answers: the same reference twice hits the network once', async () => {
     const { f, calls } = mockFetch(openalex(WORK), s2none);
     await lookupOpenAccess({ doi: DOI }, f);

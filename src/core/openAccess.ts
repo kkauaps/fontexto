@@ -169,7 +169,9 @@ async function call(ctx: Ctx, name: OaSourceName, url: string, headers: Record<s
     ac.abort();
   }, ctx.timeoutMs * (SLOW[name] ?? 1));
   try {
-    const r = await ctx.f(url, { headers: { 'User-Agent': UA, Accept: 'application/json', ...headers }, signal: ac.signal });
+    // call fetch unbound: on Workers, fetch invoked as a method of another object throws "Illegal invocation"
+    const f = ctx.f;
+    const r = await f(url, { headers: { 'User-Agent': UA, Accept: 'application/json', ...headers }, signal: ac.signal });
     if (r.status === 429) {
       const ra = Number(r.headers.get('retry-after'));
       cooldownUntil.set(name, ctx.now() + Math.min(Number.isFinite(ra) && ra > 0 ? ra * 1000 : 60_000, 10 * 60_000));
