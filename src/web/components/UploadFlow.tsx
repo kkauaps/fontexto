@@ -1,10 +1,10 @@
 import { useMemo, useRef, useState, type DragEvent } from 'react';
 import type { CitationGraph, PublicationNode } from '../../core/model';
 import { api } from '../api';
-import { BRAND } from '../brand';
-import lockup from '../assets/fontexto-lockup.svg';
 import type { FlowMode } from './Landing';
 import { fetchOpenAccess, OaCell, type OaState } from './ReferencesView';
+import { AppearanceSwitcher } from './AppearanceSwitcher';
+import { BrandMark } from './BrandMark';
 import { LanguageSwitcher, privacyNote, translateRuntime, useI18n } from '../i18n';
 
 interface Props {
@@ -187,13 +187,14 @@ export function UploadFlow({ mode, onBack, onDone }: Props) {
   return (
     <div className="uf">
       <header className="lp-nav">
-        <button className="linklike" onClick={onBack}>
-          <img className="lp-logo" src={lockup} alt={BRAND.name} height={30} />
+        <button className="linklike brand-btn" onClick={onBack} aria-label={t.backToStart}>
+          <BrandMark />
         </button>
         <div className="lp-nav-right">
           <button className="linklike" onClick={onBack}>
             ← {t.back}
           </button>
+          <AppearanceSwitcher />
           <LanguageSwitcher />
         </div>
       </header>

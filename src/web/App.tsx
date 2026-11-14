@@ -4,10 +4,10 @@ import { categoryOf, type CategoryRule } from '../core/categories';
 import type { CitationGraph, ReviewAction } from '../core/model';
 import { buildView, DEFAULT_FILTERS, type ViewFilters } from '../core/view';
 import { api, edition, type ProjectSummary } from './api';
-import { BRAND } from './brand';
 import { Landing, type FlowMode } from './components/Landing';
 import { UploadFlow } from './components/UploadFlow';
-import lockup from './assets/fontexto-lockup.svg';
+import { AppearanceSwitcher } from './components/AppearanceSwitcher';
+import { BrandMark } from './components/BrandMark';
 import { SetupChecklist } from './components/SetupChecklist';
 import { occurrencesByPublication } from '../core/evidenceView';
 import type { EvidenceReport } from '../core/evidence';
@@ -176,7 +176,7 @@ export function App() {
     <div className="app">
       <header className="topbar">
         <button className="brand-btn" onClick={() => setProjectId(undefined)} aria-label={t.backHomeAria} title={t.backHomeTitle}>
-          <img src={lockup} alt={BRAND.name} height={26} />
+          <BrandMark />
         </button>
         <select value={projectId} onChange={(e) => setProjectId(e.target.value || undefined)} aria-label={t.project}>
           {projects.map((p) => (
@@ -219,7 +219,10 @@ export function App() {
         <button className="primary" onClick={() => setPanelOpen(true)}>
           {t.filesAndReview}
         </button>
-        <LanguageSwitcher />
+        <>
+          <AppearanceSwitcher />
+          <LanguageSwitcher />
+        </>
       </header>
       {error && (
         <div className="notice error" onClick={() => setError(undefined)}>
@@ -345,6 +348,17 @@ export function App() {
           }}
         />
       )}
+      <nav className="m-tabs" role="tablist" aria-label={t.views}>
+        <button type="button" role="tab" aria-selected={tab === 'doc'} className={tab === 'doc' ? 'on' : ''} onClick={() => setTab('doc')}>
+          {t.tabDocument}
+        </button>
+        <button type="button" role="tab" aria-selected={tab === 'refs'} className={tab === 'refs' ? 'on' : ''} onClick={() => setTab('refs')}>
+          {t.tabReferences}
+        </button>
+        <button type="button" role="tab" aria-selected={tab === 'graph'} className={tab === 'graph' ? 'on' : ''} onClick={showGraph}>
+          {t.tabGraph}
+        </button>
+      </nav>
     </div>
   );
 }

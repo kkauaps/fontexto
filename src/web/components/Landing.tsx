@@ -1,7 +1,8 @@
 import type { ProjectSummary } from '../api';
 import { BRAND } from '../brand';
-import lockup from '../assets/fontexto-lockup.svg';
-import mark from '../assets/fontexto-mark.svg';
+import { AppearanceSwitcher } from './AppearanceSwitcher';
+import { BrandMark } from './BrandMark';
+import { HeroPreview } from './HeroPreview';
 import { LanguageSwitcher, formatDate, privacyNote, useI18n } from '../i18n';
 
 export type FlowMode = 'doc' | 'bib' | 'nobib';
@@ -23,13 +24,14 @@ export function Landing({ projects, error, onStart, onOpen }: Props) {
   return (
     <div className="landing">
       <header className="lp-nav">
-        <img className="lp-logo" src={lockup} alt={BRAND.name} height={34} />
+        <BrandMark />
         <div className="lp-nav-right">
           <nav aria-label={t.navSections}>
             <a href="#como-funciona">{t.navHowItWorks}</a>
             <a href="#privacidade">{t.navPrivacy}</a>
             {projects.length > 0 && <a href="#projetos">{t.navOpenProject}</a>}
           </nav>
+          <AppearanceSwitcher />
           <LanguageSwitcher />
         </div>
       </header>
@@ -37,6 +39,7 @@ export function Landing({ projects, error, onStart, onOpen }: Props) {
       <main>
         <section className="lp-hero">
           <div className="lp-hero-text">
+            <div className="lp-kicker">{BRAND.name}</div>
             <h1>{t.tagline}</h1>
             <p className="lp-lead">{t.heroLead}</p>
             <div className="lp-cta">
@@ -54,9 +57,7 @@ export function Landing({ projects, error, onStart, onOpen }: Props) {
               </button>
             </p>
           </div>
-          <figure className="lp-preview">
-            <img src="/preview-documento.png" alt={t.previewDocAlt} width={1280} height={800} />
-          </figure>
+          <HeroPreview />
         </section>
 
         <section id="como-funciona" className="lp-steps">
@@ -74,15 +75,9 @@ export function Landing({ projects, error, onStart, onOpen }: Props) {
           </ol>
         </section>
 
-        <section className="lp-preview2">
-          <figure>
-            <img src="/preview-grafo.png" alt={t.previewGraphAlt} width={1280} height={800} loading="lazy" />
-            <figcaption className="small muted">{t.previewGraphCaption}</figcaption>
-          </figure>
-        </section>
 
         <section id="privacidade" className="lp-privacy">
-          <img src={mark} alt="" width={44} height={39} />
+          <BrandMark wordmark={false} />
           <div>
             <h2>{t.privacyTitle}</h2>
             <p>
@@ -114,7 +109,7 @@ export function Landing({ projects, error, onStart, onOpen }: Props) {
       </main>
 
       <footer className="lp-footer small">
-        <img src={mark} alt="" width={22} height={20} />
+        <BrandMark wordmark={false} />
         <span>
           {BRAND.name} · {t.footerNote}
         </span>
