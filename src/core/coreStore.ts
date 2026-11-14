@@ -100,7 +100,7 @@ export function textKey(t: string): string {
 
 export interface CoreStoreOptions {
   driver: StorageDriver;
-  extractText: (data: Uint8Array) => Promise<PdfText>;
+  extractText: (data: Uint8Array, onProgress?: (p: { stage: string; done: number; total: number; name?: string }) => void) => Promise<PdfText>;
 }
 
 /** Embeddings of texts, kept per project so rebuilds stay semantic without loading the model again. */
@@ -240,10 +240,10 @@ export class CoreStore {
       let pageCount: number | undefined;
       try {
         const { data } = await this.getFileBytes(projectId, f.id);
-        const text = await this.extractText(data);
+        const text = await this.extractText(data, (p) => onProgress?.(done, pending.length, p.name ? `${f.originalName} · ${p.name}` : f.originalName));
         pageCount = text.pageCount;
         const chars = text.pages.reduce((n, pg) => n + pg.lines.reduce((m, l) => m + l.text.length, 0), 0);
-        if (chars < 20) status = { status: 'no_text', error: 'No extractable text (scanned PDF? OCR is not available offline).' };
+        if (chars < 20) status = { status: 'no_text', error: 'Não foi possível reconhecer texto neste arquivo (PDF digitalizado ou imagem).' };
         await this.d.putJson(projectId, `derived/${f.id}.text.json`, text);
       } catch (err) {
         status = { status: 'failed', error: (err as Error).message.slice(0, 300) };

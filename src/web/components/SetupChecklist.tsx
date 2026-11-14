@@ -71,7 +71,7 @@ export function SetupChecklist({ projectId, graph, onGraph }: { projectId: strin
           <strong>Documento principal (PDF)</strong>
           <span className="small muted">{main ? main.originalName : 'O trabalho cujas citações você quer conferir (TCC, dissertação, artigo).'}</span>
         </div>
-        <UploadButton {...common} role="main" accept="application/pdf,.pdf" primary={!main}>
+        <UploadButton {...common} role="main" accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" primary={!main}>
           {main ? 'Trocar PDF' : 'Escolher PDF'}
         </UploadButton>
       </li>
@@ -91,7 +91,7 @@ export function SetupChecklist({ projectId, graph, onGraph }: { projectId: strin
           <strong>PDFs das referências</strong>
           <span className="small muted">{refs.length ? `${refs.length} PDF(s) enviados` : 'Opcional, mas necessário para localizar o trecho citado em cada artigo.'}</span>
         </div>
-        <UploadButton {...common} role="reference" accept="application/pdf,.pdf" multiple>
+        <UploadButton {...common} role="reference" accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" multiple>
           {refs.length ? 'Enviar mais PDFs' : 'Escolher PDFs'}
         </UploadButton>
       </li>

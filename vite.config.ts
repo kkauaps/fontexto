@@ -3,6 +3,7 @@ import type { Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { pagesHeadersFile } from './src/server/securityHeaders';
 
@@ -10,6 +11,24 @@ const apiPort = Number(process.env.CITATION_GRAPH_PORT ?? 5174);
 
 /** Self-hosts what pdf.js loads at run time (standard fonts, wasm decoders, cmaps) and writes the Pages `_headers` file. */
 const PART_BYTES = 16 * 1024 * 1024; // Cloudflare Pages: 25 MiB per file
+
+/** Self-hosts tesseract.js worker, wasm and por+eng traineddata (lazy OCR; not in the JS bundle). */
+function copyTesseract(out: string) {
+  const tessdata = path.resolve('models/tessdata');
+  if (!existsSync(path.join(tessdata, 'eng.traineddata.gz')) || !existsSync(path.join(tessdata, 'por.traineddata.gz'))) {
+    execFileSync(process.execPath, ['scripts/fetch-tessdata.mjs'], { stdio: 'inherit' });
+  }
+  const dest = path.join(out, 'tesseract');
+  mkdirSync(path.join(dest, 'tessdata'), { recursive: true });
+  cpSync(path.resolve('node_modules/tesseract.js/dist/worker.min.js'), path.join(dest, 'worker.min.js'));
+  const core = path.resolve('node_modules/tesseract.js-core');
+  for (const f of ['tesseract-core-simd-lstm.wasm.js', 'tesseract-core-simd-lstm.wasm']) {
+    cpSync(path.join(core, f), path.join(dest, f));
+  }
+  for (const f of ['eng.traineddata.gz', 'por.traineddata.gz']) cpSync(path.join(tessdata, f), path.join(dest, 'tessdata', f));
+}
+
+
 
 /** Browser edition: onnxruntime wasm + the semantic model, split in parts that fit the Pages file limit. */
 function copyWebModel(out: string) {
@@ -63,7 +82,10 @@ const selfHostedAssets = (web: boolean): Plugin => ({
   apply: 'build',
   closeBundle() {
     const out = path.resolve(web ? 'dist/site' : 'dist/web');
-    if (web) copyWebModel(out);
+    if (web) {
+      copyWebModel(out);
+      copyTesseract(out);
+    }
     const pdfjs = path.resolve('node_modules/pdfjs-dist');
     for (const dir of ['standard_fonts', 'wasm', 'cmaps', 'iccs']) cpSync(path.join(pdfjs, dir), path.join(out, 'pdfjs', dir), { recursive: true });
     mkdirSync(out, { recursive: true });

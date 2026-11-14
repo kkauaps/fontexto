@@ -1,6 +1,6 @@
 import type { CitationOccurrence, EvidenceStatus } from '../../core/evidence';
 import type { CitationGraph, PublicationNode } from '../../core/model';
-import { formatPassage, occurrenceStatus, REASON_TEXT, STATUS_TEXT, type CitationGroup } from '../../core/evidenceView';
+import { passageParts, occurrenceStatus, REASON_TEXT, STATUS_TEXT, type CitationGroup } from '../../core/evidenceView';
 import type { OpenRequest } from './SidePanel';
 
 function StatusPill({ o }: { o: CitationOccurrence }) {
@@ -84,8 +84,8 @@ function OccurrenceCard({ o, graph, props }: { o: CitationOccurrence; graph: Cit
   const alternatives = o.passages.map((p, i) => ({
     label: p.curated ? `${i + 1} · p. ${p.page} · curadoria` : `${i + 1} · p. ${p.page} · ${Math.round(p.score * 100)}%`,
     request: {
-      anchor: { fileId: p.fileId, page: p.page, text: p.text },
-      phrase: p.text,
+      anchor: { fileId: p.fileId, page: p.page, text: p.focus ?? p.text },
+      phrase: p.focus ?? p.text,
       title: label,
       context: p.curated ? `Passagem ${i + 1} de ${o.passages.length}, na página ${p.page}, vinda da curadoria importada (${o.curated?.source ?? ''}).` : `Passagem ${i + 1} de ${o.passages.length}, na página ${p.page}. Candidata a sustentar a frase citada; confira no texto.`,
       citing: o.sentence,
@@ -141,7 +141,14 @@ function OccurrenceCard({ o, graph, props }: { o: CitationOccurrence; graph: Cit
                 )}
                 {p.region === 'resumo' && <span className="tag">resumo/início</span>}
               </div>
-              <blockquote>{formatPassage(p.text)}</blockquote>
+              <blockquote>
+                {passageParts(p.text, p.focus).map((part, k) => (part.highlight ? <strong key={k} className="passage-focus">{part.text}</strong> : <span key={k}>{part.text}</span>))}
+              </blockquote>
+              {p.focusApproximate && (
+                <p className="small muted" title="Não houve âncora (número, sigla, autor) nem modelo semântico para cravar a frase; o destaque cobre o trecho inteiro.">
+                  Destaque aproximado no trecho
+                </p>
+              )}
               <button className="primary small" onClick={() => props.onOpenReference(requests[i])}>
                 Abrir no artigo · p. {p.page}
               </button>

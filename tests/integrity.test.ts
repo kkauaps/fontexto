@@ -35,6 +35,12 @@ describe('page and anchor integrity', () => {
     expect(t).toMatchObject({ ok: true, page: 2, exactHighlight: false, highlights: [] });
   });
 
+  it('highlights from extracted line boxes when the anchor has the passage text but no rectangles', () => {
+    const t = viewerTarget({ fileId: file.id, page: 2, text: 'Gradient lattices' }, file, text);
+    expect(t).toMatchObject({ ok: true, page: 2, exactHighlight: true });
+    expect(t.ok && t.highlights.length).toBeGreaterThan(0);
+  });
+
   it('rejects anchors that point to another file', () => {
     expect(viewerTarget({ fileId: 'f_00000000000b', page: 1 }, file)).toMatchObject({ ok: false, reason: 'file_mismatch' });
   });
