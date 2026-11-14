@@ -28,10 +28,10 @@ export interface ReferenceEntry {
 }
 
 const HEADING_RE =
-  /^(?:(?:\d{1,2}|[IVX]{1,5})\.?\s*)?(references?(?:\s+and\s+notes)?|bibliography|refer[eê]ncias(?:\s+bibliogr[aá]ficas)?|literature\s+cited|works\s+cited|cited\s+literature)\s*:?$/i;
+  /^(?:(?:\d{1,2}|[IVX]{1,5})\.?\s*)?(references?(?:\s+and\s+notes)?|bibliography|refer[eêé]ncias?(?:\s+bibliogr[aá]ficas?)?|literature\s+cited|works\s+cited|cited\s+literature|sources\s+cited|bibliograf[ií]as?|bibliographie|r[ée]f[ée]rences(?:\s+bibliographiques)?|literatur(?:verzeichnis|angaben|liste)?|quellen(?:verzeichnis|angaben)?|riferimenti\s+bibliografici|список\s+(?:использованн(?:ой|ых)\s+)?(?:литературы|источников)|библиографи(?:я|ческий\s+список)|литература|参考文献|参考资料|引用文献)\s*[:：]?$/iu;
 
 const STOP_RE =
-  /^(?:(?:\d{1,2}|[A-Z]|[IVX]{1,5})\.?\s*)?(appendix|appendices|ap[eê]ndices?|anexos?|supplementary|supporting information|acknowledg(?:e)?ments?|agradecimentos|author contributions|funding|conflicts? of interest|competing interests|declaration of|data availability|abbreviations|biograph(?:y|ies)|about the authors?)\b/i;
+  /^(?:(?:\d{1,2}|[A-Z]|[IVX]{1,5})\.?\s*)?(appendix|appendices|ap[eê]ndices?|anexos?|supplementary|supporting information|acknowledg(?:e)?ments?|agradecimentos|author contributions|funding|conflicts? of interest|competing interests|declaration of|data availability|abbreviations|biograph(?:y|ies)|about the authors?|annexes?|anhang|anh[äa]nge|danksagung|remerciements|agradecimientos|ap[ée]ndices?|приложени[ея]|благодарност[ьи]|附录|致谢)(?![\p{L}])/iu;
 
 const NUMBERED_PATTERNS: { re: RegExp; name: string }[] = [
   { re: /^\[(\d{1,3})\]\s*/, name: 'bracket' },
@@ -49,6 +49,10 @@ const AUTHOR_START_RE = new RegExp(
     String.raw`^\p{Lu}{2,}[\p{Lu}'’\-]*(?:\s\p{Lu}{2,}[\p{Lu}'’\-]*)?,\s`,
     // ABNT corporate author: "CVAT.AI. CVAT documentation.", "OMS. Relatório ..."
     String.raw`^\p{Lu}{2,}(?:\.\p{Lu}{1,3})?\.\s+\p{Lu}`,
+    // French/European author-year in capitals without comma: "BARJOT D. (2012)", "DI NEZZA E., PALATUCCI G."
+    String.raw`^\p{Lu}{2,}[\p{Lu}'’\-]*(?:\s\p{Lu}{2,}[\p{Lu}'’\-]*)?\s\p{Lu}\.(?:\s?\p{Lu}\.)*[,\s(]`,
+    // APA corporate author with the year on the same line: "World Health Organization. (2020)."
+    String.raw`^\p{Lu}[\p{L}&,.'’\-\s]{2,120}?\(\s*(?:1[89]|20)\d{2}[a-z]?\s*\)\.`,
   ].join('|'),
   'u',
 );
@@ -60,21 +64,30 @@ export function isPageNumber(text: string) {
   return /^(?:page\s*)?\d{1,4}(?:\s*(?:of|\/|de)\s*\d{1,4})?$/i.test(text.trim());
 }
 
+/** Fraction of the page height, at the top and at the bottom, where running headers and footers are looked for. */
+const MARGIN_BAND = 0.1;
+
 /** Lines repeated on many pages (running headers/footers), with digits masked. */
 export function repeatedLines(pdf: PdfText): Set<string> {
+  // A running header/footer sits in the top or bottom margin band and at (almost) the same height on every page.
+  // Body lines that repeat (e.g. "Journal of X, vol. #" continuing several reference entries) move around and must
+  // never be dropped: they carry the year and the DOI of the entry.
   const counts = new Map<string, number>();
   for (const p of pdf.pages) {
     const seen = new Set<string>();
     for (const l of p.lines) {
+      if (p.height && l.rect.y > p.height * MARGIN_BAND && l.rect.y + l.rect.h < p.height * (1 - MARGIN_BAND)) continue;
       const k = l.text.replace(/\d+/g, '#').trim().toLowerCase();
-      if (k.length < 4 || seen.has(k)) continue;
-      seen.add(k);
-      counts.set(k, (counts.get(k) ?? 0) + 1);
+      if (k.length < 4) continue;
+      const ky = `${k}\u0000${Math.round(l.rect.y / 6)}`;
+      if (seen.has(ky)) continue;
+      seen.add(ky);
+      counts.set(ky, (counts.get(ky) ?? 0) + 1);
     }
   }
   const out = new Set<string>();
   if (pdf.pages.length < 3) return out;
-  for (const [k, c] of counts) if (c >= Math.max(3, pdf.pages.length * 0.4)) out.add(k);
+  for (const [ky, c] of counts) if (c >= Math.max(3, pdf.pages.length * 0.4)) out.add(ky.split('\u0000')[0]);
   return out;
 }
 
@@ -82,7 +95,7 @@ export function findReferenceHeading(pdf: PdfText): { page: number; line: number
   let found: { page: number; line: number } | undefined;
   for (const p of pdf.pages) {
     p.lines.forEach((l, idx) => {
-      if (HEADING_RE.test(l.text.trim())) found = { page: p.page, line: idx };
+      if (HEADING_RE.test(l.text.normalize('NFKC').trim())) found = { page: p.page, line: idx };
     });
   }
   return found;
@@ -196,7 +209,8 @@ export function extractReferenceEntries(pdf: PdfText): ReferenceEntry[] {
   const page = (n: number) => pdf.pages.find((p) => p.page === n)!;
   return groups
     .map((g, index) => {
-      let text = joinLines(g.lines.map((l) => l.text));
+      // NFKC: CJK fonts often map to Kangxi radicals (⽂ for 文), and ligatures (ﬁ) break words
+      let text = joinLines(g.lines.map((l) => l.text)).normalize('NFKC');
       if (g.label && text.startsWith(g.label)) text = text.slice(g.label.length).trim();
       const first = g.lines[0];
       const p = page(first.page);

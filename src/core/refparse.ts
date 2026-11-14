@@ -30,6 +30,10 @@ export interface ParsedReference {
 
 const PARTICLE = /^(?:van|von|de|da|der|den|dos|das|del|della|di|du|le|la)$/i;
 const INITIAL = /^\p{Lu}{1,2}\.$/u;
+/** Lower-case particle, written out or abbreviated ("de", "d."), as it appears after the initials in ABNT. */
+const LOWER_PARTICLE = /^(?:van|von|de|da|der|den|do|dos|das|del|della|di|du|le|la|d\.)$/;
+/** GOST 7.1 / 7.0.5 (Russian): "Иванов И.И., Петров П. [и др.] Заглавие // Журнал. – 2018. – Т. 5, № 3. – С. 10–20." */
+const GOST_RE = /^((?:\p{Lu}[\p{L}'’\-]+(?:\s\p{Lu}[\p{L}'’\-]+)?\s(?:\p{Lu}\.\s?){1,3},?\s*)+)(\[?\s*(?:и\s+др|et\s+al)\.?\s*\]?)?\s*(.+?)\s+\/\/\s+(.+)$/su;
 const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /** "RONNEBERGER" -> "Ronneberger", "KESSEL-BRANDT" -> "Kessel-Brandt", "de FREITAS" keeps particles lower-case. */
@@ -43,6 +47,7 @@ export function titleCaseName(s: string): string {
 }
 
 function detectStyle(text: string, label?: string): ReferenceStyle {
+  if (/^\p{Lu}{2,}[\p{Lu}'’\- ]*,\s*["“]/u.test(text)) return 'ieee';
   if (/^\p{Lu}{2,}[\p{Lu}'’\- ]*,\s/u.test(text) || /^\p{Lu}{2,}(?:\.\p{Lu}{1,3})?\.\s+\p{Lu}/u.test(text)) return 'abnt';
   if (/^[^()]{3,200}\(\s*(?:\d{4}[a-z]?|n\.d\.)\s*\)\./u.test(text)) return 'apa';
   if (label || /^(?:\p{Lu}\.\s?){1,3}\p{Lu}[\p{L}'’\-]+/u.test(text) || /["“]/.test(text.slice(0, 250))) return /^\p{Lu}[\p{L}'’\-]+\s\p{Lu}{1,3}[,.]/u.test(text) ? 'vancouver' : 'ieee';
@@ -92,15 +97,19 @@ function abntAuthors(text: string): { authors: ParsedReference['authors']; etAl:
         given.push(tok);
         pos += w[0].length;
         after = true;
-        const nxt = /^(\S+)/u.exec(rest())?.[1] ?? '';
-        if (!(INITIAL.test(nxt) || PARTICLE.test(nxt) || /^et$/i.test(nxt))) {
+        const nxt = (/^(\S+)/u.exec(rest())?.[1] ?? '').replace(/;$/, '');
+        // "BOLGER, A. M.; LOHSE, M." (the next initial carries the ";"), "SOUZA, A. C. d."; a capitalised word after
+        // the initials ("La", "De") starts the title, it is not a particle.
+        if (!(INITIAL.test(nxt) || LOWER_PARTICLE.test(nxt) || /^et$/i.test(nxt))) {
           done = true;
         }
         continue;
       }
-      if (PARTICLE.test(tok) && after) {
+      if (LOWER_PARTICLE.test(tok) && after) {
         given.push(tok);
         pos += w[0].length;
+        const nxt = (/^(\S+)/u.exec(rest())?.[1] ?? '').replace(/;$/, '');
+        if (/\.$/.test(tok) && !(INITIAL.test(nxt) || LOWER_PARTICLE.test(nxt) || /^et$/i.test(nxt))) done = true;
         continue;
       }
       if (tok.endsWith('.') && !/^\p{Lu}\.$/u.test(tok)) {
@@ -125,20 +134,28 @@ function abntAuthors(text: string): { authors: ParsedReference['authors']; etAl:
 }
 
 function titleAfter(text: string, from: number): string | undefined {
-  const rest = text.slice(from).replace(/^[\s.]+/, '');
-  const m = /^(.+?[^\s.])(?:[.?!]\s+(?=\p{Lu}|\d)|\.$|$)/su.exec(rest);
+  const rest = text.slice(from).replace(/^[\s.,]+/, '').replace(/^\(\s*(?:1[5-9]|20)\d{2}[a-z]?\s*\)[.,:]?\s*/, '');
+  // a quoted title: « Titre », “Title,” or "Title."
+  // (only when the quote closes the title: '"Big data" in health' is a title that starts with a quotation)
+  const q = /^[«“"]\s*([^»”"]{3,}?)[\s,.]*[»”"]/u.exec(rest);
+  if (q && /^\s*(?:[,.;:]|$|\p{Lu}|\d)/u.test(rest.slice(q[0].length))) return q[1].trim();
+  const m = /^(.+?[^\s.])(?:[.?!]+\s+(?=\p{Lu}|\p{Lo}|\d|\[|https?:|doi:|arXiv\b)|\.$|$)/su.exec(rest);
   if (!m) return undefined;
   let t = m[1];
   // keep a trailing "?" or "!" that belongs to the title
   if (/[?!]\s/.test(rest.slice(t.length, t.length + 2))) t += rest[t.length];
-  t = t.trim();
+  // GB/T 7714 document-type marks: "标题[J]", "Title[M]", "[EB/OL]"
+  t = t.replace(/\s*\[(?:J|M|D|C|N|R|S|P|Z|A|G|EB\/OL|DB\/OL|J\/OL|M\/OL|CP)\]\s*$/, '').trim();
   return t.length >= 3 ? t : undefined;
 }
 
 function pickYear(text: string, from = 0): number | undefined {
   const clean = text
     .slice(from)
+    .replace(/(?:Acesso|Acessado|Accessed|Atualizado|Updated|Retrieved|Dispon[ií]vel|cited|consultado|дата\s+обращения)[^\]\)]{0,40}?\d{4}/giu, ' ')
     .replace(/(?:Acesso|Acessado|Accessed|Atualizado|Updated|Retrieved|Dispon[ií]vel)[^.]*?(?:\d{4}|\.)/gi, ' ')
+    .replace(/(?:\b(?:pp?|S|vol|v|no|n|nr)\.?|С\.|Т\.|№)\s*\d+(?:\s*[–—-]\s*\d+)?/gu, ' ')
+    .replace(/:\s*\d+\s*[–—-]\s*\d+/g, ' ')
     .replace(/https?:\/\/\S+/g, ' ')
     .replace(/\b10\.\d{4,9}\/\S+/g, ' ');
   const max = new Date().getFullYear() + 1;
@@ -188,7 +205,7 @@ function parseAuthorsGeneric(block: string): { authors: ParsedReference['authors
 const FAMILY = String.raw`(?:(?:van|von|de|da|der|den|dos|das|del|della|di|du|le|la)\s+)*\p{Lu}[\p{L}\p{M}'’¨´\-]+(?:\s(?:\p{Lu}[\p{L}\p{M}'’¨´\-]+))?`;
 const INITIALS = String.raw`\p{Lu}\.(?:\s?-?\p{Lu}\.)*`;
 const FAMILY_INITIALS_BLOCK = new RegExp(
-  String.raw`^(${FAMILY},\s${INITIALS}(?:(?:,\s|,?\s&\s|,?\sand\s)${FAMILY},\s${INITIALS})*(?:,?\s(?:et\s+al\.|\.\.\.\s${FAMILY},\s${INITIALS}))?)(?:,\s((?:1[5-9]|20)\d{2})[a-z]?\.|:(?=\s)|(?=\s(?:\p{Lu}[\p{Ll}\d\-]|["“\d]|\p{Lu}{2,}[\s:\-])))`,
+  String.raw`^(${FAMILY},\s${INITIALS}(?:(?:,\s|,?\s&\s|,?\sand\s)${FAMILY},\s${INITIALS})*(?:,?\s(?:et\s+al\.|\.\.\.\s${FAMILY},\s${INITIALS}))?)(?:,?\s((?:1[5-9]|20)\d{2})[a-z]?\.|:(?=\s)|(?=\s(?:\p{Lu}[\p{Ll}\d\-]|["“\d]|\p{Lu}{2,}[\s:\-])))`,
   'u',
 );
 
@@ -203,8 +220,35 @@ function familyInitialsBlock(text: string): { authors: string; year?: number; en
 }
 
 export function parseReferenceText(text: string, index = 0, label?: string): Omit<ParsedReference, 'key'> {
-  let style = detectStyle(text, label);
   const doi = findDois(text)[0];
+  const gost = GOST_RE.exec(text);
+  if (gost) {
+    const authors = gost[1]
+      .split(/,\s*/)
+      .map((a) => a.trim())
+      .filter(Boolean)
+      .map((a) => {
+        const m = /^(.+?)\s((?:\p{Lu}\.\s?){1,3})$/u.exec(a);
+        return m ? { family: m[1], given: m[2].replace(/\s+/g, '') } : { family: a };
+      });
+    const title = gost[3].trim().replace(/[\s.]+$/, '');
+    return { index, text, style: 'vancouver', authors, etAl: Boolean(gost[2]), year: pickYear(gost[4]) ?? pickYear(text), title: title.length >= 3 ? title : undefined, doi, label };
+  }
+  // French/European author-year with capitals and no comma: "BARJOT D. (2012), « Titre », Revue..."
+  const fr = /^((?:\p{Lu}[\p{Lu}'’\-]+(?:\s\p{Lu}[\p{Lu}'’\-]+)?\s(?:\p{Lu}\.\s?){1,3},?\s*)+(?:et\s+al\.)?)\s*\(\s*((?:1[5-9]|20)\d{2})[a-z]?\s*\)[,.:]?\s*/u.exec(text);
+  if (fr) {
+    const authors = fr[1]
+      .replace(/et\s+al\./, '')
+      .split(/,\s*/)
+      .map((a) => a.trim())
+      .filter(Boolean)
+      .map((a) => {
+        const m = /^(.+?)\s((?:\p{Lu}\.\s?){1,3})$/u.exec(a);
+        return m ? { family: titleCaseName(m[1]), given: m[2].trim() } : { family: titleCaseName(a) };
+      });
+    return { index, text, style: 'apa', authors, etAl: /et\s+al\./.test(fr[1]), year: Number(fr[2]), title: titleAfter(text, fr[0].length), doi, label };
+  }
+  let style = detectStyle(text, label);
   let authors: ParsedReference['authors'] = [];
   let etAl = false;
   let title: string | undefined;
@@ -294,13 +338,14 @@ export function parseReferences(entries: Pick<ReferenceEntry, 'index' | 'text' |
 
 const esc = (s: string) => s.replace(/[{}\\]/g, ' ').replace(/\s+/g, ' ').trim();
 
-/** BibTeX text for the entries that carry enough to be matched (an author and a year). */
+/** BibTeX text for every entry with an author or a title (year optional). */
 export function toBibtex(refs: ParsedReference[]): string {
   const out: string[] = ['% Gerado automaticamente a partir da lista de referências do artigo. Confira antes de usar.'];
   for (const r of refs) {
-    if (!r.authors.length || !r.year) continue;
+    // an entry without a readable year (or author) is still a source of the document: keep it in the graph
+    if (!r.authors.length && !r.title) continue;
     const authors = r.authors.map((a) => (a.organization ? `{${esc(a.family)}}` : a.given ? `${esc(a.family)}, ${esc(a.given)}` : esc(a.family))).join(' and ') + (r.etAl ? ' and others' : '');
-    const fields = [`author = {${authors}}`, `year = {${r.year}}`];
+    const fields = [...(r.authors.length ? [`author = {${authors}}`] : []), ...(r.year ? [`year = {${r.year}}`] : [])];
     if (r.title) fields.push(`title = {{${esc(r.title)}}}`);
     if (r.doi) fields.push(`doi = {${r.doi}}`);
     fields.push(`note = {Extraído da lista de referências do artigo}`);

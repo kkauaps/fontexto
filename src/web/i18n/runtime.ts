@@ -117,6 +117,9 @@ export function reviewActionLabel(t: Messages, action: string): string {
   return action;
 }
 
+/** Set by the free-PDF lookup when the catalogues answered with rate limits or timeouts (not a real "not found"). */
+export const OA_CATALOGS_BUSY = 'Os catálogos de acesso aberto estão limitando as consultas agora; tente de novo em alguns minutos.';
+
 function exactMap(t: Messages): Record<string, string> {
   return {
     [EVIDENCE_METHOD]: t.evidenceMethod,
@@ -124,6 +127,8 @@ function exactMap(t: Messages): Record<string, string> {
     'Mais de uma referência da lista combina com esta citação; escolha a certa.':
       t.localeListAmbiguous,
     'Nenhuma referência da lista tem este autor e ano.': t.localeListNone,
+    'Não encontrei a seção "Referências" no PDF do artigo.': t.localeNoRefSection,
+    [OA_CATALOGS_BUSY]: t.oaCatalogsBusy,
     'O PDF desta referência não foi enviado. Envie-o em "PDFs das referências" para localizar o trecho.':
       t.localePdfNotSentNote,
     'O PDF da referência não tem texto extraível.': t.localePdfNoText,

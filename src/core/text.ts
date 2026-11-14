@@ -42,7 +42,9 @@ export function joinLines(lines: string[]): string {
     }
     const tail = out.slice(out.lastIndexOf(' ') + 1);
     const doiBreak = /10\.\d{4,9}\/\S*[./_-]$/.test(tail) || /^(?:https?:\/\/)?(?:dx\.)?doi\.org\/$/i.test(tail);
-    if (doiBreak) out += line;
+    // a DOI that ends the line with "." is usually finished: keep the space unless the next line goes on in
+    // lower case or digits ("…819861. Revista", "…2717. S. SILVA")
+    if (doiBreak && !(/\.$/.test(tail) && !/^[\p{Ll}\d]/u.test(line))) out += line;
     else if (/\p{Ll}-$/u.test(out) && /^\p{Ll}/u.test(line)) out = out.slice(0, -1) + line;
     else if (/\p{L}-$/u.test(out) && /^\p{Lu}/u.test(line)) out += line; // "Maier-" + "Hein"
     else out += ' ' + line;

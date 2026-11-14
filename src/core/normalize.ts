@@ -86,7 +86,8 @@ export function normalizeDoi(input: string | undefined | null): string | undefin
 /** Finds DOIs inside free text (e.g. a reference entry or a PDF first page). */
 export function findDois(text: string): string[] {
   const out: string[] = [];
-  const re = /\b(10\.\d{4,9}\/[^\s"<>]+)/gi;
+  // SICI-style DOIs carry <...> segments: 10.1002/(SICI)1097-4636(199704)35:1<129::AID-JBM13>3.0.CO;2-E
+  const re = /\b(10\.\d{4,9}\/(?:[^\s"<>]|<[^\s"<>]{1,40}>)+)/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
     const d = normalizeDoi(m[1]);
