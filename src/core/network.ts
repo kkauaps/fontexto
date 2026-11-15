@@ -15,7 +15,7 @@ import type { GraphWork } from './openAlexGraph.js';
 
 export type NetType = 'article' | 'book' | 'thesis' | 'web' | 'other';
 export type NetEdgeKind = 'cites' | 'coupling' | 'similar' | 'doc';
-export type ClusterSource = 'topic' | 'subfield' | 'keyword' | 'other';
+export type ClusterSource = 'topic' | 'subfield' | 'field' | 'keyword' | 'other';
 
 export interface NetInput {
   id: string;
@@ -168,8 +168,29 @@ function assignClusters(pubs: NetInput[], works: Map<string, GraphWork>): { byNo
     }
     return m;
   };
-  take('topic', group((w) => w.topic), 2);
-  take('subfield', group((w) => w.topic?.subfield), 3);
+  // pick the finest OpenAlex level whose 10 biggest groups cover most references: a focused bibliography gets
+  // topics ("Flood risk"), a broad one gets subfields or fields instead of one big "other"
+  const levels: [ClusterSource, (w: GraphWork) => { id: string; name: string } | undefined][] = [
+    ['topic', (w) => w.topic],
+    ['subfield', (w) => w.topic?.subfield],
+    ['field', (w) => w.topic?.field],
+  ];
+  const withTopic = pubs.filter((p) => works.get(p.id)?.topic).length;
+  const coverage = (pick: (w: GraphWork) => { id: string; name: string } | undefined) =>
+    [...group(pick).values()]
+      .map((g) => g.ids.length)
+      .filter((n) => n >= 2)
+      .sort((a, b) => b - a)
+      .slice(0, MAX_CLUSTERS)
+      .reduce((a, b) => a + b, 0);
+  let chosen = 0;
+  if (withTopic) {
+    const covs = levels.map(([, pick]) => coverage(pick) / withTopic);
+    const fine = covs.findIndex((c) => c >= 0.6);
+    chosen = fine >= 0 ? fine : covs.indexOf(Math.max(...covs));
+  }
+  take(levels[chosen][0], group(levels[chosen][1]), 2);
+  for (const [src, pick] of levels.slice(chosen + 1)) take(src, group(pick), 3);
   // keyword groups for the references without a topic: each takes its most shared title word
   const noTopic = pubs.filter((p) => !byNode.has(p.id) && !works.get(p.id)?.topic);
   const words = new Map(pubs.map((p) => [p.id, titleWords(p.title)]));

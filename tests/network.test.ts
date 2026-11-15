@@ -90,10 +90,26 @@ describe('network: clusters', () => {
 
   it('never makes more than 10 coloured groups', () => {
     const inputs = Array.from({ length: 40 }, (_, i) => pub(`p${i}`, `Title ${i}`));
-    const works = new Map(inputs.map((p, i) => [p.id, work(`W${i + 1}`, [], [`T${Math.floor(i / 2)}`, `Topic ${Math.floor(i / 2)}`])]));
+    const works = new Map(
+      inputs.map((p, i) => {
+        const k = Math.floor(i / 2);
+        return [p.id, { id: `W${i + 1}`, refs: [], topic: { id: `T${k}`, name: `Topic ${k}`, subfield: { id: `S${k}`, name: `Sub ${k}` }, field: { id: `F${k}`, name: `Field ${k}` } } } as GraphWork];
+      }),
+    );
     const net = buildNetwork(inputs, works);
     expect(net.clusters.filter((c) => c.key !== OTHER_CLUSTER).length).toBe(10);
     expect(net.clusters.find((c) => c.key === OTHER_CLUSTER)?.count).toBe(20);
+  });
+});
+
+describe('network: cluster level', () => {
+  it('a broad bibliography is grouped by subfield/field instead of one big "other"', () => {
+    const inputs = Array.from({ length: 30 }, (_, i) => pub(`p${i}`, `Title ${i}`));
+    // 30 different topics, but only 3 fields
+    const works = new Map(inputs.map((p, i) => [p.id, { id: `W${i + 1}`, refs: [], topic: { id: `T${i}`, name: `Topic ${i}`, subfield: { id: `S${i}`, name: `Sub ${i}` }, field: { id: `F${i % 3}`, name: `Field ${i % 3}` } } } as GraphWork]));
+    const net = buildNetwork(inputs, works);
+    expect(net.clusters.map((c) => c.label).sort()).toEqual(['Field 0', 'Field 1', 'Field 2']);
+    expect(net.clusters.every((c) => c.source === 'field')).toBe(true);
   });
 });
 
