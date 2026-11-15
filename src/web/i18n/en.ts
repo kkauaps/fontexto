@@ -1,9 +1,23 @@
+const pl = (n: number, one: string, many: string) => (n === 1 ? one : many);
+
 /** English is the source of truth for the message shape. Other locales must match this type. */
 export const en = {
   metaTitle: 'Fontexto — each citation linked to the passage in the source',
   metaDescription:
     'Fontexto links each citation in your document to the exact passage in the source. Upload a PDF, review the matches, and keep your files in the browser.',
   boot: 'Loading Fontexto…',
+  heroSample: {
+    kicker: "Sample University",
+    title: "An example paper on climate data",
+    p1: "Recent assessments of regional temperature records show a consistent warming trend over the last fifty years",
+    p1b: "These records are typically compiled from weather stations and satellite observations.",
+    p2: "Manual review of station metadata is described as time-consuming",
+    p2b: "and producing quality-controlled series requires specialized work",
+    p3: "Automated methods have been investigated to flag outliers in climate series",
+    q1: "consistent warming trend",
+    q2: "quality-controlled series",
+    q3: "flag outliers",
+  },
   language: 'Language',
   displaySettings: 'Theme and language',
   appearance: 'Appearance',
@@ -54,7 +68,7 @@ export const en = {
   views: 'Views',
   tabDocument: 'Document',
   tabDocumentTitle: 'Your text, with each citation checked',
-  tabCitations: (n: number) => `${n} citations`,
+  tabCitations: (n: number) => `${n} ${pl(n, 'citation', 'citations')}`,
   tabReferences: 'References',
   tabReferencesTitle: 'Each bibliography entry: status, PDF, and free-PDF lookup',
   tabGraph: 'Graph',
@@ -447,8 +461,8 @@ export const en = {
   confirmCitation: 'Confirm citation',
   reject: 'Reject',
   undoReviews: 'Undo reviews',
-  aggregatedRelations: (n: number) => `${n} aggregated relations`,
-  declaredReferences: (n: number) => `Main document · ${n} declared references`,
+  aggregatedRelations: (n: number) => `${n} ${pl(n, 'aggregated relation', 'aggregated relations')}`,
+  declaredReferences: (n: number) => `Main document · ${n} ${pl(n, 'declared reference', 'declared references')}`,
   mainPdfUnavailable: 'Main document PDF unavailable',
   collapsedGroup: 'Collapsed group. Use the “+” button on the node or the legend to expand.',
   actionConfirm: 'confirm',
@@ -629,7 +643,7 @@ export const en = {
   netBusy: (n: number) => (n === 1 ? 'Catalogues busy: 1 reference not checked yet. Try again in a minute.' : `Catalogues busy: ${n} references not checked yet. Try again in a minute.`),
   netFailed: 'Couldn’t reach the catalogue. The graph uses title keywords for now.',
   netKeywordsOnly: 'Grouped by title keywords. Find links in OpenAlex to see which references cite each other.',
-  netStats: (nodes: number, links: number, topics: number) => `${nodes} references · ${links} links · ${topics} topics`,
+  netStats: (nodes: number, links: number, topics: number) => `${nodes} ${pl(nodes, 'reference', 'references')} · ${links} ${pl(links, 'link', 'links')} · ${topics} ${pl(topics, 'topic', 'topics')}`,
   netTopics: 'Topics',
   netOther: 'Other',
   netKeywordSource: 'Title keyword',

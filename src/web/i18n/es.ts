@@ -1,10 +1,24 @@
 import type { Messages } from './en';
 
+const pl = (n: number, one: string, many: string) => (n === 1 ? one : many);
+
 export const es: Messages = {
   metaTitle: 'Fontexto — cada cita ligada al pasaje de la fuente',
   metaDescription:
     'Fontexto relaciona cada cita de tu documento con el pasaje exacto de la fuente. Sube un PDF, revisa las coincidencias y deja los archivos en el navegador.',
   boot: 'Cargando Fontexto…',
+  heroSample: {
+    kicker: "Universidad de Ejemplo",
+    title: "Un artículo de ejemplo sobre datos climáticos",
+    p1: "Las evaluaciones recientes de los registros regionales de temperatura muestran una tendencia de calentamiento constante en los últimos cincuenta años",
+    p1b: "Estos registros suelen compilarse a partir de estaciones meteorológicas y observaciones satelitales.",
+    p2: "La revisión manual de los metadatos de las estaciones se describe como lenta",
+    p2b: "y producir series con control de calidad exige trabajo especializado",
+    p3: "Se han investigado métodos automáticos para señalar valores atípicos en series climáticas",
+    q1: "tendencia de calentamiento constante",
+    q2: "series con control de calidad",
+    q3: "señalar valores atípicos",
+  },
   language: 'Idioma',
   displaySettings: 'Tema e idioma',
   appearance: 'Apariencia',
@@ -53,7 +67,7 @@ export const es: Messages = {
   views: 'Vistas',
   tabDocument: 'Documento',
   tabDocumentTitle: 'Tu texto, con cada cita revisada',
-  tabCitations: (n: number) => `${n} citas`,
+  tabCitations: (n: number) => `${n} ${pl(n, 'cita', 'citas')}`,
   tabReferences: 'Referencias',
   tabReferencesTitle: 'Cada entrada de la bibliografía: situación, PDF y búsqueda de PDF gratuito',
   tabGraph: 'Grafo',
@@ -436,8 +450,8 @@ export const es: Messages = {
   confirmCitation: 'Confirmar cita',
   reject: 'Rechazar',
   undoReviews: 'Deshacer revisiones',
-  aggregatedRelations: (n: number) => `${n} relaciones agrupadas`,
-  declaredReferences: (n: number) => `Documento principal · ${n} referencias declaradas`,
+  aggregatedRelations: (n: number) => `${n} ${pl(n, 'relación agrupada', 'relaciones agrupadas')}`,
+  declaredReferences: (n: number) => `Documento principal · ${n} ${pl(n, 'referencia declarada', 'referencias declaradas')}`,
   mainPdfUnavailable: 'PDF del documento principal no disponible',
   collapsedGroup: 'Grupo recogido. Usa el botón “+” del nodo o la leyenda para expandirlo.',
   actionConfirm: 'confirmar',
@@ -615,7 +629,7 @@ export const es: Messages = {
   netBusy: (n: number) => (n === 1 ? 'Catálogos ocupados: falta revisar 1 referencia. Inténtalo de nuevo en un minuto.' : `Catálogos ocupados: faltan revisar ${n} referencias. Inténtalo de nuevo en un minuto.`),
   netFailed: 'No se pudo contactar el catálogo. Por ahora el grafo usa palabras clave de los títulos.',
   netKeywordsOnly: 'Agrupado por palabras clave de los títulos. Busca vínculos en OpenAlex para ver qué referencias se citan entre sí.',
-  netStats: (nodes: number, links: number, topics: number) => `${nodes} referencias · ${links} vínculos · ${topics} temas`,
+  netStats: (nodes: number, links: number, topics: number) => `${nodes} ${pl(nodes, 'referencia', 'referencias')} · ${links} ${pl(links, 'vínculo', 'vínculos')} · ${topics} ${pl(topics, 'tema', 'temas')}`,
   netTopics: 'Temas',
   netOther: 'Otros',
   netKeywordSource: 'Palabra clave del título',

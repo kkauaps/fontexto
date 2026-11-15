@@ -1,10 +1,24 @@
 import type { Messages } from './en';
 
+const pl = (n: number, one: string, many: string) => (n === 1 ? one : many);
+
 export const ptBR: Messages = {
   metaTitle: 'Fontexto — cada citação ligada ao trecho da fonte',
   metaDescription:
     'O Fontexto liga cada citação do seu documento ao trecho exato da fonte. Envie um PDF, confira as correspondências e mantenha os arquivos no navegador.',
   boot: 'Carregando o Fontexto…',
+  heroSample: {
+    kicker: "Universidade Exemplo",
+    title: "Um artigo de exemplo sobre dados climáticos",
+    p1: "Avaliações recentes de registros regionais de temperatura mostram uma tendência consistente de aquecimento nos últimos cinquenta anos",
+    p1b: "Esses registros costumam ser compilados a partir de estações meteorológicas e observações de satélite.",
+    p2: "A revisão manual dos metadados das estações é descrita como demorada",
+    p2b: "e produzir séries com controle de qualidade exige trabalho especializado",
+    p3: "Métodos automáticos já foram investigados para sinalizar valores discrepantes em séries climáticas",
+    q1: "tendência consistente de aquecimento",
+    q2: "séries com controle de qualidade",
+    q3: "sinalizar valores discrepantes",
+  },
   language: 'Idioma',
   displaySettings: 'Tema e idioma',
   appearance: 'Aparência',
@@ -52,7 +66,7 @@ export const ptBR: Messages = {
   views: 'Visões',
   tabDocument: 'Documento',
   tabDocumentTitle: 'Seu texto, com cada citação conferida',
-  tabCitations: (n: number) => `${n} citações`,
+  tabCitations: (n: number) => `${n} ${pl(n, 'citação', 'citações')}`,
   tabReferences: 'Referências',
   tabReferencesTitle: 'Cada referência da bibliografia: situação, PDF e busca de PDF gratuito',
   tabGraph: 'Grafo',
@@ -118,7 +132,7 @@ export const ptBR: Messages = {
   stepCheckCitations: 'Conferindo as citações',
   stepProgress: (done: number, total: number) => `${done} de ${total}`,
   entriesRecognized: (usable: number, total: number) => `${usable} de ${total} entradas reconhecidas`,
-  oaProgress: (done: number, total: number, got: number) => `${done} de ${total} consultadas · ${got} PDF(s) obtidos`,
+  oaProgress: (done: number, total: number, got: number) => `${done} de ${total} consultadas · ${got} ${pl(got, 'PDF obtido', 'PDFs obtidos')}`,
   reviewTitleDoc: 'Pronto: veja o que foi encontrado',
   reviewTitle: 'Revise as ligações',
   foundEntries: (total: number, usable: number) =>
@@ -146,7 +160,7 @@ export const ptBR: Messages = {
   swapBib: 'Trocar .bib',
   chooseBib: 'Escolher .bib',
   referencePdfs: 'PDFs das referências',
-  pdfsSent: (n: number) => `${n} PDF(s) enviados`,
+  pdfsSent: (n: number) => `${n} ${pl(n, 'PDF enviado', 'PDFs enviados')}`,
   referencePdfsHint: 'Opcional, mas necessário para localizar o trecho citado em cada artigo.',
   sendMorePdfs: 'Enviar mais PDFs',
   choosePdfs: 'Escolher PDFs',
@@ -323,7 +337,7 @@ export const ptBR: Messages = {
   searchFreePdfs: (n: number) => `Buscar PDFs gratuitos (${n} sem PDF)`,
   searchingFreePdfs: 'Buscando PDFs gratuitos…',
   oaPrivacyHint: 'Envia só DOI, título, ano e 1º autor aos catálogos abertos (OpenAlex, Crossref, Unpaywall, Semantic Scholar, Europe PMC, CORE, arXiv). Seus arquivos não saem do navegador.',
-  oaAdded: (n: number) => `${n} PDF(s) gratuito(s) adicionados e verificados.`,
+  oaAdded: (n: number) => `${n} ${pl(n, 'PDF gratuito adicionado e verificado', 'PDFs gratuitos adicionados e verificados')}.`,
   oaNone: 'Nenhum PDF gratuito pôde ser baixado automaticamente. Veja os links em cada linha.',
   colReference: 'Referência',
   colStatus: 'Situação',
@@ -389,7 +403,7 @@ export const ptBR: Messages = {
   notFoundElement: 'Elemento não encontrado.',
   seeRelationEvidence: 'Ver evidência da relação',
   citationsInTextSummary: (total: number, located: number, caveat: number, notLocated: number) =>
-    `${total} citação(ões) no texto: ${located} localizada(s), ${caveat} com ressalva, ${notLocated} não localizada(s)`,
+    `${total} ${pl(total, 'citação', 'citações')} no texto: ${located} ${pl(located, 'localizada', 'localizadas')}, ${caveat} com ressalva, ${notLocated} não ${pl(notLocated, 'localizada', 'localizadas')}`,
   checkInDocument: 'Conferir no documento',
   authors: 'Autores',
   vehicle: 'Veículo',
@@ -434,8 +448,8 @@ export const ptBR: Messages = {
   confirmCitation: 'Confirmar citação',
   reject: 'Rejeitar',
   undoReviews: 'Desfazer revisões',
-  aggregatedRelations: (n: number) => `${n} relações agregadas`,
-  declaredReferences: (n: number) => `Documento principal · ${n} referências declaradas`,
+  aggregatedRelations: (n: number) => `${n} ${pl(n, 'relação agregada', 'relações agregadas')}`,
+  declaredReferences: (n: number) => `Documento principal · ${n} ${pl(n, 'referência declarada', 'referências declaradas')}`,
   mainPdfUnavailable: 'PDF do documento principal indisponível',
   collapsedGroup: 'Grupo recolhido. Use o botão “+” no nó ou a legenda para expandir.',
   actionConfirm: 'confirmar',
@@ -514,7 +528,7 @@ export const ptBR: Messages = {
   deleteProject: 'Excluir projeto',
   confirmDeleteProject:
     'Excluir o projeto e todos os arquivos enviados e dados derivados? Arquivos referenciados por caminho não são apagados.',
-  sendingFiles: (n: number) => `Enviando e processando ${n} arquivo(s)…`,
+  sendingFiles: (n: number) => `Enviando e processando ${n} ${pl(n, 'arquivo', 'arquivos')}…`,
 
   identityDoi: 'DOI',
   identityDifferentDoi: 'DOI diferente',
@@ -613,7 +627,7 @@ export const ptBR: Messages = {
   netBusy: (n: number) => (n === 1 ? 'Catálogos ocupados: falta conferir 1 referência. Tente de novo em um minuto.' : `Catálogos ocupados: faltam conferir ${n} referências. Tente de novo em um minuto.`),
   netFailed: 'Não deu para falar com o catálogo. Por enquanto o grafo usa palavras-chave dos títulos.',
   netKeywordsOnly: 'Agrupado por palavras-chave dos títulos. Busque ligações na OpenAlex para ver quais referências se citam.',
-  netStats: (nodes: number, links: number, topics: number) => `${nodes} referências · ${links} ligações · ${topics} temas`,
+  netStats: (nodes: number, links: number, topics: number) => `${nodes} ${pl(nodes, 'referência', 'referências')} · ${links} ${pl(links, 'ligação', 'ligações')} · ${topics} ${pl(topics, 'tema', 'temas')}`,
   netTopics: 'Temas',
   netOther: 'Outros',
   netKeywordSource: 'Palavra-chave do título',
