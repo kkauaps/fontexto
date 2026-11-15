@@ -188,6 +188,30 @@ describe('lookupOpenAccess cascade', () => {
     expect(r.status).toBe('not_found');
   });
 
+  it('resolves a bilingual no-DOI hit to the sibling record that has a DOI and PDF', async () => {
+    const pt = 'Indice de lumen para o crescimento ficticio modelado';
+    const bilingual = {
+      id: 'https://openalex.org/W-stub',
+      doi: null,
+      display_name: `${TITLE}. ${pt}`,
+      title: `${TITLE}. ${pt}`,
+      publication_year: 2021,
+      authorships: [{ author: { display_name: 'Ada Quillfeather' } }],
+      best_oa_location: null,
+      locations: [],
+    };
+    const { f, calls } = mockFetch(
+      (u) => (u.startsWith('https://api.openalex.org/works?') && u.includes('has_doi') ? json({ results: [WORK] }) : undefined),
+      (u) => (u.startsWith('https://api.openalex.org/works?') ? json({ results: [bilingual] }) : undefined),
+      s2none,
+    );
+    const r = await lookupOpenAccess({ title: pt, year: 2021, author: 'Quillfeather' }, f);
+    expect(r.status).toBe('oa');
+    expect(r.doi).toBe(DOI);
+    expect(r.pdfUrls[0]?.url).toBe('https://journal.example.org/lumen.pdf');
+    expect(calls.some((c) => c.url.includes('has_doi'))).toBe(true);
+  });
+
   it('asks arXiv by title only when nothing else gave a PDF', async () => {
     const atom = `<feed><entry><id>http://arxiv.org/abs/2101.00001v1</id><title>Lumen Index: Synthetic Benchmarks for Moss
       Growth Modelling</title></entry></feed>`;

@@ -19,4 +19,23 @@ describe('bibliographic title lookup', () => {
     expect(wrong).toBeLessThan(0.75);
     expect(titleSimilarity(q.title, 'Lumen Index for Fictional Growth')).toBeGreaterThan(0.85);
   });
+
+  it('matches a bilingual catalog title that contains the queried title', () => {
+    const q = { title: 'Indice de lumen para o crescimento ficticio', year: 2021, author: 'Quillfeather' };
+    const catalog = 'Lumen index for fictional growth. Indice de lumen para o crescimento ficticio';
+    expect(titleSimilarity(q.title, catalog)).toBeGreaterThan(0.85);
+    expect(scoreBibliographicMatch(q, catalog, ['Ada Quillfeather'], 2021)).toBeGreaterThan(0.9);
+  });
+
+  it('matches a translated catalog title when author and year agree', () => {
+    const q = { title: 'Indice de lumen para o crescimento ficticio modelado', year: 2021, author: 'Quillfeather' };
+    const catalog = 'Lumen index for modeled fictional growth';
+    expect(scoreBibliographicMatch(q, catalog, ['Ada Quillfeather'], 2021)).toBeGreaterThanOrEqual(0.82);
+  });
+
+  it('does not accept a weak title overlap even with the same author and year', () => {
+    const q = { title: 'Lumen Index for Fictional Growth', year: 2021, author: 'Quillfeather' };
+    const other = 'Survey of fictional methods for lumen analysis';
+    expect(scoreBibliographicMatch(q, other, ['Ada Quillfeather'], 2021)).toBeLessThan(0.8);
+  });
 });

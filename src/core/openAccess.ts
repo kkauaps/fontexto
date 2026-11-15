@@ -134,13 +134,47 @@ export function normalizeBibliographicTitle(title: string): string {
   return t.trim();
 }
 
-export function titleSimilarity(a: string, b: string): number {
-  const x = tokens(a);
-  const y = tokens(b);
-  if (!x.size || !y.size) return 0;
+/** Same stem or a long shared prefix, so Latinate pairs like "lumen"/"lumen" and "fictional"/"ficticio" count. */
+export function tokensClose(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (a.length < 5 || b.length < 5) return false;
+  if (a.startsWith(b) || b.startsWith(a)) return true;
+  const norm = (t: string) => t.replace(/h/g, '');
+  const x = norm(a);
+  const y = norm(b);
+  if (x === y) return true;
+  if (x.length >= 5 && y.length >= 5 && (x.startsWith(y) || y.startsWith(x) || x.slice(0, 5) === y.slice(0, 5))) return true;
+  return false;
+}
+
+function tokenOverlap(a: string, b: string, minLen = 0): { inter: number; x: Set<string>; y: Set<string> } {
+  const keep = (t: string) => t.length >= minLen;
+  const x = new Set([...tokens(a)].filter(keep));
+  const y = new Set([...tokens(b)].filter(keep));
+  const yList = [...y];
+  const used = new Set<number>();
   let inter = 0;
-  for (const t of x) if (y.has(t)) inter++;
-  return inter / Math.max(x.size, y.size);
+  for (const t of x) {
+    const i = yList.findIndex((u, k) => !used.has(k) && tokensClose(t, u));
+    if (i >= 0) {
+      used.add(i);
+      inter++;
+    }
+  }
+  return { inter, x, y };
+}
+
+/**
+ * Token overlap between two titles. A long title that fully contains a shorter one (bilingual catalog
+ * records that prepend an English translation) scores as a match, not a miss.
+ */
+export function titleSimilarity(a: string, b: string): number {
+  const { inter, x, y } = tokenOverlap(a, b);
+  if (!x.size || !y.size) return 0;
+  const jaccardMax = inter / Math.max(x.size, y.size);
+  const containment = inter / Math.min(x.size, y.size);
+  if (Math.min(x.size, y.size) >= 4 && containment >= 0.8) return Math.max(jaccardMax, 0.75 + 0.25 * containment);
+  return jaccardMax;
 }
 
 const ARXIV_NEW_RE = /^\d{4}\.\d{4,5}$/;
@@ -322,8 +356,8 @@ export const oaCacheKey = (q: OaQuery) =>
   q.doi ? `v4|doi|${q.doi}` : q.arxiv ? `v4|arxiv|${q.arxiv}` : `v4|t|${fold(q.title ?? '')}|${q.year ?? ''}|${fold(q.author ?? '')}${q.kind ? `|${q.kind}` : ''}`;
 
 /** OpenAlex `filter=` for a title search: ±1 year, or for theses type:dissertation with ±2 years. */
-export function openAlexTitleFilter(q: OaQuery): string {
-  const parts: string[] = [];
+export function openAlexTitleFilter(q: OaQuery, extra: string[] = []): string {
+  const parts: string[] = [...extra];
   if (q.kind === 'thesis') parts.push('type:dissertation');
   const w = q.kind === 'thesis' ? 2 : 1;
   if (q.year) parts.push(`publication_year:${q.year - w}-${q.year + w}`);
@@ -477,13 +511,14 @@ export function emailIn(texts: (string | null | undefined)[]): string | undefine
 function crossrefToWork(m: {
   DOI?: string;
   title?: string[];
+  'original-title'?: string[];
   URL?: string;
   issued?: { 'date-parts'?: number[][] };
   author?: { given?: string; family?: string }[];
   link?: { URL?: string; 'content-type'?: string }[];
   license?: { URL?: string }[];
 }): OpenAlexWork {
-  const title = m.title?.[0];
+  const title = [...(m.title ?? []), ...(m['original-title'] ?? [])].filter(Boolean).join(' ') || undefined;
   const year = m.issued?.['date-parts']?.[0]?.[0];
   const doi = m.DOI?.toLowerCase();
   // Crossref "link" entries are often text-mining links behind a licence: only trust them for CC-licensed works
@@ -495,6 +530,7 @@ function crossrefToWork(m: {
     id: '',
     doi: doi ? `https://doi.org/${doi}` : null,
     title,
+    display_name: title,
     publication_year: year ?? null,
     authorships: (m.author ?? []).map((a) => ({ author: { display_name: [a.given, a.family].filter(Boolean).join(' ') } })),
     primary_location: { landing_page_url: m.URL ?? null },
@@ -511,28 +547,42 @@ export function scoreBibliographicMatch(
 ): number {
   const qt = normalizeBibliographicTitle(q.title ?? '');
   if (!qt) return 0;
-  let s = titleSimilarity(qt, normalizeBibliographicTitle(title));
+  const nt = normalizeBibliographicTitle(title);
+  let s = titleSimilarity(qt, nt);
   const author = q.author ? (fold(q.author).split(' ').pop() ?? '') : '';
-  if (author && authors.some((a) => fold(a).split(' ').includes(author))) s += 0.12;
+  const authorMatch = Boolean(author && authors.some((a) => fold(a).split(' ').includes(author)));
+  if (authorMatch) s += 0.12;
+  let yearClose = false;
   if (q.year && year != null) {
     const delta = Math.abs(year - q.year);
-    if (delta === 0) s += 0.06;
-    else if (delta === 1) s += 0.02;
-    else if (delta > 1) s -= Math.min(0.45, 0.1 + delta * 0.02);
+    if (delta === 0) {
+      s += 0.06;
+      yearClose = true;
+    } else if (delta === 1) {
+      s += 0.02;
+      yearClose = true;
+    } else if (delta > 1) s -= Math.min(0.45, 0.1 + delta * 0.02);
+  }
+  // Catalogues often store only a translation. If the first author and year agree and enough
+  // Latinate title tokens line up, treat it as the same work (still below a raw 1.0 exact title).
+  if (authorMatch && yearClose) {
+    const { inter, x } = tokenOverlap(qt, nt, 4);
+    if (x.size >= 4 && inter >= 3 && inter / x.size >= 0.4) s = Math.max(s, 0.82);
   }
   return s;
 }
 
-function bestMatch<T>(items: T[], q: OaQuery, titleOf: (w: T) => string, authorsOf: (w: T) => string[], yearOf: (w: T) => number | null | undefined, min = 0.8): T | undefined {
+function bestMatch<T>(items: T[], q: OaQuery, titleOf: (w: T) => string, authorsOf: (w: T) => string[], yearOf: (w: T) => number | null | undefined, min = 0.8, prefer?: (w: T) => number): T | undefined {
   if (!q.title) return undefined;
   const author = q.author ? (fold(q.author).split(' ').pop() ?? '') : '';
-  let best: { w: T; s: number } | undefined;
+  const good: { w: T; s: number }[] = [];
   for (const w of items) {
     const s = scoreBibliographicMatch(q, titleOf(w), authorsOf(w), yearOf(w));
     if (author && s < 0.88 && !authorsOf(w).some((a) => fold(a).split(' ').includes(author))) continue;
-    if (!best || s > best.s) best = { w, s };
+    if (s >= min) good.push({ w, s });
   }
-  return best && best.s >= min ? best.w : undefined;
+  good.sort((a, b) => b.s - a.s || (prefer?.(b.w) ?? 0) - (prefer?.(a.w) ?? 0));
+  return good[0]?.w;
 }
 
 async function findWorkCrossref(ctx: Ctx, q: OaQuery): Promise<OpenAlexWork | undefined> {
@@ -542,11 +592,13 @@ async function findWorkCrossref(ctx: Ctx, q: OaQuery): Promise<OpenAlexWork | un
     return undefined;
   }
   if (!q.title) return undefined;
-  const params = new URLSearchParams({ 'query.bibliographic': q.title, rows: '8' });
+  const biblio = [q.author, q.title, q.year].filter(Boolean).join(' ');
+  const params = new URLSearchParams({ 'query.bibliographic': biblio, rows: '15' });
+  if (q.author) params.set('query.author', q.author);
   if (q.year) params.set('filter', `from-pub-date:${q.year - 1},until-pub-date:${q.year + 1}`);
   const res = await callJson<{ message?: { items?: Parameters<typeof crossrefToWork>[0][] } }>(ctx, 'Crossref', withMail(`https://api.crossref.org/works?${params.toString()}`));
   const works = (res?.message?.items ?? []).map(crossrefToWork);
-  return bestMatch(works, q, (w) => w.title ?? '', (w) => (w.authorships ?? []).map((a) => a.author?.display_name ?? ''), (w) => w.publication_year);
+  return bestMatch(works, q, workTitle, workAuthors, (w) => w.publication_year, 0.8, workPrefer);
 }
 
 async function findWorkOpenAlex(ctx: Ctx, q: OaQuery): Promise<OpenAlexWork | undefined> {
@@ -560,9 +612,25 @@ async function findWorkOpenAlex(ctx: Ctx, q: OaQuery): Promise<OpenAlexWork | un
     return undefined;
   }
   if (!q.title) return undefined;
-  const filter = openAlexTitleFilter(q);
-  const res = await callJson<{ results: OpenAlexWork[] }>(ctx, 'OpenAlex', withOpenAlexKey(ctx, `https://api.openalex.org/works?search=${encodeURIComponent(q.title)}${filter}&per-page=8`), undefined, 'OpenAlex:search');
-  return bestMatch(res?.results ?? [], q, (w) => w.title ?? w.display_name ?? '', (w) => (w.authorships ?? []).map((a) => a.author?.display_name ?? ''), (w) => w.publication_year);
+  const found = await searchOpenAlexTitle(ctx, q);
+  if (!found) return undefined;
+  // Title search often hits a language-variant record with no DOI; a sibling record has the DOI and OA PDF.
+  if (workDoi(found)) return found;
+  const resolved = await searchOpenAlexTitle(ctx, { ...q, title: workTitle(found) }, ['has_doi:true']);
+  return resolved ?? found;
+}
+
+const workTitle = (w: OpenAlexWork) => w.display_name ?? w.title ?? '';
+const workAuthors = (w: OpenAlexWork) => (w.authorships ?? []).map((a) => a.author?.display_name ?? '');
+const workDoi = (w: OpenAlexWork) => (w.doi ?? w.ids?.doi ?? '').replace(/^https?:\/\/doi\.org\//i, '').trim();
+const workPrefer = (w: OpenAlexWork) => (workDoi(w) ? 2 : 0) + (w.best_oa_location?.pdf_url ? 1 : 0);
+
+async function searchOpenAlexTitle(ctx: Ctx, q: OaQuery, extra: string[] = []): Promise<OpenAlexWork | undefined> {
+  if (!q.title) return undefined;
+  const filter = openAlexTitleFilter(q, extra);
+  const query = [q.title, q.author].filter(Boolean).join(' ');
+  const res = await callJson<{ results: OpenAlexWork[] }>(ctx, 'OpenAlex', withOpenAlexKey(ctx, `https://api.openalex.org/works?search=${encodeURIComponent(query)}${filter}&per-page=15`), undefined, 'OpenAlex:search');
+  return bestMatch(res?.results ?? [], q, workTitle, workAuthors, (w) => w.publication_year, 0.8, workPrefer);
 }
 
 function openAlexCandidates(w: OpenAlexWork, set: CandidateSet, via: OaSourceName) {
