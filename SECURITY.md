@@ -1,24 +1,37 @@
-# Política de segurança
+# Security policy
 
-O Fontexto processa documentos acadêmicos dos usuários, então tratamos relatos de segurança com prioridade.
+Fontexto processes people's academic documents, so we treat security reports as a priority.
 
-## Como relatar uma vulnerabilidade
+## Reporting a vulnerability
 
-Escreva para **security@fontexto.com** *(placeholder: edite este endereço antes de publicar; mantenha o mesmo valor em `src/web/public/.well-known/security.txt`)*.
+Email **contact@xoryn.com.br** with "Fontexto security" in the subject.
 
-- Descreva o problema, como reproduzir e o impacto que você enxerga.
-- Não abra uma issue pública com detalhes antes da correção.
-- Responderemos em até 5 dias úteis e avisamos quando houver correção. Agradecemos o crédito, se você quiser.
-- Não acesse dados de outras pessoas, não faça testes de negação de serviço e não use engenharia social.
+- Describe the problem, how to reproduce it and the impact you see.
+- Please do not open a public issue with details before a fix is out.
+- We reply within 5 business days and let you know when a fix ships. We are happy to credit you if you want.
+- Do not access other people's data, do not run denial-of-service tests and do not use social engineering.
 
-## Versões com suporte
+The same contact is published in [`/.well-known/security.txt`](https://fontexto.com/.well-known/security.txt).
 
-Só a versão publicada em `main` recebe correções de segurança.
+## Supported versions
 
-## O que o projeto faz para se proteger
+Only the version published from `main` (the one running on fontexto.com) receives security fixes.
 
-- **Tudo local.** Na versão web, os PDFs e o `.bib` são lidos no próprio navegador e não são enviados a nenhum servidor. Não há análise de uso, anúncios nem scripts, fontes ou CDNs de terceiros.
-- **CSP restrita** (`src/server/securityHeaders.ts`, gerada para `_headers` no build): sem `unsafe-inline` nem `unsafe-eval`, `connect-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`, Trusted Types para scripts. Além disso: HSTS, `nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy` negando câmera, microfone, geolocalização e afins, COOP/COEP/CORP.
-- **Texto de PDF e de `.bib` nunca vira HTML.** O React escapa tudo; não há `innerHTML` nem `dangerouslySetInnerHTML` (um teste vigia isso).
-- **pdf.js** em Web Worker, com `isEvalSupported: false`, versão corrigida para a CVE-2024-4367, fontes e decodificadores servidos pelo próprio site.
-- **Cadeia de suprimentos:** `package-lock.json` versionado, `npm ci` no build, `npm audit` sem vulnerabilidades altas ou críticas, Dependabot, ações do GitHub fixadas por SHA com permissões mínimas e CodeQL.
+## What the project does to protect users
+
+- **Local first.** In the web edition, PDFs and `.bib` files are read in your own browser and never uploaded. The only
+  network calls are the optional free-PDF and graph lookups, which send bibliographic metadata of the references (DOI,
+  title, year, first author) to the site's own `/api/oa/*` proxy, never the document itself. No analytics, ads, or
+  third-party scripts, fonts or CDNs.
+- **Strict CSP** (`src/server/securityHeaders.ts`, emitted as `_headers` at build time): no `unsafe-inline` or
+  `unsafe-eval`, `connect-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`, Trusted Types for scripts. Plus
+  HSTS, `nosniff`, `Referrer-Policy: no-referrer`, a `Permissions-Policy` that denies camera, microphone, geolocation and
+  similar, and COOP/COEP/CORP.
+- **PDF and `.bib` text never becomes HTML.** React escapes everything; there is no `innerHTML` or
+  `dangerouslySetInnerHTML` (a test guards this).
+- **pdf.js** runs in a Web Worker with `isEvalSupported: false`, on a version patched for CVE-2024-4367, with fonts and
+  decoders served by the site itself.
+- **API keys stay on the server.** Catalogue keys (`OPENALEX_API_KEY`, `CORE_API_KEY`, `S2_API_KEY`) are Cloudflare Pages
+  secrets read only by the `/api/oa/*` functions; they are never bundled into client code.
+- **Supply chain:** versioned `package-lock.json`, `npm ci` in builds, `npm audit` with no high or critical findings,
+  Dependabot, GitHub Actions pinned by SHA with minimal permissions, and CodeQL.
