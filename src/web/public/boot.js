@@ -5,7 +5,8 @@
   var q = new URLSearchParams(location.search).get('lang');
   var storedLang = null;
   try { storedLang = localStorage.getItem('fontexto:lang'); } catch (e) {}
-  var lang = map[String(q || storedLang || 'en').toLowerCase()] || 'en';
+  var m = /^\/(es|ru|pt-br)(\/|$)/i.exec(location.pathname);
+  var lang = map[String(q || (m && m[1]) || storedLang || 'en').toLowerCase()] || 'en';
   document.documentElement.lang = lang;
   var boot = { en: 'Loading Fontexto…', es: 'Cargando Fontexto…', ru: 'Загрузка Fontexto…', 'pt-BR': 'Carregando o Fontexto…' };
   var el = document.querySelector('#root .boot p');

@@ -14,10 +14,12 @@ export interface HeaderOptions {
   https: boolean;
 }
 
-export function contentSecurityPolicy(opts: HeaderOptions): string {
+/** `scriptHashes`: sha256 sources for inline data blocks (the static pages' JSON-LD), e.g. "sha256-AbC…=". */
+export function contentSecurityPolicy(opts: HeaderOptions, scriptHashes: string[] = []): string {
+  for (const h of scriptHashes) if (!/^sha256-[A-Za-z0-9+/]{43}=$/.test(h)) throw new Error(`invalid CSP hash: ${h}`);
   const d = [
     "default-src 'self'",
-    "script-src 'self' 'wasm-unsafe-eval'",
+    ["script-src 'self' 'wasm-unsafe-eval'", ...scriptHashes.map((h) => `'${h}'`)].join(' '),
     "style-src 'self'",
     "img-src 'self' data: blob:",
     "font-src 'self'",

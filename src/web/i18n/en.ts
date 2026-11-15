@@ -59,6 +59,7 @@ export const en = {
   openProject: 'Open a project',
   createdOn: (date: string) => `created on ${date}`,
   footerNote: 'The label on each citation is a reading aid, not proof. Always check the passage in the source.',
+  siteLinks: { label: 'Site', about: 'About', howItWorks: 'How it works', faq: 'FAQ', privacy: 'Privacy', oaSources: 'Open-access sources' },
 
   // App chrome
   backHomeAria: 'Fontexto: back to the start',

@@ -3,7 +3,7 @@ import { BRAND } from '../brand';
 import { HeaderControls } from './HeaderControls';
 import { BrandMark } from './BrandMark';
 import { HeroPreview } from './HeroPreview';
-import { formatDate, privacyNote, useI18n } from '../i18n';
+import { formatDate, privacyNote, sitePath, useI18n } from '../i18n';
 
 export type FlowMode = 'doc' | 'bib' | 'nobib';
 
@@ -112,6 +112,13 @@ export function Landing({ projects, error, onStart, onOpen }: Props) {
         <span>
           {BRAND.name} · {t.footerNote}
         </span>
+        <nav className="lp-footer-links" aria-label={t.siteLinks.label}>
+          <a href={sitePath(locale, 'about')}>{t.siteLinks.about}</a>
+          <a href={sitePath(locale, 'how-it-works')}>{t.siteLinks.howItWorks}</a>
+          <a href={sitePath(locale, 'faq')}>{t.siteLinks.faq}</a>
+          <a href={sitePath(locale, 'privacy')}>{t.siteLinks.privacy}</a>
+          <a href={sitePath(locale, 'open-access-sources')}>{t.siteLinks.oaSources}</a>
+        </nav>
       </footer>
     </div>
   );

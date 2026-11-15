@@ -48,10 +48,29 @@ export function parseLocale(raw: string | null | undefined): Locale | undefined 
   return ALIASES[raw.trim().toLowerCase()];
 }
 
-export function detectLocale(search = typeof window === 'undefined' ? '' : window.location.search): Locale {
+/** Home page of each language on the public site ("/" is English, the default). */
+export const LOCALE_PATH: Record<Locale, string> = { en: '/', es: '/es/', ru: '/ru/', 'pt-BR': '/pt-br/' };
+
+/** Locale of a language-prefixed public page ("/es/", "/pt-br/faq/"), or undefined for English/unprefixed paths. */
+export function localeFromPath(pathname: string): Locale | undefined {
+  const m = /^\/(es|ru|pt-br)(\/|$)/i.exec(pathname);
+  return m ? parseLocale(m[1]) : undefined;
+}
+
+/** Link to a static page of the public site in a given language ("faq" -> "/es/faq/"). */
+export function sitePath(locale: Locale, slug = ''): string {
+  return LOCALE_PATH[locale] + (slug ? `${slug}/` : '');
+}
+
+export function detectLocale(
+  search = typeof window === 'undefined' ? '' : window.location.search,
+  pathname = typeof window === 'undefined' ? '/' : window.location.pathname,
+): Locale {
   try {
     const fromQuery = parseLocale(new URLSearchParams(search).get('lang'));
     if (fromQuery) return fromQuery;
+    const fromPath = localeFromPath(pathname);
+    if (fromPath) return fromPath;
     if (typeof localStorage !== 'undefined') {
       const fromStore = parseLocale(localStorage.getItem(LANG_STORAGE_KEY));
       if (fromStore) return fromStore;
@@ -127,8 +146,8 @@ interface I18nValue {
 
 const I18nContext = createContext<I18nValue>({ locale: DEFAULT_LOCALE, t: en, setLocale: () => undefined });
 
-export function LocaleProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(() => detectLocale());
+export function LocaleProvider({ children, initial }: { children: ReactNode; initial?: Locale }) {
+  const [locale, setLocaleState] = useState<Locale>(() => initial ?? detectLocale());
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);
     persistLocale(next);

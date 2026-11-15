@@ -93,8 +93,18 @@ const selfHostedAssets = (web: boolean): Plugin => ({
   },
 });
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, isSsrBuild }) => {
   const web = mode === 'web';
+  // `vite build --mode web --ssr prerender.tsx`: build-time landing prerender for the public site (Node only).
+  if (isSsrBuild) {
+    return {
+      root: 'src/web',
+      define: { __EDITION__: JSON.stringify('web') },
+      plugins: [react()],
+      publicDir: false,
+      build: { outDir: '../../dist/prerender', emptyOutDir: true, ssr: true },
+    };
+  }
   return {
   root: 'src/web',
   define: { __EDITION__: JSON.stringify(web ? 'web' : 'local') },

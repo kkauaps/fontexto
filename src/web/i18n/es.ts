@@ -59,6 +59,7 @@ export const es: Messages = {
   openProject: 'Abrir un proyecto',
   createdOn: (date: string) => `creado el ${date}`,
   footerNote: 'La etiqueta de cada cita es una ayuda de lectura, no una prueba. Revisa siempre el pasaje en la fuente.',
+  siteLinks: { label: 'Sitio', about: 'Acerca de', howItWorks: 'Cómo funciona', faq: 'Preguntas frecuentes', privacy: 'Privacidad', oaSources: 'Fuentes de acceso abierto' },
 
   backHomeAria: 'Fontexto: volver al inicio',
   backHomeTitle: 'Volver al inicio',

@@ -66,6 +66,7 @@ export const ru: Messages = {
   openProject: 'Открыть проект',
   createdOn: (date: string) => `создан ${date}`,
   footerNote: 'Метка у каждой ссылки — подсказка для чтения, а не доказательство. Всегда сверяйте фрагмент в источнике.',
+  siteLinks: { label: 'Сайт', about: 'О проекте', howItWorks: 'Как это работает', faq: 'Вопросы и ответы', privacy: 'Конфиденциальность', oaSources: 'Источники открытого доступа' },
 
   backHomeAria: 'Fontexto: вернуться в начало',
   backHomeTitle: 'Вернуться в начало',

@@ -1,1 +1,16 @@
-{"name":"Fontexto","short_name":"Fontexto","icons":[{"src":"icon-192.png","sizes":"192x192","type":"image/png"},{"src":"icon-512.png","sizes":"512x512","type":"image/png"}],"theme_color":"#065F46","background_color":"#ffffff","display":"standalone"}
+{
+  "id": "/",
+  "name": "Fontexto",
+  "short_name": "Fontexto",
+  "description": "Each citation in your document linked to the exact passage in the source.",
+  "lang": "en",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#065F46",
+  "background_color": "#ECEEF1",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

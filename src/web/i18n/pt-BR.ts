@@ -58,6 +58,7 @@ export const ptBR: Messages = {
   openProject: 'Abrir projeto',
   createdOn: (date: string) => `criado em ${date}`,
   footerNote: 'O rótulo de cada citação é um apoio à leitura, não uma prova. Confira sempre o trecho na fonte.',
+  siteLinks: { label: 'Site', about: 'Sobre', howItWorks: 'Como funciona', faq: 'Perguntas frequentes', privacy: 'Privacidade', oaSources: 'Fontes de acesso aberto' },
 
   backHomeAria: 'Fontexto: voltar ao início',
   backHomeTitle: 'Voltar ao início',

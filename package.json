@@ -20,7 +20,7 @@
     "demo:seed": "tsx src/server/devtools/seedDemo.ts",
     "package:win": "npm run build && node scripts/package-win.mjs",
     "fetch-model": "node scripts/fetch-model.mjs",
-    "build:site": "vite build --mode web",
+    "build:site": "vite build --mode web && vite build --mode web --ssr prerender.tsx && tsx scripts/build-site-pages.ts",
     "deploy:site": "npm run build:site && wrangler pages deploy dist/site --project-name=fontexto --commit-dirty=true",
     "fetch-tessdata": "node scripts/fetch-tessdata.mjs"
   },
