@@ -7,6 +7,8 @@ import { api, edition, type ProjectSummary } from './api';
 import { Landing, type FlowMode } from './components/Landing';
 import { UploadFlow } from './components/UploadFlow';
 import { BackPill, HeaderControls } from './components/HeaderControls';
+import { MobileBottomNav, type MobileAppTab } from './components/MobileBottomNav';
+import { isPhoneWidth } from './fit';
 import { BrandMark } from './components/BrandMark';
 import { SetupChecklist } from './components/SetupChecklist';
 import { occurrencesByPublication } from '../core/evidenceView';
@@ -61,6 +63,22 @@ export function App() {
   const [error, setError] = useState<string | undefined>();
   const [externalAvailable, setExternalAvailable] = useState(false);
   const [flow, setFlow] = useState<FlowMode | undefined>();
+  const [phone, setPhone] = useState(() => isPhoneWidth());
+  const [phoneTab, setPhoneTab] = useState<MobileAppTab>('doc');
+  const [sourceRequest, setSourceRequest] = useState<OpenRequest | undefined>();
+
+  useEffect(() => {
+    const onResize = () => setPhone(isPhoneWidth());
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const openReference = useCallback((r: OpenRequest) => {
+    if (isPhoneWidth()) {
+      setSourceRequest(r);
+      setPhoneTab('source');
+    } else setViewer(r);
+  }, []);
 
   useEffect(() => {
     api.health().then(
@@ -109,6 +127,8 @@ export function App() {
   const showInDocument = useCallback((pubId?: string) => {
     setDocFocus((f) => ({ pubId, nonce: (f?.nonce ?? 0) + 1 }));
     setDocMode(true);
+    setTab('doc');
+    if (isPhoneWidth()) setPhoneTab('doc');
   }, []);
 
   useEffect(() => {
@@ -254,10 +274,10 @@ export function App() {
           </span>
         )}
         {tab === 'graph' && <button onClick={() => setLayoutNonce((n) => n + 1)}>{t.relayout}</button>}
-        <button className="primary" onClick={() => setPanelOpen(true)}>
+        <button className="primary topbar-files" onClick={() => setPanelOpen(true)}>
           {t.filesAndReview}
         </button>
-        <HeaderControls />
+        <HeaderControls onFiles={phone ? () => setPanelOpen(true) : undefined} onGraph={phone ? showGraph : undefined} />
       </header>
       {error && (
         <div className="notice error" onClick={() => setError(undefined)}>
@@ -269,14 +289,14 @@ export function App() {
           <span className="spinner" /> {t.loadingProject}
         </div>
       )}
-      {docMode && graph && (
+      {((phone && phoneTab === 'doc') || (!phone && docMode)) && graph && (
         <div className="main">
           <DocumentView
             projectId={projectId}
             graph={graph}
             evidence={evidence}
             focus={docFocus}
-            onOpenReference={setViewer}
+            onOpenReference={openReference}
             onShowInGraph={(pubId) => {
               setDocMode(false);
               setSelection({ type: 'node', id: pubId });
@@ -287,7 +307,7 @@ export function App() {
           />
         </div>
       )}
-      {tab === 'refs' && graph && (
+      {((phone && phoneTab === 'refs') || (!phone && tab === 'refs')) && graph && (
         <div className="main">
           <ReferencesView
             projectId={projectId}
@@ -296,13 +316,28 @@ export function App() {
             oa={oa}
             setOa={setOa}
             onGraph={setGraph}
-            onOpen={setViewer}
+            onOpen={openReference}
             onShowInDocument={showInDocument}
             onShowInGraph={(pubId) => {
               showGraph();
               setSelection({ type: 'node', id: pubId });
             }}
           />
+        </div>
+      )}
+      {phone && phoneTab === 'source' && graph && (
+        <div className="main main-source">
+          {sourceRequest ? (
+            <PdfViewer projectId={projectId} request={sourceRequest} embedded onClose={() => setPhoneTab('doc')} />
+          ) : (
+            <div className="doc-empty">
+              <h2>{t.tabSourceEmpty}</h2>
+              <p className="muted">{t.tabSourceEmptyHint}</p>
+              <button type="button" className="primary" onClick={() => setPhoneTab('refs')}>
+                {t.tabReferences}
+              </button>
+            </div>
+          )}
         </div>
       )}
       {tab === 'graph' && (
@@ -383,7 +418,7 @@ export function App() {
           )}
         </div>
       )}
-      {viewer && <PdfViewer projectId={projectId} request={viewer} backLabel={backLabel} onClose={() => setViewer(undefined)} />}
+      {viewer && !phone && <PdfViewer projectId={projectId} request={viewer} backLabel={backLabel} onClose={() => setViewer(undefined)} />}
       {panelOpen && graph && (
         <ProjectPanel
           projectId={projectId}
@@ -391,7 +426,7 @@ export function App() {
           externalAvailable={externalAvailable}
           onGraph={setGraph}
           onOpen={(r) => {
-            setViewer(r);
+            openReference(r);
           }}
           onClose={() => setPanelOpen(false)}
           onDeleted={() => {
@@ -402,17 +437,31 @@ export function App() {
           }}
         />
       )}
-      <nav className="m-tabs" role="tablist" aria-label={t.views}>
-        <button type="button" role="tab" aria-selected={tab === 'doc'} className={tab === 'doc' ? 'on' : ''} onClick={() => setTab('doc')}>
-          {t.tabDocument}
-        </button>
-        <button type="button" role="tab" aria-selected={tab === 'refs'} className={tab === 'refs' ? 'on' : ''} onClick={() => setTab('refs')}>
-          {t.tabReferences}
-        </button>
-        <button type="button" role="tab" aria-selected={tab === 'graph'} className={tab === 'graph' ? 'on' : ''} onClick={showGraph}>
-          {t.tabGraph}
-        </button>
-      </nav>
+      {phone && tab !== 'graph' ? (
+        <MobileBottomNav
+          tab={phoneTab}
+          onTab={(next) => {
+            setPhoneTab(next);
+            if (next === 'doc') {
+              setDocMode(true);
+              setTab('doc');
+            }
+            if (next === 'refs') setTab('refs');
+          }}
+        />
+      ) : !phone ? (
+        <nav className="m-tabs" role="tablist" aria-label={t.views}>
+          <button type="button" role="tab" aria-selected={tab === 'doc'} className={tab === 'doc' ? 'on' : ''} onClick={() => setTab('doc')}>
+            {t.tabDocument}
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'refs'} className={tab === 'refs' ? 'on' : ''} onClick={() => setTab('refs')}>
+            {t.tabReferences}
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'graph'} className={tab === 'graph' ? 'on' : ''} onClick={showGraph}>
+            {t.tabGraph}
+          </button>
+        </nav>
+      ) : null}
     </div>
   );
 }

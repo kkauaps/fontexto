@@ -1,4 +1,5 @@
 import { SemanticNotice } from './SemanticNotice';
+import { BottomSheet } from './BottomSheet';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EvidenceReport } from '../../core/evidence';
 import type { CitationGraph } from '../../core/model';
@@ -146,6 +147,15 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
   const [scrollNonce, setScrollNonce] = useState(0);
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
   const scrollerRef = useCallback((el: HTMLDivElement | null) => setScroller(el), []);
+  const [phone, setPhone] = useState(() => isPhoneWidth());
+  const [filterSheet, setFilterSheet] = useState(false);
+  const [citSheet, setCitSheet] = useState(false);
+  const [hideNotices, setHideNotices] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    const onResize = () => setPhone(isPhoneWidth());
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const labelOf = useCallback((id: string) => graph.nodes[id]?.label ?? id, [graph]);
   const groups = useMemo(() => (evidence ? groupOccurrences(evidence) : []), [evidence]);
@@ -246,7 +256,8 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
   const select = useCallback((spanId: string | undefined, jump = false) => {
     setSelected(spanId);
     if (jump && spanId) setScrollNonce((x) => x + 1);
-  }, []);
+    if (phone && spanId) setCitSheet(true);
+  }, [phone]);
 
   // bring the selected citation into view (the page may still be rendering)
   useEffect(() => {
@@ -299,19 +310,45 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
   const hasBib = Object.values(graph.files).some((f) => f.role === 'bibtex');
   const refsWithoutPdf = evidence.summary.semPdf;
 
+  const chipRows = ([
+    ['all', t.all],
+    ['localizado', evidenceStatusText(t, 'localizado')],
+    ['ressalva', evidenceStatusText(t, 'ressalva')],
+    ['nao_localizado', evidenceStatusText(t, 'nao_localizado')],
+    ['sem_pdf', evidenceStatusText(t, 'sem_pdf')],
+    ['unresolved', evidenceStatusText(t, 'unresolved')],
+  ] as [StatusFilter, string][]);
+
   return (
-    <div className="docview">
+    <div className={`docview${phone ? ' docview-phone' : ''}`}>
       <div className="doc-main">
+        {phone && (
+          <div className="doc-float-bar" role="toolbar" aria-label={t.tabDocument}>
+            <button type="button" className="doc-float-btn" onClick={() => setFilterSheet(true)}>
+              {t.mobileFilters}
+            </button>
+            <button type="button" className="doc-float-btn" onClick={() => setCitSheet(true)} disabled={filtered.length === 0}>
+              {t.mobileCitationList} ({filtered.length})
+            </button>
+            <span className="doc-nav doc-nav-float">
+              <button type="button" onClick={() => step(-1)} disabled={filtered.length === 0} title={t.previousCitation}>
+                ‹
+              </button>
+              <button type="button" onClick={() => step(1)} disabled={filtered.length === 0} title={t.nextCitation}>
+                ›
+              </button>
+              <button type="button" onClick={() => setScale((s) => Math.max(0.4, +(s - 0.15).toFixed(2)))} title={t.zoomOut}>
+                −
+              </button>
+              <button type="button" onClick={() => setScale((s) => Math.min(2.4, +(s + 0.15).toFixed(2)))} title={t.zoomIn}>
+                +
+              </button>
+            </span>
+          </div>
+        )}
         <div className="doc-toolbar">
           <div className="doc-chips" role="group" aria-label={t.filterByStatus}>
-            {([
-              ['all', t.all],
-              ['localizado', evidenceStatusText(t, 'localizado')],
-              ['ressalva', evidenceStatusText(t, 'ressalva')],
-              ['nao_localizado', evidenceStatusText(t, 'nao_localizado')],
-              ['sem_pdf', evidenceStatusText(t, 'sem_pdf')],
-              ['unresolved', evidenceStatusText(t, 'unresolved')],
-            ] as [StatusFilter, string][]).map(([key, label]) => (
+            {chipRows.map(([key, label]) => (
               <button key={key} className={`chip-filter st-${key}${status === key ? ' on' : ''}`} onClick={() => setStatus(key)} aria-pressed={status === key}>
                 {label} <b>{counts?.[key] ?? 0}</b>
               </button>
@@ -347,23 +384,38 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
             </button>
           </span>
         </div>
-        {!hasBib && (
-          <div className="notice">
+        {!hasBib && !hideNotices.bib && (
+          <div className="notice notice-dismiss">
+            <button type="button" className="notice-x" aria-label={t.close} onClick={() => setHideNotices((h) => ({ ...h, bib: true }))}>
+              ×
+            </button>
             {t.noBibNotice}{' '}
             <UploadButton projectId={projectId} role="reference" accept=".bib,text/plain" primary onGraph={onGraph}>
               {t.sendBib}
             </UploadButton>
           </div>
         )}
-        {hasBib && refsWithoutPdf > 0 && (
-          <div className="notice">
+        {hasBib && refsWithoutPdf > 0 && !hideNotices.missingPdf && (
+          <div className="notice notice-dismiss">
+            <button type="button" className="notice-x" aria-label={t.close} onClick={() => setHideNotices((h) => ({ ...h, missingPdf: true }))}>
+              ×
+            </button>
             {t.citationsWithoutPdf(refsWithoutPdf)}{' '}
             <UploadButton projectId={projectId} role="reference" accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" multiple onGraph={onGraph}>
               {t.findOrSendPdfs}
             </UploadButton>
           </div>
         )}
-        {hasBib && evidence.summary.occurrences > 0 && <SemanticNotice projectId={projectId} method={evidence.method} onGraph={onGraph} />}
+        {hasBib && evidence.summary.occurrences > 0 && !hideNotices.semantic && (
+          <div className="semantic-wrap">
+            <SemanticNotice projectId={projectId} method={evidence.method} onGraph={onGraph} />
+            {phone && (
+              <button type="button" className="notice-x notice-x-float" aria-label={t.close} onClick={() => setHideNotices((h) => ({ ...h, semantic: true }))}>
+                ×
+              </button>
+            )}
+          </div>
+        )}
         {docError && <div className="notice error">{translateRuntime(t, docError)}</div>}
         <div className="doc-pages" ref={scrollerRef}>
           {doc ? (
@@ -395,6 +447,52 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
           <CitationList groups={filtered} graph={graph} onSelect={(id) => select(id, true)} method={evidence.method} />
         )}
       </aside>
+      {phone && (
+        <>
+          <BottomSheet open={filterSheet} onClose={() => setFilterSheet(false)} title={t.mobileFilters} className="doc-filter-sheet">
+            <div className="doc-chips" role="group" aria-label={t.filterByStatus}>
+              {chipRows.map(([key, label]) => (
+                <button key={key} className={`chip-filter st-${key}${status === key ? ' on' : ''}`} onClick={() => setStatus(key)} aria-pressed={status === key}>
+                  {label} <b>{counts?.[key] ?? 0}</b>
+                </button>
+              ))}
+            </div>
+            <select value={pubFilter ?? ''} onChange={(e) => setPubFilter(e.target.value || undefined)} aria-label={t.filterByReference}>
+              <option value="">{t.allReferences}</option>
+              {pubOptions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label} ({p.n})
+                </option>
+              ))}
+            </select>
+            <input className="doc-sheet-search" type="search" placeholder={t.searchInSentenceOrRef} value={search} onChange={(e) => setSearch(e.target.value)} />
+          </BottomSheet>
+          <BottomSheet open={citSheet} onClose={() => setCitSheet(false)} title={t.mobileCitationList} className="doc-cit-sheet">
+            {selectedGroup ? (
+              <CitationPanel
+                key={selectedGroup.spanId}
+                projectId={projectId}
+                graph={graph}
+                group={selectedGroup}
+                method={evidence.method}
+                onBack={() => {
+                  select(undefined);
+                  setCitSheet(false);
+                }}
+                onOpenReference={(r) => {
+                  onOpenReference(r);
+                  setCitSheet(false);
+                }}
+                onShowInGraph={onShowInGraph}
+                onOpenFiles={onOpenFiles}
+                onLabel={async (occId, status) => onEvidence(await api.evidenceLabel(projectId, occId, status))}
+              />
+            ) : (
+              <CitationList groups={filtered} graph={graph} onSelect={(id) => select(id, true)} method={evidence.method} />
+            )}
+          </BottomSheet>
+        </>
+      )}
     </div>
   );
 }

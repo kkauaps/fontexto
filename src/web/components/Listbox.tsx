@@ -129,6 +129,7 @@ export function Listbox<T extends string>({ value, options, onChange, ariaLabel,
         <span className="lb-value">{selected?.label ?? value}</span>
         <span className="lb-chevron" aria-hidden="true" />
       </button>
+      {open && phone && <button type="button" className="lb-scrim" aria-label="Close" onClick={() => setOpen(false)} />}
       {open && (
         <ul
           ref={listRef}

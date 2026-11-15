@@ -64,7 +64,7 @@ function LanguagePill({ block }: { block?: boolean }) {
 /**
  * Theme + language, the same on every screen: two matching glass pills on wide screens, one "⋯" menu on phones.
  */
-export function HeaderControls() {
+export function HeaderControls({ onFiles, onGraph }: { onFiles?: () => void; onGraph?: () => void } = {}) {
   const { t } = useI18n();
   const menu = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
@@ -97,6 +97,16 @@ export function HeaderControls() {
           <ThemePill block />
           <span className="hdr-menu-label">{t.language}</span>
           <LanguagePill block />
+          {onFiles && (
+            <button type="button" className="hdr-pill hdr-menu-action" onClick={onFiles}>
+              {t.filesAndReview}
+            </button>
+          )}
+          {onGraph && (
+            <button type="button" className="hdr-pill hdr-menu-action" onClick={onGraph}>
+              {t.tabGraph}
+            </button>
+          )}
         </div>
       </details>
     </div>

@@ -16,6 +16,16 @@ describe('phone fit scale', () => {
   });
 });
 
+describe('mobile chrome CSS contracts', () => {
+  it('documents the phone-first viewer classes', async () => {
+    const css = await import('node:fs/promises').then((fs) => fs.readFile(new URL('../src/web/styles.css', import.meta.url), 'utf8'));
+    expect(css).toContain('.docview-phone');
+    expect(css).toContain('.viewer-embedded');
+    expect(css).toContain('.bottom-sheet');
+    expect(css).toContain('--glass-panel');
+  });
+});
+
 describe('narrow star layout', () => {
   const node = (id: string, kind: ViewNode['kind'], refStatus?: ViewNode['refStatus']) =>
     ({ id, kind, label: id, inDegree: 1, refStatus }) as unknown as ViewNode;
