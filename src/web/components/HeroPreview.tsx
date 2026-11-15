@@ -12,13 +12,13 @@ export function HeroPreview() {
             <div className="mini-kicker">{h.kicker}</div>
             <div className="ttl">{h.title}</div>
             <p>
-              {h.p1} <span className="hl-warn hl-sel">(Silva et al., 2024)</span>. {h.p1b}
+              {h.p1} <span className="hl-warn hl-sel">{h.c1}</span>. {h.p1b}
             </p>
             <p>
-              {h.p2} <span className="hl-ok">(Silva et al., 2024)</span>, {h.p2b} <span className="hl-ok">(Doe &amp; Lee, 2023)</span>.
+              {h.p2} <span className="hl-ok">{h.c2}</span>, {h.p2b} <span className="hl-ok">{h.c3}</span>.
             </p>
             <p>
-              {h.p3} <span className="hl-ok">(Chen et al., 2022; Park, 2021)</span>.
+              {h.p3} <span className="hl-ok">{h.c4}</span>.
             </p>
           </div>
         </div>
@@ -26,24 +26,30 @@ export function HeroPreview() {
           <div className="k">{t.allCitations}</div>
           <div className="mini-card">
             <div className="mini-card-h">
-              <b>Silva et al. (2024)</b>
+              <b>{h.s1}</b>
               <span className="mini-pill warn">{t.statusCaveat}</span>
             </div>
-            <p>“{h.q1}” · p. 3</p>
+            <p>
+              “{h.q1}” · {t.pageAbbr} 3
+            </p>
           </div>
           <div className="mini-card">
             <div className="mini-card-h">
-              <b>Doe &amp; Lee (2023)</b>
+              <b>{h.s2}</b>
               <span className="mini-pill ok">{t.statusLocated}</span>
             </div>
-            <p>“{h.q2}” · p. 5</p>
+            <p>
+              “{h.q2}” · {t.pageAbbr} 5
+            </p>
           </div>
           <div className="mini-card">
             <div className="mini-card-h">
-              <b>Chen et al. (2022)</b>
+              <b>{h.s3}</b>
               <span className="mini-pill ok">{t.statusLocated}</span>
             </div>
-            <p>“{h.q3}” · p. 2</p>
+            <p>
+              “{h.q3}” · {t.pageAbbr} 2
+            </p>
           </div>
         </div>
       </div>
