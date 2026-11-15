@@ -167,6 +167,7 @@ export const ja: SiteContent = {
           p: ['OA コピーに関する質問：oa@fontexto.com。セキュリティ：contact@xoryn.com.br。'],
         },
       ],
+      credit: 'Pablo Kauã（[@kkauaps](https://github.com/kkauaps)）が作成しました',
     },
     privacy: {
       nav: 'プライバシー',

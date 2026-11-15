@@ -166,6 +166,7 @@ export const ru: SiteContent = {
           p: ['Вопросы о копиях в открытом доступе: oa@fontexto.com. Сообщения о безопасности: contact@xoryn.com.br.'],
         },
       ],
+      credit: 'Создано Pablo Kauã ([@kkauaps](https://github.com/kkauaps))',
     },
     privacy: {
       nav: 'Конфиденциальность',

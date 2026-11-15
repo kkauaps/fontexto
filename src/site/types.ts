@@ -32,6 +32,8 @@ export interface SitePage {
   faq?: FaqItem[];
   /** Short name in breadcrumbs and menus. */
   nav: string;
+  /** Optional discreet credit line at the end of the article (About only). Supports [label](https://url). */
+  credit?: string;
 }
 
 export interface SiteChrome {

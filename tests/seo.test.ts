@@ -56,12 +56,42 @@ describe('head tags', () => {
 });
 
 describe('structured data', () => {
-  it('home: Organization, WebSite, a free EducationalApplication under the AGPL, WebPage', () => {
+  const person = {
+    '@type': 'Person',
+    '@id': 'https://fontexto.com/#author',
+    name: 'Pablo Kauã',
+    alternateName: 'kkauaps',
+    url: 'https://github.com/kkauaps',
+    sameAs: ['https://github.com/kkauaps', 'https://x.com/kkauaps', 'https://www.threads.net/@kkauaps'],
+  };
+  const authorRef = { author: { '@id': 'https://fontexto.com/#author' }, creator: { '@id': 'https://fontexto.com/#author' } };
+
+  it('home: Organization, author Person, WebSite, a free EducationalApplication under the AGPL, WebPage', () => {
     const d = structuredData('en', siteContent.en, undefined, { title: 'T', description: 'D' }) as { '@graph': Record<string, unknown>[] };
-    expect(graphTypes(d as never)).toEqual(['Organization', 'WebSite', 'WebApplication', 'WebPage']);
-    const app = d['@graph'][2];
+    expect(graphTypes(d as never)).toEqual(['Organization', 'Person', 'WebSite', 'WebApplication', 'WebPage']);
+    const [org, who, site, app] = d['@graph'];
     expect(app).toMatchObject({ applicationCategory: 'EducationalApplication', operatingSystem: 'Web', offers: { '@type': 'Offer', price: '0' }, license: 'https://www.gnu.org/licenses/agpl-3.0.html' });
-    expect(d['@graph'][0]).not.toHaveProperty('sameAs');
+    expect(org).not.toHaveProperty('sameAs');
+    expect(org).toMatchObject({ '@type': 'Organization', name: 'Fontexto' });
+    expect(who).toEqual(person);
+    expect(site).toMatchObject({ '@type': 'WebSite', publisher: { '@id': 'https://fontexto.com/#organization' }, ...authorRef });
+    expect(app).toMatchObject({ publisher: { '@id': 'https://fontexto.com/#organization' }, ...authorRef });
+  });
+
+  it('author Person is valid JSON-LD on the home page and on every content page', () => {
+    const home = structuredData('en', siteContent.en, undefined, { title: 'T', description: 'D' });
+    const parsed = JSON.parse(ldScript(home).tag.replace(/^<script type="application\/ld\+json">/, '').replace(/<\/script>$/, ''));
+    expect(parsed['@graph'].find((n: { '@type': string }) => n['@type'] === 'Person')).toEqual(person);
+    for (const lang of SITE_LANGS) {
+      for (const slug of SITE_SLUGS) {
+        const { html } = staticPage(lang, slug, siteContent, assets);
+        const data = ldOf(html).data as { '@graph': Record<string, unknown>[] };
+        expect(data['@graph'].find((n) => n['@type'] === 'Person')).toEqual(person);
+        const page = data['@graph'].find((n) => n['@type'] === 'WebPage' || n['@type'] === 'AboutPage' || n['@type'] === 'FAQPage') as Record<string, Record<string, unknown>>;
+        expect(page.isPartOf).toMatchObject(authorRef);
+        expect(page.about).toMatchObject(authorRef);
+      }
+    }
   });
   it('FAQPage only on the FAQ, with exactly the visible questions', () => {
     for (const lang of SITE_LANGS) {
@@ -72,13 +102,28 @@ describe('structured data', () => {
         expect(types).toContain('BreadcrumbList');
       }
       const faq = staticPage(lang, 'faq', siteContent, assets).html;
-      const questions = ldOf(faq).data['@graph'][0].mainEntity as { name: string }[];
+      const faqPage = ldOf(faq).data['@graph'].find((n: { '@type': string }) => n['@type'] === 'FAQPage');
+      const questions = faqPage.mainEntity as { name: string }[];
       expect(questions.length).toBe(siteContent[lang].pages.faq.faq!.length);
       for (const q of questions) expect(faq).toContain(`<h2>${q.name.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}</h2>`);
     }
   });
   it('the JSON cannot close its script element', () => {
     expect(ldScript({ x: '</script><script>alert(1)</script>' }).tag).not.toMatch(/<\/script><script>/);
+  });
+});
+
+
+describe('email addresses', () => {
+  it('wraps contact emails in mailto links and Cloudflare email_off markers', () => {
+    for (const lang of SITE_LANGS) {
+      const { html } = staticPage(lang, 'about', siteContent, assets);
+      expect(html).toContain('<!--email_off--><a href="mailto:oa@fontexto.com">oa@fontexto.com</a><!--/email_off-->');
+      expect(html).toContain('<!--email_off--><a href="mailto:contact@xoryn.com.br">contact@xoryn.com.br</a><!--/email_off-->');
+      expect(html).not.toContain('[email');
+    }
+    const faq = staticPage('en', 'faq', siteContent, assets).html;
+    expect(faq).toContain('mailto:contact@xoryn.com.br');
   });
 });
 

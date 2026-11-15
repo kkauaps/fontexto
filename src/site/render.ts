@@ -30,7 +30,13 @@ export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-/** Escaped text with **bold** and [label](slug | https://url) marks. */
+/** Escaped text with **bold** and [label](slug | https://url) marks. Emails become mailto links wrapped in Cloudflare <!--email_off--> markers so Email Obfuscation cannot rewrite them to "[email protected]". */
+export function emailOff(href: string, label: string): string {
+  return `<!--email_off--><a href="${href}">${label}</a><!--/email_off-->`;
+}
+
+const EMAIL_RE = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
+
 export function inline(text: string, lang: SiteLang): string {
   let out = escapeHtml(text);
   out = out.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
@@ -39,6 +45,7 @@ export function inline(text: string, lang: SiteLang): string {
     if (target !== '' && !(SITE_SLUGS as readonly string[]).includes(target)) throw new Error(`unknown site link target: ${target}`);
     return `<a href="${pathOf(lang, target as SiteSlug | '')}">${label}</a>`;
   });
+  out = out.replace(EMAIL_RE, (addr) => emailOff(`mailto:${addr}`, addr));
   return out;
 }
 
@@ -88,11 +95,21 @@ export function headTags(h: HeadInput): string {
 const ORG_ID = `${SITE_ORIGIN}/#organization`;
 const WEBSITE_ID = `${SITE_ORIGIN}/#website`;
 const APP_ID = `${SITE_ORIGIN}/#app`;
+const PERSON_ID = `${SITE_ORIGIN}/#author`;
+
+const AUTHOR = {
+  '@type': 'Person',
+  '@id': PERSON_ID,
+  name: 'Pablo Kauã',
+  alternateName: 'kkauaps',
+  url: 'https://github.com/kkauaps',
+  sameAs: ['https://github.com/kkauaps', 'https://x.com/kkauaps', 'https://www.threads.net/@kkauaps'],
+} as const;
 
 type Json = Record<string, unknown>;
 
 function organization(): Json {
-  // sameAs is omitted on purpose: there is no public profile to point to yet.
+  // sameAs is omitted on the organization: public profiles belong to the author Person below.
   return {
     '@type': 'Organization',
     '@id': ORG_ID,
@@ -103,8 +120,21 @@ function organization(): Json {
   };
 }
 
+function person(): Json {
+  return { ...AUTHOR };
+}
+
 function website(): Json {
-  return { '@type': 'WebSite', '@id': WEBSITE_ID, url: `${SITE_ORIGIN}/`, name: 'Fontexto', inLanguage: [...SITE_LANGS], publisher: { '@id': ORG_ID } };
+  return {
+    '@type': 'WebSite',
+    '@id': WEBSITE_ID,
+    url: `${SITE_ORIGIN}/`,
+    name: 'Fontexto',
+    inLanguage: [...SITE_LANGS],
+    publisher: { '@id': ORG_ID },
+    author: { '@id': PERSON_ID },
+    creator: { '@id': PERSON_ID },
+  };
 }
 
 function application(lang: SiteLang, c: SiteContent): Json {
@@ -125,6 +155,8 @@ function application(lang: SiteLang, c: SiteContent): Json {
     screenshot: `${SITE_ORIGIN}/preview-documento.png`,
     image: `${SITE_ORIGIN}${OG_IMAGE.path}`,
     publisher: { '@id': ORG_ID },
+    author: { '@id': PERSON_ID },
+    creator: { '@id': PERSON_ID },
   };
 }
 
@@ -137,6 +169,7 @@ export function structuredData(lang: SiteLang, c: SiteContent, slug?: SiteSlug, 
       '@context': 'https://schema.org',
       '@graph': [
         organization(),
+        person(),
         website(),
         application(lang, c),
         { '@type': 'WebPage', '@id': `${url}#webpage`, url, name: meta.title, description: meta.description, inLanguage: lang, isPartOf: { '@id': WEBSITE_ID }, about: { '@id': APP_ID }, primaryImageOfPage: { '@type': 'ImageObject', url: `${SITE_ORIGIN}${OG_IMAGE.path}` } },
@@ -152,8 +185,8 @@ export function structuredData(lang: SiteLang, c: SiteContent, slug?: SiteSlug, 
     description: page.description,
     inLanguage: lang,
     dateModified: CONTENT_UPDATED,
-    isPartOf: { '@type': 'WebSite', '@id': WEBSITE_ID, name: 'Fontexto', url: `${SITE_ORIGIN}/` },
-    about: { '@type': 'WebApplication', '@id': APP_ID, name: 'Fontexto' },
+    isPartOf: { '@type': 'WebSite', '@id': WEBSITE_ID, name: 'Fontexto', url: `${SITE_ORIGIN}/`, publisher: { '@id': ORG_ID }, author: { '@id': PERSON_ID }, creator: { '@id': PERSON_ID } },
+    about: { '@type': 'WebApplication', '@id': APP_ID, name: 'Fontexto', author: { '@id': PERSON_ID }, creator: { '@id': PERSON_ID } },
     breadcrumb: { '@id': `${url}#breadcrumb` },
   };
   if (page.faq) {
@@ -162,6 +195,7 @@ export function structuredData(lang: SiteLang, c: SiteContent, slug?: SiteSlug, 
   return {
     '@context': 'https://schema.org',
     '@graph': [
+      person(),
       webPage,
       {
         '@type': 'BreadcrumbList',
@@ -276,6 +310,7 @@ ${assets.css.map((href) => `    <link rel="stylesheet" href="${href}" />`).join(
           <p class="sp-lead">${inline(page.lead, lang)}</p>
         </header>
         ${article(lang, page, c)}
+        ${page.credit ? `<p class="sp-credit">${inline(page.credit, lang)}</p>` : ''}
         <p class="sp-updated">${escapeHtml(c.chrome.updated)}: <time datetime="${CONTENT_UPDATED}">${date}</time></p>
       </article>
       <aside class="sp-cta-card">

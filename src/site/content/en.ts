@@ -166,6 +166,7 @@ export const en: SiteContent = {
           p: ['Questions about open-access copies: oa@fontexto.com. Security reports: contact@xoryn.com.br.'],
         },
       ],
+      credit: 'Created by Pablo Kauã ([@kkauaps](https://github.com/kkauaps))',
     },
     privacy: {
       nav: 'Privacy',

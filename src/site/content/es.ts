@@ -166,6 +166,7 @@ export const es: SiteContent = {
           p: ['Preguntas sobre copias de acceso abierto: oa@fontexto.com. Avisos de seguridad: contact@xoryn.com.br.'],
         },
       ],
+      credit: 'Creado por Pablo Kauã ([@kkauaps](https://github.com/kkauaps))',
     },
     privacy: {
       nav: 'Privacidad',

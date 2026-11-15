@@ -109,10 +109,12 @@ export function Landing({ projects, error, onStart, onOpen }: Props) {
       </main>
 
       <footer className="lp-footer small">
-        <BrandMark wordmark={false} />
-        <span>
-          {BRAND.name} · {t.footerNote}
-        </span>
+        <div className="lp-footer-note">
+          <BrandMark wordmark={false} />
+          <span>
+            {BRAND.name} · {t.footerNote}
+          </span>
+        </div>
         <nav className="lp-footer-links" aria-label={t.siteLinks.label}>
           <a href={sitePath(locale, 'about')}>{t.siteLinks.about}</a>
           <a href={sitePath(locale, 'how-it-works')}>{t.siteLinks.howItWorks}</a>

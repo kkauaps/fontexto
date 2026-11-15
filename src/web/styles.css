@@ -2386,7 +2386,54 @@ button.primary:hover, .primary:hover { background: var(--accent-hover); }
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md);
   padding: 12px 14px; color: inherit;
 }
-.lp-footer { display: flex; align-items: center; gap: 10px; color: var(--faint); font-size: 12px; margin-top: auto; padding: 8px 0 12px; }
+/* Dark and glass: hovered/focused cards use a low-alpha accent fill so title and date stay readable.
+   Light keeps the mint fill from the earlier .lp-project:hover rule. */
+:root:not([data-theme="light"]) .lp-project:hover:not(:disabled),
+:root:not([data-theme="light"]) .lp-project:focus,
+:root:not([data-theme="light"]) .lp-project:focus-visible,
+:root:not([data-theme="light"]) .lp-project:active {
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  color: var(--text);
+}
+:root:not([data-theme="light"]) .lp-project:hover:not(:disabled) .muted,
+:root:not([data-theme="light"]) .lp-project:focus .muted,
+:root:not([data-theme="light"]) .lp-project:focus-visible .muted,
+:root:not([data-theme="light"]) .lp-project:active .muted {
+  color: color-mix(in srgb, var(--text) 72%, var(--muted));
+}
+.lp-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 8px;
+  color: var(--faint);
+  font-size: 12px;
+  margin-top: auto;
+  padding: 16px 0 20px;
+  width: 100%;
+}
+.lp-footer-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 10px;
+  max-width: 62ch;
+  margin: 0;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+.lp-footer-note .lp-brand,
+.lp-footer-note .fx-mark-tile {
+  flex: none;
+}
+.lp-footer-note > span:not(.lp-brand) {
+  flex: 1 1 16rem;
+  min-width: min(100%, 18ch);
+}
 .lp-footer .fx-mark-tile { width: 22px; height: 22px; border-radius: 7px; }
 .lp-footer .fx-mark-tile img { width: 14px; height: 12px; }
 
@@ -2665,7 +2712,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   .lp-privacy { order: 3; flex-direction: column; text-align: center; padding: 20px 18px; gap: 10px; }
   .lp-projects h2 { text-align: center; }
   .lp-project { min-height: 56px; align-items: center; text-align: center; }
-  .lp-footer { justify-content: center; text-align: center; flex-wrap: wrap; padding: 12px 0 calc(12px + env(safe-area-inset-bottom)); }
+  .lp-footer { padding: 16px 0 calc(16px + env(safe-area-inset-bottom)); }
+  .lp-footer-note { max-width: 36ch; }
 
   /* upload */
   .uf-main { margin: 12px auto 28px; padding: 24px 16px 22px; width: calc(100% - 24px); }
@@ -3581,8 +3629,10 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .lp-footer-links {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 2px 16px;
-  margin-left: auto;
+  margin-left: 0;
+  width: 100%;
 }
 .lp-footer-links a {
   color: var(--muted);
@@ -3645,6 +3695,10 @@ html:has(body.sp) { height: auto; }
 .sp-article a { color: var(--brand-deep); font-weight: 600; text-underline-offset: 3px; }
 .sp-faq .sp-qa { border-top: 1px solid var(--line); padding-top: 20px; margin-top: 20px; }
 .sp-faq .sp-qa:first-child { border-top: 0; padding-top: 0; margin-top: 28px; }
+.sp-credit { margin: 28px 0 0; font-size: 13px; color: var(--muted); }
+.sp-credit a { color: inherit; font-weight: 600; text-underline-offset: 3px; }
+.sp-credit a:hover { color: var(--text); }
+.sp-credit + .sp-updated { margin-top: 10px; }
 .sp-updated { margin: 32px 0 0; font-size: 13px; color: var(--muted); }
 .sp-cta-card {
   display: flex;

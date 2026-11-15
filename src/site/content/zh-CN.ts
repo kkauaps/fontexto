@@ -167,6 +167,7 @@ export const zhCN: SiteContent = {
           p: ['开放获取副本相关问题：oa@fontexto.com。安全问题：contact@xoryn.com.br。'],
         },
       ],
+      credit: '由 Pablo Kauã（[@kkauaps](https://github.com/kkauaps)）创建',
     },
     privacy: {
       nav: '隐私',
