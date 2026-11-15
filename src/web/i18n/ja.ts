@@ -146,7 +146,7 @@ export const ja: Messages = {
   stepCheckCitations: '引用を確認しています',
   stepProgress: (done: number, total: number) => `${done} / ${total}`,
   entriesRecognized: (usable: number, total: number) => `${total}件のエントリーのうち${usable}件が認識されました`,
-  oaProgress: (done: number, total: number, got: number) => `${done}/${total}件閲覧済み · ${got} ${pl(got, 'PDF obtido', 'PDFs obtidos')}`,
+  oaProgress: (done: number, total: number, got: number) => `${done} / ${total} 件を照会 · PDF を ${got} 件取得`,
   reviewTitleDoc: '完了：見つかったものを確認してください',
   reviewTitle: 'リンクを確認する',
   foundEntries: (total: number, usable: number) =>
@@ -214,7 +214,7 @@ export const ja: Messages = {
   labeledByYouTitle: (auto: string) => `お客様が設定したラベル。自動設定は${auto}でした。`,
   curated: 'キュレーション',
   curatedTitle: (source: string, auto?: string) =>
-    `インポートされたキュレーションの評決と抜粋（${source}）。${auto ?` O rótulo automático era: ${auto}.`: ''}`,
+    `インポートされたキュレーションの評決と抜粋（${source}）。${auto ? `自動ラベルは「${auto}」でした。` : ''}`,
   yourAssessment: 'あなたの評価：',
   yourAssessmentAria: 'この引用に対する評価',
   labelOk: '問題なし',
@@ -223,7 +223,7 @@ export const ja: Messages = {
   undoAuto: (auto: string) => `元に戻す（自動：${auto}）`,
   undoAutoTitle: '自動計算されたラベルに戻る',
   unidentifiedReference: '参照が特定できません',
-  passageCurated: (i: number, page: number) => `${i} · p. ${page} · キュレーション`,
+  passageCurated: (i: number, page: number) => `${i} · ${page}頁 · キュレーション`,
   passageScored: (i: number, page: number, pct: number) => `${i} · ${page} 頁 · ${pct}%`,
   passageContextCurated: (i: number, total: number, page: number, source: string) =>
     `インポートされたキュレーション（${source}）からの、${total}の${i}の箇所（${page}ページ）。`,
@@ -245,7 +245,7 @@ export const ja: Messages = {
   approxHighlight: '該当箇所を概略的に強調表示',
   approxHighlightTitle:
     '文を固定するためのアンカー（番号、略語、著者）も意味モデルもありませんでした。強調表示は抜粋全体をカバーしています。',
-  openInArticle: (page: number) => `記事で開く · p. ${page}`,
+  openInArticle: (page: number) => `論文内で開く · ${page}頁`,
   seeInGraph: 'グラフで見る',
   allCitations: 'すべての引用',
   citationsInDocument: '文書からの引用',
@@ -401,10 +401,10 @@ export const ja: Messages = {
   askAuthorNoEmail: '丁寧なお願いの言葉でメールを始めます。著者のアドレスを入力してください。',
   askAuthorSubject: (title: string) => `論文「${title}」のコピー請求`,
   askAuthorBody: (p: { name?: string; title: string; year?: number; doi?: string }) =>
-    `拝啓　${p.name ?? '[nome do autor]'}様\n\n私は現在、貴論文「${p.title}」${p.year ?` (${p.year})`: ''}${p.doi ?`, DOI https://doi.org/${p.doi}`: ''}にアクセスできません。私の個人的な調査のために、コピー（PDFまたは受理された原稿）を送っていただけますでしょうか？\n\nお忙しい中恐縮ですが、よろしくお願いいたします。\n\n敬具、\n[あなたの氏名]\n[あなたの所属機関]`,
+    `拝啓　${p.name ?? '[著者名]'}様\n\n私は現在、貴論文「${p.title}」${p.year ?` (${p.year})`: ''}${p.doi ?`, DOI https://doi.org/${p.doi}`: ''}にアクセスできません。私の個人的な調査のために、コピー（PDFまたは受理された原稿）を送っていただけますでしょうか？\n\nお忙しい中恐縮ですが、よろしくお願いいたします。\n\n敬具、\n[あなたの氏名]\n[あなたの所属機関]`,
 
   pdfViewer: 'PDFビューア',
-  goToPage: (page: number) => `p. ${page}へ`,
+  goToPage: (page: number) => `${page}頁へ`,
   citingSentence: 'この参照を引用する文',
   passagesFound: '見つかった航空券：',
   passageHighlighted: 'ページ本文中の強調表示された箇所。',
@@ -450,7 +450,7 @@ export const ja: Messages = {
   provenance: '原産地',
   matchingFields: (fields: string) => `一致するフィールド：${fields}`,
   identifier: '識別子:',
-  openInBibliography: (page: number) => `参考文献を開く（p. ${page}）`,
+  openInBibliography: (page: number) => `参考文献リストで開く（${page}頁）`,
   bibEntryContext: (source: string, target: string) =>
     `${target}に対応する${source}の参考文献項目。`,
   markersInText: 'テキスト内のマークアップ：',

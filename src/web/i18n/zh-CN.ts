@@ -146,15 +146,15 @@ export const zhCN: Messages = {
   stepSearchFreePdfs: '正在查找参考文献的免费 PDF',
   stepCheckCitations: '检查引用',
   stepProgress: (done: number, total: number) => `${done} / ${total}`,
-  entriesRecognized: (usable: number, total: number) => `${total} 已识别输入的${usable}`,
-  oaProgress: (done: number, total: number, got: number) => `咨询了 ${total} 的${done} · ${got} ${pl(got, 'PDF obtido', 'PDFs obtidos')}`,
+  entriesRecognized: (usable: number, total: number) => `已识别 ${usable} / ${total} 条`,
+  oaProgress: (done: number, total: number, got: number) => `已查询 ${done} / ${total} · 获得 ${got} 个 PDF`,
   reviewTitleDoc: '准备好：看看发现了什么',
   reviewTitle: '检查连接',
   foundEntries: (total: number, usable: number) =>
-    `我在文档的参考列表中找到了 ${total} 条目（带有作者和年份的${usable}）。`,
+    `在文档的参考文献列表中找到 ${total} 条（其中 ${usable} 条含作者和年份）。`,
   oaSummary: (got: number, blocked: number, closed: number, missed: number) =>
     `免费PDFs：${got}已下载，${blocked}免费，需手动下载，${closed}无免费版本，${missed}未识别。`,
-  pdfsLinked: (linked: number, total: number) => `${total} PDF 的${linked} 链接到参考。`,
+  pdfsLinked: (linked: number, total: number) => `${linked} / ${total} 个 PDF 已关联到参考文献。`,
   allLinked: '一切都是相连的。',
   linkLeftovers: '如果您愿意，可以用手连接剩下的部分；您也可以稍后再做。',
   pdfsWithoutRef: (n: number) => `PDFs 无参考 (${n})`,
@@ -175,7 +175,7 @@ export const zhCN: Messages = {
   swapBib: '交换.bib',
   chooseBib: '选择.bib',
   referencePdfs: 'PDF参考文献',
-  pdfsSent: (n: number) => `${n}${pl(n, 'PDF enviado', 'PDFs enviados')}`,
+  pdfsSent: (n: number) => `已发送 ${n} 个 PDF`,
   referencePdfsHint: '可选，但对于查找每篇文章中引用的段落是必要的。',
   sendMorePdfs: '发送更多 PDF',
   choosePdfs: '选择 PDF',
@@ -215,7 +215,7 @@ export const zhCN: Messages = {
   labeledByYouTitle: (auto: string) => `由您定义的标签。自动的是：${auto}。`,
   curated: '策展',
   curatedTitle: (source: string, auto?: string) =>
-    `来自导入策展人的判决和段落 (${source}).${auto ?` O rótulo automático era: ${auto}.`: ''}`,
+    `来自导入策展人的判决和段落 (${source}).${auto ? `自动标签为：${auto}。` : ''}`,
   yourAssessment: '您的判断：',
   yourAssessmentAria: '您对此引用的评价',
   labelOk: '没问题',
@@ -224,8 +224,8 @@ export const zhCN: Messages = {
   undoAuto: (auto: string) => `撤消（自动：${auto}）`,
   undoAutoTitle: '返回自动计算的标签',
   unidentifiedReference: '不明参考文献',
-  passageCurated: (i: number, page: number) => `${i}·第1页${page}·策展`,
-  passageScored: (i: number, page: number, pct: number) => `${i}·第1页${page}·${pct}%`,
+  passageCurated: (i: number, page: number) => `${i} · 第 ${page} 页 · 已审阅`,
+  passageScored: (i: number, page: number, pct: number) => `${i} · 第 ${page} 页 · ${pct}%`,
   passageContextCurated: (i: number, total: number, page: number, source: string) =>
     `来自${total}的段落${i}，位于${page}页，来自导入的策展（${source}）。`,
   passageContext: (i: number, total: number, page: number) =>
@@ -246,7 +246,7 @@ export const zhCN: Messages = {
   approxHighlight: '摘录中的大致亮点',
   approxHighlightTitle:
     '没有锚点（数字、缩写词、作者）或语义模型来锚定句子；亮点覆盖了整个段落。',
-  openInArticle: (page: number) => `在文章·第 14 页中打开${page}`,
+  openInArticle: (page: number) => `在原文中打开 · 第 ${page} 页`,
   seeInGraph: '在图谱中查看',
   allCitations: '全部引用',
   citationsInDocument: '文献引用',
@@ -352,7 +352,7 @@ export const zhCN: Messages = {
   searchFreePdfs: (n: number) => `搜索免费 PDF（${n} 不含 PDF）`,
   searchingFreePdfs: '正在查找免费 PDF…',
   oaPrivacyHint: '仅发送 DOI、标题、年份和第一作者即可打开目录（OpenAlex、Crossref、Unpaywall、Semantic Scholar、Europe PMC、CORE、arXiv）。您的文件不会离开浏览器。',
-  oaAdded: (n: number) => `${n}${pl(n, 'PDF gratuito adicionado e verificado', 'PDFs gratuitos adicionados e verificados')}。`,
+  oaAdded: (n: number) => `已添加并核对 ${n} 个免费 PDF。`,
   oaNone: '无法自动下载免费的PDF。查看每行上的链接。',
   colReference: '参考',
   colStatus: '情况',
@@ -405,7 +405,7 @@ export const zhCN: Messages = {
     `尊敬的 ${p.name ?? '[作者姓名]'}：\n\n我正在阅读您的论文“${p.title}”${p.year ? `（${p.year}）` : ''}${p.doi ? `，DOI https://doi.org/${p.doi}` : ''}，但无法获取全文。能否请您惠赠一份 PDF 或录用稿，仅供个人研读？\n\n非常感谢您的时间。\n\n此致\n敬礼\n[您的姓名]\n[您的单位]`,
 
   pdfViewer: 'PDF 查看器',
-  goToPage: (page: number) => `转到页。 ${page}`,
+  goToPage: (page: number) => `转到第 ${page} 页`,
   citingSentence: '引用此参考文献的短语',
   passagesFound: '找到的段落：',
   passageHighlighted: '页面文本中突出显示的段落。',
@@ -451,7 +451,7 @@ export const zhCN: Messages = {
   provenance: '出处',
   matchingFields: (fields: string) => `匹配字段：${fields}`,
   identifier: '标识符：',
-  openInBibliography: (page: number) => `在参考书目中打开（第${page}）`,
+  openInBibliography: (page: number) => `在参考文献列表中打开（第 ${page} 页）`,
   bibEntryContext: (source: string, target: string) =>
     `${source}参考书目中对应于${target}的条目。`,
   markersInText: '文中标注：',
@@ -543,7 +543,7 @@ export const zhCN: Messages = {
   deleteProject: '删除项目',
   confirmDeleteProject:
     '删除项目以及所有上传的文件和派生数据？路径引用的文件不会被删除。',
-  sendingFiles: (n: number) => `发送并处理${n}${pl(n, 'arquivo', 'arquivos')}…`,
+  sendingFiles: (n: number) => `正在发送并处理 ${n} 个文件…`,
 
   identityDoi: 'DOI',
   identityDifferentDoi: 'DOI 不同',
@@ -612,7 +612,7 @@ export const zhCN: Messages = {
     plural
       ? `句子的数字${nums}没有出现在源的PDF中的任何位置。`
       : `句子的编号${nums}没有出现在源的PDF中的任何位置。`,
-  localeQuoteFound: (page: number) => `直接引用可在第 14 页找到。 ${page}。`,
+  localeQuoteFound: (page: number) => `直接引用可在第 ${page} 页找到。`,
   localePassageLowSim: (pct: string, page: number) => `摘录与第 1 页相似的${pct}。 ${page}（相似度低：查看摘录）。`,
   localePassageSim: (pct: string, page: number) => `摘录与第 1 页相似的${pct}。 ${page}。`,
   localeNumbersElsewhere: (nums: string) => `PDF 中但不在本摘录中的句子编号：${nums}。`,
