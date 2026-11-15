@@ -1506,6 +1506,107 @@
     "title": "Вымышленное исследование потоков",
     "doi": "10.5555/fx.flow.2018"
    }
+  },
+  {
+   "id": "zh-fic:j-etal",
+   "doc": "zh-fic",
+   "lang": "zh",
+   "style": "gb",
+   "source": "synthetic",
+   "text": "张三, 李四, 王五, 等. 合成数据结构的比较研究[J]. 通用方法学报, 2020, 12(3): 10-18. DOI: 10.99999/fx.zh.0001.",
+   "label": "[1]",
+   "expect": {
+    "family": "张三",
+    "year": 2020,
+    "title": "合成数据结构的比较研究",
+    "doi": "10.99999/fx.zh.0001"
+   }
+  },
+  {
+   "id": "zh-fic:thesis",
+   "doc": "zh-fic",
+   "lang": "zh",
+   "style": "gb",
+   "source": "synthetic",
+   "text": "赵六. 虚构城市的水文模型[D]. 北海大学, 2019.",
+   "label": "[2]",
+   "expect": {
+    "family": "赵六",
+    "year": 2019,
+    "title": "虚构城市的水文模型"
+   }
+  },
+  {
+   "id": "zh-fic:book",
+   "doc": "zh-fic",
+   "lang": "zh",
+   "style": "gb",
+   "source": "synthetic",
+   "text": "钱七, 孙八. 实验室手册：合成样本[M]. 南城出版社, 2018.",
+   "label": "[3]",
+   "expect": {
+    "family": "钱七",
+    "year": 2018,
+    "title": "实验室手册：合成样本"
+   }
+  },
+  {
+   "id": "zh-fic:ideographic-stop",
+   "doc": "zh-fic",
+   "lang": "zh",
+   "style": "gb",
+   "source": "synthetic",
+   "text": "张三，李四。合成数据结构的比较研究[J]. 通用方法学报, 2020, 12(3): 10-18.",
+   "label": "[4]",
+   "expect": {
+    "family": "张三",
+    "year": 2020,
+    "title": "合成数据结构的比较研究"
+   }
+  },
+  {
+   "id": "zh-fic:concat-names",
+   "doc": "zh-fic",
+   "lang": "zh",
+   "style": "gb",
+   "source": "synthetic",
+   "text": "张三李四. 一项联合实验[J]. 通用方法学报, 2021.",
+   "label": "[5]",
+   "expect": {
+    "family": "张三",
+    "year": 2021,
+    "title": "一项联合实验"
+   }
+  },
+  {
+   "id": "zh-fic:radical-fly",
+   "doc": "zh-fic",
+   "lang": "zh",
+   "style": "gb",
+   "source": "synthetic",
+   "text": "潘鹏⻜. 通信系统中的图像方法[J]. 通用方法学报, 2022. DOI: 10.99999/fx.zh.0003.",
+   "label": "[6]",
+   "expect": {
+    "family": "潘鹏飞",
+    "year": 2022,
+    "title": "通信系统中的图像方法",
+    "doi": "10.99999/fx.zh.0003"
+   }
+  },
+  {
+   "id": "zh-fic:mixed-apa",
+   "doc": "zh-fic",
+   "lang": "en",
+   "style": "apa",
+   "source": "synthetic",
+   "text": "Smith, J. (2018). An English review of laboratory methods. Generic Journal, 4(1), 1-9. https://doi.org/10.99999/fx.en.0002",
+   "label": "[7]",
+   "expect": {
+    "family": "Smith",
+    "year": 2018,
+    "title": "An English review of laboratory methods",
+    "doi": "10.99999/fx.en.0002"
+   }
   }
  ]
 }

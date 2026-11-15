@@ -2,13 +2,15 @@ import { createContext, createElement, useCallback, useContext, useEffect, useMe
 import { edition } from '../api';
 import { en, type Messages } from './en';
 import { es } from './es';
+import { ja } from './ja';
 import { ptBR } from './pt-BR';
 import { ru } from './ru';
+import { zhCN } from './zh-CN';
 
-export type Locale = 'en' | 'es' | 'ru' | 'pt-BR';
+export type Locale = 'en' | 'es' | 'ru' | 'pt-BR' | 'zh-CN' | 'ja';
 export type { Messages };
 
-export const LOCALES: Locale[] = ['en', 'es', 'ru', 'pt-BR'];
+export const LOCALES: Locale[] = ['en', 'es', 'ru', 'pt-BR', 'zh-CN', 'ja'];
 export const DEFAULT_LOCALE: Locale = 'en';
 export const LANG_STORAGE_KEY = 'fontexto:lang';
 
@@ -17,12 +19,28 @@ export const LOCALE_NATIVE: Record<Locale, string> = {
   es: 'Español',
   ru: 'Русский',
   'pt-BR': 'Português (Brasil)',
+  'zh-CN': '简体中文',
+  ja: '日本語',
 };
 
-export const messages: Record<Locale, Messages> = { en, es, ru, 'pt-BR': ptBR };
+export const messages: Record<Locale, Messages> = { en, es, ru, 'pt-BR': ptBR, 'zh-CN': zhCN, ja };
 
-export const htmlLang: Record<Locale, string> = { en: 'en', es: 'es', ru: 'ru', 'pt-BR': 'pt-BR' };
-export const dateLocale: Record<Locale, string> = { en: 'en-US', es: 'es', ru: 'ru', 'pt-BR': 'pt-BR' };
+export const htmlLang: Record<Locale, string> = {
+  en: 'en',
+  es: 'es',
+  ru: 'ru',
+  'pt-BR': 'pt-BR',
+  'zh-CN': 'zh-CN',
+  ja: 'ja',
+};
+export const dateLocale: Record<Locale, string> = {
+  en: 'en-US',
+  es: 'es',
+  ru: 'ru',
+  'pt-BR': 'pt-BR',
+  'zh-CN': 'zh-CN',
+  ja: 'ja-JP',
+};
 
 const ALIASES: Record<string, Locale> = {
   en: 'en',
@@ -41,6 +59,14 @@ const ALIASES: Record<string, Locale> = {
   'pt-br': 'pt-BR',
   'pt-pt': 'pt-BR',
   por: 'pt-BR',
+  zh: 'zh-CN',
+  'zh-cn': 'zh-CN',
+  'zh-hans': 'zh-CN',
+  'zh-sg': 'zh-CN',
+  cmn: 'zh-CN',
+  ja: 'ja',
+  'ja-jp': 'ja',
+  jpn: 'ja',
 };
 
 export function parseLocale(raw: string | null | undefined): Locale | undefined {
@@ -49,11 +75,18 @@ export function parseLocale(raw: string | null | undefined): Locale | undefined 
 }
 
 /** Home page of each language on the public site ("/" is English, the default). */
-export const LOCALE_PATH: Record<Locale, string> = { en: '/', es: '/es/', ru: '/ru/', 'pt-BR': '/pt-br/' };
+export const LOCALE_PATH: Record<Locale, string> = {
+  en: '/',
+  es: '/es/',
+  ru: '/ru/',
+  'pt-BR': '/pt-br/',
+  'zh-CN': '/zh-cn/',
+  ja: '/ja/',
+};
 
 /** Locale of a language-prefixed public page ("/es/", "/pt-br/faq/"), or undefined for English/unprefixed paths. */
 export function localeFromPath(pathname: string): Locale | undefined {
-  const m = /^\/(es|ru|pt-br)(\/|$)/i.exec(pathname);
+  const m = /^\/(es|ru|pt-br|zh-cn|ja)(\/|$)/i.exec(pathname);
   return m ? parseLocale(m[1]) : undefined;
 }
 

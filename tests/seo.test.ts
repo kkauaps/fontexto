@@ -14,8 +14,8 @@ const ldOf = (html: string) => {
 const graphTypes = (d: { '@graph': { '@type': string }[] }) => d['@graph'].map((n) => n['@type']);
 
 describe('public site URLs', () => {
-  it('has a home and five content pages in each of the four languages', () => {
-    expect(siteUrls()).toHaveLength(24);
+  it('has a home and five content pages in each locale', () => {
+    expect(siteUrls()).toHaveLength(36);
     expect(pathOf('en')).toBe('/');
     expect(pathOf('pt-BR', 'faq')).toBe('/pt-br/faq/');
     expect(urlOf('ru', 'about')).toBe('https://fontexto.com/ru/about/');
@@ -32,7 +32,15 @@ describe('public site URLs', () => {
 });
 
 describe('head tags', () => {
-  const head = headTags({ lang: 'es', slug: 'faq', title: 'T', description: 'D', ogImageAlt: 'A', ogLocale: 'es_ES', allLocales: { en: 'en_US', es: 'es_ES', ru: 'ru_RU', 'pt-BR': 'pt_BR' } });
+  const head = headTags({
+    lang: 'es',
+    slug: 'faq',
+    title: 'T',
+    description: 'D',
+    ogImageAlt: 'A',
+    ogLocale: 'es_ES',
+    allLocales: { en: 'en_US', es: 'es_ES', ru: 'ru_RU', 'pt-BR': 'pt_BR', 'zh-CN': 'zh_CN', ja: 'ja_JP' },
+  });
   it('self-canonical, hreflang for every language plus x-default', () => {
     expect(head).toContain('<link rel="canonical" href="https://fontexto.com/es/faq/" />');
     for (const [l, u] of [['en', '/faq/'], ['es', '/es/faq/'], ['ru', '/ru/faq/'], ['pt-BR', '/pt-br/faq/'], ['x-default', '/faq/']]) {
@@ -102,9 +110,9 @@ describe('landing pages from the app shell', () => {
 
 describe('sitemap and robots', () => {
   const xml = sitemapXml();
-  it('lists all 24 pages with hreflang alternates', () => {
-    expect(xml.match(/<loc>/g)).toHaveLength(24);
-    expect(xml.match(/hreflang="x-default"/g)).toHaveLength(24);
+  it('lists all public pages with hreflang alternates', () => {
+    expect(xml.match(/<loc>/g)).toHaveLength(36);
+    expect(xml.match(/hreflang="x-default"/g)).toHaveLength(36);
     expect(xml).toContain('<loc>https://fontexto.com/es/open-access-sources/</loc>');
   });
   it('robots.txt points to the sitemap and keeps the API out', () => {

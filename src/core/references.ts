@@ -53,6 +53,8 @@ const AUTHOR_START_RE = new RegExp(
     String.raw`^\p{Lu}{2,}[\p{Lu}'’\-]*(?:\s\p{Lu}{2,}[\p{Lu}'’\-]*)?\s\p{Lu}\.(?:\s?\p{Lu}\.)*[,\s(]`,
     // APA corporate author with the year on the same line: "World Health Organization. (2020)."
     String.raw`^\p{Lu}[\p{L}&,.'’\-\s]{2,120}?\(\s*(?:1[89]|20)\d{2}[a-z]?\s*\)\.`,
+    // GB/T / CJK: "张三, 李四. 标题" or "张三。标题" or "张三等."
+    String.raw`^[\p{Script=Han}]{2,4}(?:·[\p{Script=Han}]{1,4})?(?:\s*[,，、]\s*[\p{Script=Han}]{2,4}|\s*等|[.．。])`,
   ].join('|'),
   'u',
 );

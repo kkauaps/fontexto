@@ -12,8 +12,15 @@ export const CONTENT_UPDATED = '2026-11-14';
 export const OG_IMAGE = { path: '/og-image.png', width: 1200, height: 630 } as const;
 export const LICENSE_URL = 'https://www.gnu.org/licenses/agpl-3.0.html';
 
-const PREFIX: Record<SiteLang, string> = { en: '', es: 'es/', ru: 'ru/', 'pt-BR': 'pt-br/' };
-export const LANG_NATIVE: Record<SiteLang, string> = { en: 'English', es: 'Español', ru: 'Русский', 'pt-BR': 'Português (Brasil)' };
+const PREFIX: Record<SiteLang, string> = { en: '', es: 'es/', ru: 'ru/', 'pt-BR': 'pt-br/', 'zh-CN': 'zh-cn/', ja: 'ja/' };
+export const LANG_NATIVE: Record<SiteLang, string> = {
+  en: 'English',
+  es: 'Español',
+  ru: 'Русский',
+  'pt-BR': 'Português (Brasil)',
+  'zh-CN': '简体中文',
+  ja: '日本語',
+};
 
 /** "/", "/es/", "/pt-br/faq/" */
 export const pathOf = (lang: SiteLang, slug?: SiteSlug | ''): string => `/${PREFIX[lang]}${slug ? `${slug}/` : ''}`;

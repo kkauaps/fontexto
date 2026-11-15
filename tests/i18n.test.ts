@@ -72,15 +72,25 @@ describe('locale detection', () => {
 
   it('ignores unknown language codes', () => {
     expect(parseLocale('fr')).toBeUndefined();
-    expect(parseLocale('zh')).toBeUndefined();
+    expect(parseLocale('zh-TW')).toBeUndefined();
+    expect(parseLocale('zh-HK')).toBeUndefined();
     expect(detectLocale('?lang=fr')).toBe('en');
+  });
+
+  it('maps Chinese and Japanese aliases', () => {
+    expect(parseLocale('zh')).toBe('zh-CN');
+    expect(parseLocale('zh-cn')).toBe('zh-CN');
+    expect(parseLocale('zh-hans')).toBe('zh-CN');
+    expect(parseLocale('ja')).toBe('ja');
+    expect(parseLocale('ja-jp')).toBe('ja');
   });
 });
 
 describe('catalogs', () => {
-  it('has the four locales and matching html lang tags', () => {
-    expect(LOCALES).toEqual(['en', 'es', 'ru', 'pt-BR']);
-    expect(htmlLang).toEqual({ en: 'en', es: 'es', ru: 'ru', 'pt-BR': 'pt-BR' });
+  it('has six locales and matching html lang tags', () => {
+    expect(LOCALES).toEqual(['en', 'es', 'ru', 'pt-BR', 'zh-CN', 'ja']);
+    expect(htmlLang['zh-CN']).toBe('zh-CN');
+    expect(htmlLang.ja).toBe('ja');
     expect(dateLocale['pt-BR']).toBe('pt-BR');
   });
 
@@ -103,7 +113,7 @@ describe('catalogs', () => {
 
   it('uses distinct copy for the landing headline and keeps Fontexto in the boot line', () => {
     const headlines = LOCALES.map((l) => messages[l].tagline);
-    expect(new Set(headlines).size).toBe(4);
+    expect(new Set(headlines).size).toBe(6);
     for (const locale of LOCALES) {
       expect(messages[locale].boot).toMatch(/Fontexto/);
       expect(messages[locale].ctaJustDoc.length).toBeGreaterThan(3);
@@ -112,7 +122,7 @@ describe('catalogs', () => {
 });
 
 describe('runtime translation', () => {
-  const locales: Locale[] = ['en', 'es', 'ru', 'pt-BR'];
+  const locales: Locale[] = ['en', 'es', 'ru', 'pt-BR', 'zh-CN', 'ja'];
 
   it('translates built-in method blurbs and exact notices in every language', () => {
     for (const locale of locales) {

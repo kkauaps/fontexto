@@ -25,7 +25,7 @@ import { claimSpanFor, isLeadingNarrative, numbersAttributedTo } from './attribu
 import { authorsFromMarker, bestPassageFocus } from './passageFocus.js';
 import { extractMarkersFromText, isSelfCitation, resolveMarker, type MarkerReference } from './citations.js';
 import type { CitationGraph, FileRecord, PublicationNode, Rect } from './model.js';
-import { stripDiacritics } from './normalize.js';
+import { foldCjk, stripDiacritics } from './normalize.js';
 import { extractReferenceEntries, isPageNumber, matchReference, referenceSectionBounds, repeatedLines } from './references.js';
 import type { PdfText } from './text.js';
 
@@ -77,7 +77,7 @@ export const EVIDENCE_PARAMS: EvidenceParams = {
   lengthPenalty: 0,
   windowNext: false,
   matcher: 'v2',
-  v2: { strong: 0.18, weak: 0.1, strongSem: 0.3, weakSem: 0.14 },
+  v2: { strong: 0.3, weak: 0.1, strongSem: 0.3, weakSem: 0.14 },
   match: MATCH_PARAMS,
   fusion: { lambdaRank: 0.5, lambda: 0.5, semFloor: 0.3, semCeil: 0.8 },
 };
@@ -303,7 +303,7 @@ export interface Span {
   end: number;
 }
 
-const START_CHAR = /[\p{Lu}\d(\[“"‘'•¿¡]/u;
+const START_CHAR = /[\p{Lu}\p{Script=Han}\d(\[“"‘'「『•¿¡]/u;
 
 /** Sentence spans (trimmed, never empty) of `text`. Breaks at U+2029 and at sentence-final punctuation. */
 export function segmentSentences(text: string): Span[] {
@@ -322,12 +322,24 @@ export function segmentSentences(text: string): Span[] {
       segStart = i + 1;
       continue;
     }
-    if (c !== '.' && c !== '!' && c !== '?' && c !== '…') continue;
+    const cjkEnd = c === '。' || c === '！' || c === '？';
+    if (!cjkEnd && c !== '.' && c !== '!' && c !== '?' && c !== '…') continue;
     // include closing quotes/brackets after the punctuation
     let j = i + 1;
-    while (j < n && /["”’')\]]/.test(text[j])) j++;
+    while (j < n && /["”’')\]」』]/.test(text[j])) j++;
     if (j >= n) continue;
-    if (!/\s/.test(text[j])) continue;
+    // Latin sentence ends need a space before the next sentence; CJK may use none or optional spaces.
+    if (!cjkEnd && !/\s/.test(text[j])) continue;
+    if (cjkEnd) {
+      let k = j;
+      while (k < n && /\s/.test(text[k]) && text[k] !== PARA) k++;
+      if (k >= n || text[k] === PARA) continue;
+      if (!START_CHAR.test(text[k])) continue;
+      push(segStart, j);
+      segStart = k;
+      i = k - 1;
+      continue;
+    }
     let k = j;
     while (k < n && /\s/.test(text[k]) && text[k] !== PARA) k++;
     if (k >= n || text[k] === PARA) continue; // paragraph break handles it
@@ -365,7 +377,7 @@ const TOKEN_RE = /\d+[.,]\d+|\d+|[A-Za-z][A-Za-z0-9\-+]*/g;
  *  - acronyms / alphanumerics (>=2 capitals or a digit): `@sam2`
  */
 export function tokenize(input: string, glossary: Readonly<Record<string, string>> = DEFAULT_GLOSSARY): string[] {
-  const s = stripDiacritics(input.replace(/\u00ad/g, '').replace(/ﬁ/g, 'fi').replace(/ﬂ/g, 'fl'));
+  const s = foldCjk(stripDiacritics(input.replace(/\u00ad/g, '').replace(/ﬁ/g, 'fi').replace(/ﬂ/g, 'fl')));
   const out: string[] = [];
   for (const m of s.matchAll(TOKEN_RE)) {
     const w = m[0];
@@ -384,6 +396,12 @@ export function tokenize(input: string, glossary: Readonly<Record<string, string
       if (g) out.push(g);
     }
     if (/\d/.test(w) || (w.match(/[A-Z]/g) ?? []).length >= 2) out.push('@' + lw);
+  }
+  // Chinese has no spaces between words: index Han runs as character bigrams (same idea as open-access title matching).
+  for (const m of s.matchAll(/\p{Script=Han}+/gu)) {
+    const w = m[0];
+    if (w.length === 1) out.push(w);
+    else for (let i = 0; i + 1 < w.length; i++) out.push(w.slice(i, i + 2));
   }
   return out;
 }
@@ -423,7 +441,8 @@ export function buildReferenceIndex(pdf: PdfText): ReferenceIndex {
   const df = new Map<string, number>();
   for (const sp of segmentSentences(flow.text)) {
     const text = flow.text.slice(sp.start, sp.end).replace(/\s+/g, ' ');
-    if (text.length < 25) continue;
+    const minLen = /\p{Script=Han}|\p{Script=Hiragana}|\p{Script=Katakana}/u.test(text) ? 12 : 25;
+    if (text.length < minLen) continue;
     const page = pageAt(flow, sp.start);
     const tokens = new Set(tokenize(text));
     const region: 'resumo' | 'corpo' = introOffset > 0 && sp.start < introOffset ? 'resumo' : 'corpo';
@@ -737,7 +756,7 @@ export function numericMarkers(text: string, mainText: PdfText, pubs: Publicatio
   const max = Math.max(...byNumber.keys());
   const expand = (body: string): number[] | undefined => {
     const out: number[] = [];
-    for (const part of body.split(/\s*[,;]\s*/)) {
+    for (const part of body.split(/\s*[,，、;；]\s*/)) {
       const r = /^(\d{1,3})(?:\s*[-–—]\s*(\d{1,3}))?$/.exec(part.trim());
       if (!r) return undefined;
       const a = Number(r[1]);
@@ -749,7 +768,7 @@ export function numericMarkers(text: string, mainText: PdfText, pubs: Publicatio
   };
   type M = { raw: string; start: number; end: number; nums: number[] };
   const found: M[] = [];
-  for (const m of text.matchAll(/\[(\d{1,3}(?:\s*[-–—,;]\s*\d{1,3})*)\](?:\s*[-–—]\s*\[(\d{1,3})\])?/g)) {
+  for (const m of text.matchAll(/\[(\d{1,3}(?:\s*[-–—,，、;；]\s*\d{1,3})*)\](?:\s*[-–—]\s*\[(\d{1,3})\])?/g)) {
     let nums = expand(m[1]);
     if (!nums) continue;
     if (m[2]) {
@@ -915,7 +934,10 @@ export function fuseCandidates(cands: Candidate[], params: EvidenceParams): bool
 
 /** Page cited in a marker: "(Silva, 2020, p. 12)", "(SILVA, 2020, p. 12-14)". */
 export function citedPages(marker: string): number[] | undefined {
-  const m = /\bp(?:p|ág|ag)?\.\s*(\d{1,4})(?:\s*[-–]\s*(\d{1,4}))?/i.exec(marker);
+  const m =
+    /\bp(?:p|ág|ag)?\.\s*(\d{1,4})(?:\s*[-–]\s*(\d{1,4}))?/i.exec(marker) ||
+    /第\s*(\d{1,4})\s*(?:[-–至到]\s*(\d{1,4}))?\s*页/.exec(marker) ||
+    /页\s*(\d{1,4})(?:\s*[-–]\s*(\d{1,4}))?/.exec(marker);
   if (!m) return undefined;
   const a = Number(m[1]);
   const b = m[2] ? Number(m[2]) : a;
@@ -923,12 +945,17 @@ export function citedPages(marker: string): number[] | undefined {
   return Array.from({ length: b - a + 1 }, (_, i) => a + i);
 }
 
-const foldQuote = (s: string) => stripDiacritics(s).toLowerCase().replace(/[\u00ad-]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+const foldQuote = (s: string) => foldCjk(stripDiacritics(s)).toLowerCase().replace(/[\u00ad-]/g, '').replace(/[^\p{L}\p{N}]+/gu, '').trim();
 
 /** Direct quotations (4+ words between quotes) in a sentence. */
 export function directQuotes(sentence: string): string[] {
   const out: string[] = [];
-  for (const m of sentence.matchAll(/[“"«]([^”"»]{12,600})[”"»]/g)) if (m[1].trim().split(/\s+/).length >= 4) out.push(m[1].trim());
+  for (const m of sentence.matchAll(/[“"«「『]([^”"»」』]{8,600})[”"»」』]/g)) {
+    const t = m[1].trim();
+    const compact = t.replace(/\s+/g, '');
+    const words = t.split(/\s+/).filter(Boolean);
+    if (/\p{Script=Han}/u.test(compact) ? compact.length >= 8 : words.length >= 4) out.push(t);
+  }
   return out;
 }
 

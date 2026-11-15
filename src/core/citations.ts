@@ -30,41 +30,56 @@ export interface CitationMarker extends MarkerReference {
 
 const NAME = String.raw`\p{Lu}[\p{L}'’.\-]*(?:\s+(?:(?:van|von|de|da|der|den|dos|del|di|le)\s+)?\p{Lu}[\p{L}'’.\-]*)?`;
 const AUTHORS = String.raw`${NAME}(?:\s*[,;]\s*${NAME})*(?:\s*,?\s+(?:and|e|&)\s+${NAME})?(?:\s+et\s+al\.?)?`;
-const NARRATIVE_RE = new RegExp(String.raw`(?<![\p{L}])(${AUTHORS})\s*\(((?:1[5-9]|20)\d{2}[a-z]?)(?:,\s*p+\.\s*[\d\-–]+)?\)`, 'gu');
-const PAREN_RE = /\(([^()]{3,400})\)/g;
-const YEAR_IN_SEGMENT = /\b((?:1[5-9]|20)\d{2})([a-z])?\b/g;
+const NARRATIVE_RE = new RegExp(String.raw`(?<![\p{L}])(${AUTHORS})\s*[（(]((?:1[5-9]|20)\d{2}[a-z]?)(?:,\s*p+\.\s*[\d\-–]+)?[）)]`, 'gu');
+/** Narrative CJK: 张三（2020） / 张三等（2020）. Up to 4 Han characters (resolveMarker drops a leading run-on). */
+const HAN_NARRATIVE_RE = /([\p{Script=Han}]{1,4})(等)?\s*[（(]((?:1[5-9]|20)\d{2}[a-z]?)(?:[,，]\s*(?:p+\.\s*[\d\-–]+|第\s*\d{1,4}\s*页))?[）)]/gu;
+const PAREN_RE = /[（(]([^()（）]{2,400})[）)]/g;
+const YEAR_IN_SEGMENT = /(?<![\d])((?:1[5-9]|20)\d{2})([a-z])?(?![\d])/g;
 const LEADING_NOISE = /^(?:e\.g\.,?|i\.e\.,?|see(?:\s+also)?|cf\.|ver|veja|conforme|segundo)\s+/i;
 
+const HAN_AUTHOR = /^[\p{Script=Han}]{1,4}(?:·[\p{Script=Han}]{1,4})?$/u;
+const isCitationAuthor = (a: string) =>
+  HAN_AUTHOR.test(a) || (/^\p{Lu}/u.test(a) && a.split(/\s+/).length <= 4);
+
+
+// A narrative name is often glued to a preceding conjunction (和张三（2020）).
+const HAN_PARTICLE = /^(?:和|与|及|见|据|如|由|按|于|自|从|对|在|而|则|但|且|也|还|另|即|以|为|因|故|经|依|将|把|被|比|就|才|又|或|既)/;
+function trimLeadingHanParticle(name: string): string {
+  let t = name;
+  while (t.length > 2 && HAN_PARTICLE.test(t)) t = t.slice(1);
+  return t;
+}
+
 function parseAuthorPart(part: string): { authors: string[]; etAl: boolean } | undefined {
-  let s = part.replace(LEADING_NOISE, '').trim().replace(/[,;\s]+$/, '');
-  const etAl = /\bet\s+al\.?/i.test(s);
-  s = s.replace(/\bet\s+al\.?/gi, '').trim().replace(/[,;\s]+$/, '');
+  let s = part.replace(LEADING_NOISE, '').trim().replace(/[,，、;；\s]+$/, '');
+  const etAl = /(?:等|\bet\s+al\.?)/i.test(s);
+  s = s.replace(/(?:等|\bet\s+al\.?)/gi, '').trim().replace(/[,，、;；\s]+$/, '');
   if (!s) return undefined;
   const authors = s
-    .split(/\s*(?:;|,|&|\band\b|\be\b)\s*/)
+    .split(/\s*(?:[;；,，、]|&|\band\b|\be\b)\s*/)
     .map((a) => a.trim())
     .filter(Boolean);
   if (authors.length === 0 || authors.length > 6) return undefined;
-  if (!authors.every((a) => /^\p{Lu}/u.test(a) && a.split(/\s+/).length <= 4)) return undefined;
+  if (!authors.every(isCitationAuthor)) return undefined;
   return { authors, etAl };
 }
 
 /** Parses the content of a parenthetical citation into one or more references. */
 export function parseParenthetical(content: string): MarkerReference[] {
   const out: MarkerReference[] = [];
-  const rawSegments = content.split(';').map((s) => s.trim());
+  const rawSegments = content.split(/[;；]/).map((s) => s.trim());
   // ABNT joins co-authors with ';' ("SILVA; SOUZA, 2020"): merge segments without a year forward.
   const segments: string[] = [];
   let carry = '';
   for (const seg of rawSegments) {
     const merged = carry ? `${carry}; ${seg}` : seg;
-    if (/\b(?:1[5-9]|20)\d{2}[a-z]?\b/.test(seg)) {
+    if (/(?<![\d])(?:1[5-9]|20)\d{2}[a-z]?(?![\d])/.test(seg)) {
       segments.push(merged);
       carry = '';
     } else carry = merged;
   }
   for (const seg0 of segments) {
-    const seg = seg0.replace(/,\s*(?:p|pp|s)\.\s*[\d\-–, ]+$/i, '');
+    const seg = seg0.replace(/[,，]\s*(?:(?:p|pp|s)\.\s*[\d\-–, ]+|第\s*\d{1,4}(?:\s*[-–]\s*\d{1,4})?\s*页)$/i, '');
     const years = [...seg.matchAll(YEAR_IN_SEGMENT)];
     if (years.length === 0) continue;
     const authorPart = seg.slice(0, years[0].index);
@@ -97,6 +112,22 @@ export function extractMarkersFromText(text: string, opts: { includeSelf?: boole
     if (!parsed) continue;
     const yearLabel = m[2];
     out.push({ ...parsed, narrative: true, year: Number(yearLabel.slice(0, 4)), yearLabel, raw: m[0], start: m.index!, end: m.index! + m[0].length });
+  }
+  for (const m of text.matchAll(HAN_NARRATIVE_RE)) {
+    const start = m.index!;
+    const end = start + m[0].length;
+    if (out.some((x) => x.start < end && start < x.end)) continue;
+    const yearLabel = m[3];
+    out.push({
+      authors: [trimLeadingHanParticle(m[1])],
+      etAl: Boolean(m[2]),
+      narrative: true,
+      year: Number(yearLabel.slice(0, 4)),
+      yearLabel,
+      raw: m[0],
+      start,
+      end,
+    });
   }
   return out.filter((m) => opts.includeSelf || !isSelfCitation(m)).sort((a, b) => a.start - b.start);
 }
@@ -139,6 +170,10 @@ export function resolveMarker(marker: MarkerReference, pubs: PublicationNode[]):
     const words = (marker.authors[0] ?? '').split(/\s+/).filter(Boolean);
     for (let i = 1; i < words.length; i++) variants.push({ ...marker, authors: [words.slice(i).join(' '), ...marker.authors.slice(1)] });
     for (let k = 1; k < marker.authors.length; k++) variants.push({ ...marker, authors: marker.authors.slice(k) });
+    const first = marker.authors[0] ?? '';
+    if (/^\p{Script=Han}+$/u.test(first) && first.length > 1) {
+      for (let i = 1; i < first.length; i++) variants.push({ ...marker, authors: [first.slice(i), ...marker.authors.slice(1)] });
+    }
   }
   for (const v of variants) {
     const res = resolveVariant(v, pubs);

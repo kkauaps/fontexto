@@ -1,5 +1,5 @@
 /** Shape of the static public pages (about, how it works, FAQ, privacy, open-access sources) in each language. */
-export const SITE_LANGS = ['en', 'es', 'ru', 'pt-BR'] as const;
+export const SITE_LANGS = ['en', 'es', 'ru', 'pt-BR', 'zh-CN', 'ja'] as const;
 export type SiteLang = (typeof SITE_LANGS)[number];
 
 export const SITE_SLUGS = ['how-it-works', 'faq', 'about', 'privacy', 'open-access-sources'] as const;

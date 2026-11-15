@@ -227,11 +227,28 @@ function familyInitialsBlock(text: string): { authors: string; year?: number; en
 }
 
 // GB/T 7714: "张三, 李四, 王五, 等. 标题[J]. 期刊, 2020, 78(3): 1-10." or "ZHOU Q H, LI S, et al. Title[J]. ...".
-const GBT_RE = /^(.{1,200}?)[.．]\s*(.+?)\s*\[(?:J|M|D|C|N|R|S|P|Z|A|G|EB\/OL|DB\/OL|J\/OL|M\/OL|CP)\]/su;
+const GBT_RE = /^(.{1,200}?)[.．。]\s*(.+?)\s*\[(?:J|M|D|C|N|R|S|P|Z|A|G|EB\/OL|DB\/OL|J\/OL|M\/OL|CP)\]/su;
 const HAN_RE = /^[\p{Script=Han}·]+$/u;
+
+// Two 2-character names sometimes lose their separator in PDF text ("张三李四").
+// Compound surnames (欧阳, 司马, …) of length 4 stay as one person.
+const COMPOUND_SURNAME = /^(欧阳|司马|上官|诸葛|皇甫|夏侯|司徒|东方|独孤|南宫|公孙|慕容|令狐|宇文|长孙|司空|端木|巫马|公羊|公冶|申屠|太史|仲孙|钟离|闾丘|鲜于|赫连|澹台|宗政|濮阳|淳于|单于|太叔|公西|漆雕|乐正|壤驷|公良|拓跋|夹谷|宰父|谷梁|梁丘|左丘)/;
+function splitConcatenatedHan(s: string): string[] {
+  if (s.length === 4 && !COMPOUND_SURNAME.test(s)) return [s.slice(0, 2), s.slice(2)];
+  return [s];
+}
+
 /** Authors of a GB/T 7714 entry, or undefined when the entry is not GB/T-shaped. */
+
+/** Drops a numeric list marker so "[1] 张三, 李四. 标题[J]." still matches GB/T. */
+export function stripLeadingRefLabel(text: string): string {
+  return text
+    .replace(/^(?:[\[【(（]\s*)?\d{1,3}\s*[\]】)）]\s+/, '')
+    .replace(/^\d{1,3}\s*[.)、．]\s+/, '');
+}
+
 export function gbtAuthors(text: string): { authors: ParsedReference['authors']; etAl: boolean; title: string } | undefined {
-  const m = GBT_RE.exec(text);
+  const m = GBT_RE.exec(stripLeadingRefLabel(text));
   if (!m) return undefined;
   const block = m[1].trim();
   const parts = block.split(/\s*[,，、;；]\s*/).map((p) => p.trim()).filter(Boolean);
@@ -244,7 +261,7 @@ export function gbtAuthors(text: string): { authors: ParsedReference['authors'];
     }
     // Chinese names stay whole: in-text author-year citations ("（张越, 2025）") and catalogues use the full name.
     if (HAN_RE.test(p)) {
-      authors.push({ family: p.replace(/\s+/g, '') });
+      for (const name of splitConcatenatedHan(p.replace(/\s+/g, ''))) authors.push({ family: name });
       continue;
     }
     // Pinyin/Latin: the family name comes first, in capitals ("ZHOU Q H", "ZHANG San", "HOPEWELL S").

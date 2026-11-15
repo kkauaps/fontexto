@@ -1,0 +1,33 @@
+import { en, type Messages } from './en';
+
+/** Simplified Chinese UI. Body strings follow English where not yet reviewed by a native speaker. */
+export const zhCN: Messages = {
+  ...en,
+  metaTitle: 'Fontexto — 将每条引用链接到原文段落',
+  metaDescription: 'Fontexto 将文档中的每条引用与源 PDF 中的对应段落关联。上传 PDF，在浏览器中审阅匹配结果，文件不离本机。',
+  boot: '正在加载 Fontexto…',
+  language: '语言',
+  displaySettings: '主题与语言',
+  appearance: '外观',
+  themeGlass: '玻璃',
+  themeDarkSolid: '深色',
+  themeLight: '浅色',
+  tagline: '将每条引用链接到原文中的对应段落',
+  pageTitle: (section?: string) => (section ? `${section} · Fontexto` : 'Fontexto — 将每条引用链接到原文段落'),
+  privacyNote: '您添加的文件仅在本设备上读取和存储。',
+  privacyNoteWeb: '您添加的文件仅在当前浏览器中读取和存储。',
+  navHowItWorks: '工作原理',
+  navPrivacy: '隐私',
+  navOpenProject: '打开项目',
+  heroLead: '上传您的文档。Fontexto 查找参考文献、检索论文的合法免费版本，并标出每条引用在原文中的对应页码，供您核对。',
+  ctaJustDoc: '仅主文档',
+  ctaDocAndPdfs: '文档 + 参考文献 PDF',
+  howItWorks: '工作原理',
+  openingPdf: '正在打开 PDF…',
+  pdfViewer: 'PDF 查看器',
+  back: '返回',
+  all: '全部',
+  filterByStatus: '按状态筛选',
+  filterByReference: '按参考文献筛选',
+  searchInSentenceOrRef: '在句子或参考文献中搜索…',
+};

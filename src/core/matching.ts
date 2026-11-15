@@ -9,7 +9,7 @@
  * Nothing here proves a claim: every result is a candidate for human review.
  */
 import { GLOSSARY_V2, STOPWORDS, stemOf } from './lexicon.js';
-import { stripDiacritics } from './normalize.js';
+import { foldCjk, stripDiacritics } from './normalize.js';
 import type { IndexedSentence, ReferenceIndex } from './evidence.js';
 
 export interface MatchParams {
@@ -60,7 +60,7 @@ export interface Token {
 }
 
 export function tokenizeV2(input: string): Token[] {
-  const s = stripDiacritics(input.replace(/\u00ad/g, '').replace(/ﬁ/g, 'fi').replace(/ﬂ/g, 'fl'));
+  const s = foldCjk(stripDiacritics(input.replace(/\u00ad/g, '').replace(/ﬁ/g, 'fi').replace(/ﬂ/g, 'fl')));
   const out: Token[] = [];
   for (const m of s.matchAll(TOKEN_RE)) {
     const w = m[0];
@@ -76,6 +76,11 @@ export function tokenizeV2(input: string): Token[] {
       if (lw.length < 3 || STOPWORDS.has(lw) || /\d/.test(lw)) continue;
       out.push({ t: stemOf(lw), kind: 'word' });
     }
+  }
+  for (const m of s.matchAll(/\p{Script=Han}+/gu)) {
+    const w = m[0];
+    if (w.length === 1) out.push({ t: w, kind: 'word' });
+    else for (let i = 0; i + 1 < w.length; i++) out.push({ t: w.slice(i, i + 2), kind: 'word' });
   }
   return out;
 }
@@ -240,11 +245,17 @@ export function lexicalCandidates(index: ReferenceIndex, query: QueryTerm[], p: 
       }
       if (!sum) continue;
       const lex = (sum / denom) * (1 - p.windowPenalty * (L - 1));
-      let firstPage = S[i].page;
+      let bestPage = S[i].page;
+      let bestPageScore = -1;
       for (let k = 0; k < L; k++) {
-        if (terms.some((q) => x.tf[i + k].tf.has(q.t))) {
-          firstPage = S[i + k].page;
-          break;
+        let sentenceScore = 0;
+        for (const q of terms) {
+          const tf = x.tf[i + k].tf.get(q.t) ?? 0;
+          if (tf) sentenceScore += q.w * q.idf * Math.min(1, (tf * (p.k1 + 1)) / (tf + p.k1 * norm));
+        }
+        if (sentenceScore > bestPageScore) {
+          bestPageScore = sentenceScore;
+          bestPage = S[i + k].page;
         }
       }
       const miss = numbers.filter((n) => {
@@ -255,7 +266,7 @@ export function lexicalCandidates(index: ReferenceIndex, query: QueryTerm[], p: 
         start: i,
         len: L,
         lex,
-        page: firstPage,
+        page: bestPage,
         region: S[i].region,
         text: '',
         missingNumbers: miss.map((n) => n.slice(1)),

@@ -39,6 +39,7 @@ import {
   titleTokens,
 } from './normalize.js';
 import { extractReferenceEntries, findReferenceHeading, matchReference, type ReferenceEntry } from './references.js';
+import { parseReferenceText } from './refparse.js';
 import { pageString, type PdfText } from './text.js';
 import { applyReview, assertAutomaticStatus } from './verification.js';
 
@@ -158,16 +159,25 @@ function fileRecordToPub(file: FileRecord, text: PdfText | undefined): PubRecord
 }
 
 function mainRefToRecord(entry: ReferenceEntry, fileId: string): PubRecord {
+  const parsed = parseReferenceText(entry.text, entry.index, entry.label);
+  const fields = ['doi', 'year', 'title', 'authors']
+    .filter((k) => (k === 'doi' ? parsed.doi ?? entry.dois[0] : k === 'year' ? parsed.year ?? entry.years[0] : k === 'title' ? parsed.title : parsed.authors.length > 0));
   return {
     id: `pub:mainref:${entry.index}`,
     kind: 'publication',
-    title: undefined,
-    authors: [],
-    year: entry.years[0],
-    doi: entry.dois[0],
+    title: parsed.title,
+    authors: parsed.authors.map((a) => ({
+      raw: a.given ? `${a.family}, ${a.given}` : a.family,
+      family: a.family,
+      given: a.given,
+      organization: a.organization,
+    })),
+    year: parsed.year ?? entry.years[0],
+    yearLabel: parsed.year ? String(parsed.year) : undefined,
+    doi: parsed.doi ?? entry.dois[0],
     bibKeys: [],
     fileIds: [],
-    metadataSources: [{ kind: 'reference_list', ref: fileId, fields: ['doi', 'year'].filter((k) => (k === 'doi' ? entry.dois[0] : entry.years[0])) }],
+    metadataSources: [{ kind: 'reference_list', ref: fileId, fields }],
     inMainBibliography: true,
     priority: 1,
   };
