@@ -1,53 +1,53 @@
-# Avaliação do localizador automático de passagens
+# Evaluating the automatic passage finder
 
-O Fontexto liga cada citação do artigo a passagens do PDF da referência **sem curadoria**. Este documento descreve como
-medimos isso, os números atuais e os limites.
+Fontexto links each citation in a document to passages in the PDF of the cited reference **without manual curation**.
+This page explains how that is measured, the current numbers and their limits.
 
-## Conjunto de referência (gold)
+## Gold set
 
-O projeto de referência tem uma revisão manual (a curadoria importada de `index.html`): para cada ocorrência de citação, o
-veredito (Localizado / Ressalva / Não localizado) e as páginas das passagens escolhidas. `scripts/eval/gold.mts` carrega
-isso e o pareia com as ocorrências do projeto (por chave, por autor+ano e, no fim, por similaridade de frase).
+The evaluation uses a private project with a manual review (curated evidence imported from an exported `index.html`):
+for each citation occurrence, a verdict (Located / Caveat / Not located) and the pages of the chosen passages. The gold
+project is not part of this repository. `scripts/eval/gold.mts` loads it and pairs it with the project's occurrences (by
+key, then by author + year, and finally by sentence similarity).
 
-- 187 ocorrências resolvidas (as 6 "Autor (2026)" são autocitações de fonte de tabela e não entram: ver
-  `isSelfCitation`).
-- Métricas por ocorrência: a página certa do PDF da referência está entre as **1** / **3** primeiras passagens; e a
-  concordância de status com a curadoria (3 classes), com precisão/revocação do rótulo "Localizado".
+- 187 resolved occurrences. Self-citations used as table sources ("Author (2026)") are left out; see `isSelfCitation`.
+- Per-occurrence metrics: whether the right page of the reference PDF is among the first **1** / **3** passages, and
+  agreement of the status with the curation (3 classes), with precision/recall of the "Located" label.
 
-Os dois fluxos (com `.bib` e sem `.bib`) dão números idênticos: a ligação citação→referência acerta 31/31 em ambos, e
-a diferença só aparece na ligação, não na busca de trecho.
+Both flows (with a `.bib` and without one) give identical numbers: citation → reference linking is right for 31/31
+references in both, so any difference comes from linking, not from the passage search.
 
-## Resultados (conjunto de referência, 187 ocorrências)
+## Results (187 occurrences)
 
-| Localizador | página certa top-1 | top-3 | status (3 classes) | Localizado: precisão | Localizado: revocação |
+| Finder | right page top-1 | top-3 | status (3 classes) | Located: precision | Located: recall |
 |---|---|---|---|---|---|
-| v1 (antes) | 33,9% | 59,6% | 34,8% | 0,91 | 0,30 |
-| v2 léxico (padrão) | 42,1% | 68,3% | 69,0% | 0,91 | 0,71 |
-| v2 + modelo semântico (opcional, só web) | 47,0% | 72,1% | 65,2% | 0,91 | 0,67 |
+| v1 (before) | 33.9% | 59.6% | 34.8% | 0.91 | 0.30 |
+| v2 lexical (default) | 42.1% | 68.3% | 69.0% | 0.91 | 0.71 |
+| v2 + semantic model (optional, web only) | 47.0% | 72.1% | 65.2% | 0.91 | 0.67 |
 
-Reproduzir: `DATA_DIR=<dados> PROJECT=<id> npx tsx scripts/eval/final.mts [lex|sem|all]`.
+Reproduce with your own curated project: `DATA_DIR=<data> PROJECT=<id> npx tsx scripts/eval/final.mts [lex|sem|all]`.
 
-## O que mudou no v2
+## What changed in v2
 
-1. **Afirmação em três camadas**: a oração em volta do marcador (peso 1,0), a frase que cita (0,7) e as frases vizinhas
-   (0,3). Autocitações e nomes do próprio texto saem da afirmação.
-2. **PT→EN**: glossário de termos técnicos (peso 0,9) e normalização de cognatos (`segmentação`≈`segmentation`,
-   duplas, ph→f, y→i, -ção→-tion…), radical de 5 letras. Números e siglas pesam ×2.
-3. **Janelas de passagem** de 1–3 frases pontuadas por BM25 (k1 1,2; b 0,5), com casamento aproximado (distância de edição 1).
-4. **Re-ranqueamento semântico opcional** (`paraphrase-multilingual-MiniLM-L12-v2`, ONNX 8 bits, ~135 MB, roda no
-   navegador via onnxruntime-web, autohospedado). A pontuação final mistura o léxico e a similaridade de cosseno.
-5. **Rótulo por pontuação absoluta** (limiares em `evidence.ts`: `v2 {strong, weak, strongSem, weakSem}`); números
-   ausentes e a região "resumo" só acrescentam notas.
+1. **Three-layer claim**: the clause around the marker (weight 1.0), the citing sentence (0.7) and the neighbouring
+   sentences (0.3). Self-citations and names from the document itself are removed from the claim.
+2. **PT→EN**: a glossary of technical terms (weight 0.9) and cognate normalisation (`segmentação` ≈ `segmentation`,
+   double letters, ph→f, y→i, -ção→-tion…), 5-letter stems. Numbers and acronyms weigh ×2.
+3. **Passage windows** of 1–3 sentences scored with BM25 (k1 1.2; b 0.5), with fuzzy matching (edit distance 1).
+4. **Optional semantic re-ranking** (`paraphrase-multilingual-MiniLM-L12-v2`, 8-bit ONNX, ~135 MB, runs in the browser
+   through onnxruntime-web, self-hosted). The final score blends the lexical score and the cosine similarity.
+5. **Label by absolute score** (thresholds in `evidence.ts`: `v2 {strong, weak, strongSem, weakSem}`); missing numbers
+   and the "abstract" region only add notes.
 
-## Calibração e limites (leia antes de confiar nos números)
+## Calibration and limits (read before trusting the numbers)
 
-- Os limiares foram escolhidos na curva precisão×revocação do "Localizado". Usamos uma divisão em 2 dobras (hash da
-  chave bibtex, `scripts/eval/calib*.mts`) para checar sobreajuste; como são só 187 ocorrências de um trabalho, as
-  estimativas por dobra são ruidosas e os números acima são do conjunto inteiro.
-- A pontuação léxica **não prevê bem** se a *página* está certa (AUC ≈ 0,5): otimizar a concordância de status degenera
-  em "tudo Localizado". Por isso o rótulo "Localizado" significa "há uma passagem sobre os mesmos termos", nunca "a fonte
-  comprova a afirmação". Toda passagem é candidata e precisa de revisão humana.
-- O gold por página é ruidoso: uma frase costuma ter várias afirmações e várias páginas aceitáveis.
-- O conjunto é um único trabalho (PT→EN). Em outras áreas os números podem ser piores.
-- O automático **não** chega ao nível da curadoria manual. O objetivo é mostrar o trecho certo entre as 3 primeiras
-  opções em ~2/3 dos casos e deixar o resto claro como "Ressalva"/"Não localizado".
+- Thresholds were picked on the precision × recall curve of "Located". A 2-fold split (hash of the BibTeX key,
+  `scripts/eval/calib*.mts`) was used to check for overfitting; with only 187 occurrences from a single document the
+  per-fold estimates are noisy, so the numbers above are for the whole set.
+- The lexical score **does not predict well** whether the *page* is right (AUC ≈ 0.5): optimising status agreement
+  degenerates into "everything Located". That is why "Located" means "there is a passage about the same terms", never
+  "the source proves the claim". Every passage is a candidate and needs human review.
+- The per-page gold is noisy: one sentence often carries several claims and several acceptable pages.
+- The set is a single document (PT→EN). Numbers may be worse in other fields and language pairs.
+- The automatic finder does **not** reach the level of manual curation. The goal is to show the right passage among the
+  first 3 options in about 2/3 of the cases and to make the rest clearly "Caveat" / "Not located".

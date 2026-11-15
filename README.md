@@ -1,16 +1,31 @@
 # Fontexto
 
-Fontexto lets researchers upload an academic document (TCC, dissertation, article) together with its `.bib` and the PDFs of its references. It then lets them navigate citations down to the exact place in the original sources.
+**English** · [Español](README.es.md) · [Русский](README.ru.md) · [Português (Brasil)](README.pt-BR.md)
 
-This branch adds the **Citation Graph**, Phase 1 (bibliographic graph). The graph is interactive and directed: confirmed citations are kept apart from suggestions, every edge records its provenance, and clicking through opens the PDF at the right page. Everything runs locally and offline.
+Fontexto links every citation in an academic document (thesis, dissertation, article) to the exact passage in the source it cites. Upload your PDF: Fontexto reads the reference list, looks up legal free versions of the cited papers, and for each citation shows the page where the source says it, ready for you to check. Try it at **[fontexto.com](https://fontexto.com)**.
 
-See [`docs/architecture-citation-graph.md`](docs/architecture-citation-graph.md) for the design.
+![Document view: every in-text citation is highlighted and linked to the passage found in the cited PDF](docs/screenshots/document.png)
+
+## What it does
+
+- **Citations → passages.** Each in-text citation (author–year or numbered) is matched to its reference and to candidate passages in the reference PDF, labelled *Located*, *Caveat* or *Not located*. Labels are candidates for human review, never proof.
+- **Reference extraction without a `.bib`.** ABNT, APA, Harvard, IEEE, Vancouver, GOST, DIN, French author–year and GB/T 7714 lists, including references in Cyrillic and Chinese, theses, odd DOIs, and lists without a "References" heading.
+- **Free PDFs, legally.** Open-access copies are looked up in OpenAlex, Crossref, Unpaywall, Europe PMC, arXiv, Semantic Scholar and CORE. Only the reference's DOI, title, year and first author leave the browser.
+- **Reference network (graph v2).** One click on *Find links between references* asks OpenAlex which of your references cite each other (arrows) and which share references (dashed lines). Nodes are coloured by topic, and the clickable legend switches between topic, subfield and field for broad bibliographies. Zoom, pan and pinch, hover to see neighbours, size nodes by in-text or global citations, switch to a timeline by year, filter by year, type and topic, and export a 1600×900 PNG or SVG. Without the lookup, references are grouped by title keywords.
+- **Four languages.** The interface is in English (default), Spanish, Russian and Brazilian Portuguese.
+- **Private by design.** In the web edition your PDFs never leave the browser (IndexedDB). There are no analytics or third-party scripts.
+
+![Reference network: references that cite each other, coloured by topic](docs/screenshots/graph.png)
+
+![References table: status, citations in the text and source PDF for each entry](docs/screenshots/references.png)
+
+*Screenshots use a fictional example document and fictional references.*
 
 ## Requirements
 
 - Node.js ≥ 20.10 (tested with Node 24)
 
-## Running
+## Running locally
 
 ```bash
 npm install
@@ -25,11 +40,11 @@ npm run build            # typecheck + web bundle + server
 npm start                # serves API and UI on http://127.0.0.1:5174
 ```
 
-### Ingesting local files without uploading/copying them
+### Ingesting local files without uploading or copying them
 
 ```bash
-npm run ingest -- --project my-tcc --name "My TCC" \
-  --bib path/to/refs.bib --main path/to/tcc.pdf --refs "path/to/articles-folder" \
+npm run ingest -- --project my-thesis --name "My thesis" \
+  --bib path/to/refs.bib --main path/to/thesis.pdf --refs "path/to/articles-folder" \
   [--exclude some-substring ...] [--shareable]
 ```
 
@@ -44,6 +59,7 @@ npm run ingest -- --project my-tcc --name "My TCC" \
 | `CITATION_GRAPH_HOST` | `127.0.0.1` | bind address |
 | `CITATION_GRAPH_DATA_DIR` | `./data` | project storage (git-ignored) |
 | `CITATION_GRAPH_EXTERNAL_METADATA` | off | `on` allows opt-in OpenAlex lookups. Only DOIs are sent, and each request needs explicit consent. |
+| `OPENALEX_API_KEY`, `CORE_API_KEY`, `S2_API_KEY` | unset | optional catalogue keys for the open-access proxy (server side only; on Cloudflare Pages set them as secrets). Without them OpenAlex runs on the free budget, CORE is skipped and Semantic Scholar is rate-limited. |
 
 ## Tests
 
@@ -56,59 +72,43 @@ npm test
 
 ## Scientific-integrity rules
 
-- No bibliographic data, page or coordinate is invented. Unknown values are shown as **Indisponível**.
+- No bibliographic data, page or coordinate is invented. Unknown values are shown as unavailable.
 - `confirmed` means the reference was located in the documents (DOI or title match in a bibliography, or the main document's declared `.bib`).
 - Weak matches are `unverified` until a researcher confirms them.
-- Thematic relations (`related_to`) are `suggested` only and never imply a citation.
-- Colors and categories are presentation only.
+- Thematic relations are only `suggested` and never imply a citation; links from OpenAlex are labelled as such.
+- Colours and categories are presentation only.
 - Automatic methods can never mark evidence as `validated`.
 
-## Windows executable
+## How the labels are computed
+
+The citing sentence (markers removed) is segmented from the main PDF; every sentence of the reference PDF (bibliography excluded) is scored by IDF-weighted overlap of content terms (numbers, acronyms, stems, a PT↔EN glossary), with an optional multilingual semantic re-ranking. The best passages get one of:
+
+- **Located**: a passage shares most of the sentence's rare terms;
+- **Caveat**: weaker overlap, a number from the sentence missing in the passage, or only the abstract matches;
+- **Not located**: no similar passage, no reference PDF, no extractable text, or a sentence with too little content.
+
+See [`src/core/evidence.ts`](src/core/evidence.ts), the design notes in [`docs/architecture-citation-graph.md`](docs/architecture-citation-graph.md) and how the matcher is measured in [`docs/matcher-evaluation.md`](docs/matcher-evaluation.md).
+
+## Web edition (fontexto.com)
+
+`npm run build:site` builds a static site (`dist/site`) with **no application server**: PDF parsing (pdf.js), reference extraction, linking and matching run in Web Workers (`src/web/local/`, on top of the platform-neutral `src/core/coreStore.ts`), and projects live in the browser's IndexedDB. The only server code is the small open-access proxy in `functions/api/oa/` (Cloudflare Pages Functions).
+
+- Optional semantic search (a multilingual sentence-embedding model, ~135 MB, downloaded once and cached) needs the model files: `npm run fetch-model` (SHA-256 pinned) before `npm run build:site`.
+- Cloudflare Pages: `npx wrangler pages deploy dist/site --project-name fontexto --branch <branch>`. The `_headers` file (strict CSP + Trusted Types, COOP/COEP/CORP, HSTS) is generated from `src/server/securityHeaders.ts`.
+- End-to-end check in headless Chrome: `scripts/e2e/web-flow.mjs` (see its header for the variables).
+
+## Windows executable (offline edition)
 
 ```bash
 npm run package:win
 ```
 
-This writes a portable folder to `dist/win/Fontexto/`:
+This writes a portable folder to `dist/win/Fontexto/` with `Fontexto.exe` (starts the local server and opens the UI in your browser) and `resources/` (keep it next to the exe). No Node.js install is needed at runtime. The server binds to `127.0.0.1` on port `5174` or the next free port. Project data lives in `%APPDATA%\CitationTrace` (the product's former name, kept so existing projects stay in place). Run `Fontexto.exe --no-browser` or set `CITATION_GRAPH_NO_BROWSER=1` to start without a browser. The executable is unsigned, so Windows SmartScreen may warn on first launch.
 
-- `Fontexto.exe` — double-click to start the local server and open the UI in your default browser
-- `resources/` — the web UI and pdf.js assets (keep this folder next to the exe)
+## Security
 
-No Node.js install is required at runtime. The server always binds to `127.0.0.1`, uses port `5174` when it is free, and otherwise picks the next free port. Project data is stored in `%APPDATA%\CitationTrace` (the folder keeps the product's former name so existing projects stay in place).
+Please report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 
-To start the server without opening a browser (for example in a script):
+## License
 
-```bash
-Fontexto.exe --no-browser
-```
-
-The same thing can be done with the environment variable `CITATION_GRAPH_NO_BROWSER=1`. The last bound URL is written to `%APPDATA%\CitationTrace\last-url.txt`.
-
-The executable is unsigned, so Windows SmartScreen may show a warning on first launch.
-
-## Document view (tab C · Documento)
-
-Upload the main PDF, the `.bib` and, optionally, the reference PDFs ("Arquivos e revisão"). Tab **C · Documento** renders the main PDF page by page and highlights every in-text citation (author–year). Clicking one shows, in the side panel, the cited publication(s), the citing sentence, and the passages found in the reference PDF (page, similarity, text), with a button that opens the reference PDF on that page with the passage highlighted. Filters: status, reference, free text. From the graph, a publication or a "cites" edge has a "Ver N citação(ões) no documento" button.
-
-How the labels are computed (`src/core/evidence.ts`): the citing sentence (markers removed) is segmented from the main PDF; every sentence of the reference PDF (bibliography excluded) is scored by IDF-weighted overlap of content terms (numbers, acronyms, 5-letter stems, PT↔EN glossary). The best passages are shown with one of:
-
-- **Localizado**: a passage shares most of the sentence's rare terms;
-- **Ressalva**: weaker overlap, a number of the sentence missing from the passage, or only the abstract matches;
-- **Não localizado**: no similar passage, no reference PDF, no extractable text, or a sentence with too little content.
-
-These labels are *candidates for human review*, not proof that the reference supports the claim. Everything runs locally; the shared export (`/export/evidence`) removes text taken from private files. Results are stored in `evidence.json` per project and recomputed whenever files are added/removed or the project is rebuilt.
-
-## Web edition (fontexto.com, client-side)
-
-`npm run build:site` builds a static site (`dist/site`) with **no server**: the PDF parsing (pdf.js), reference extraction,
-linking and matching run in Web Workers (`src/web/local/`, on top of the platform-neutral `src/core/coreStore.ts`) and the
-projects live in the browser's IndexedDB. Nothing is uploaded. The Windows executable is the offline edition and shares
-`src/core`.
-
-- Optional "busca semântica" (re-rank by a multilingual sentence-embedding model, ~135 MB, downloaded once and cached) needs
-  the model files: `npm run fetch-model` (SHA-256 pinned) before `npm run build:site`. Without them the site builds without
-  that option.
-- Cloudflare Pages: `npx wrangler pages deploy dist/site --project-name fontexto --branch <branch>`. The `_headers` file
-  (strict CSP + Trusted Types, COOP/COEP/CORP, HSTS) is generated from `src/server/securityHeaders.ts`.
-- Check a deployment end to end in headless Chrome: `scripts/e2e/web-flow.mjs` (see its header for the variables).
-- How the automatic matcher is measured and its limits: `docs/matcher-evaluation.md`.
+Fontexto is free software under the [GNU Affero General Public License v3.0 or later](LICENSE) (AGPL-3.0-or-later). If you run a modified version as a network service, you must offer its source code to its users.
