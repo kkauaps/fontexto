@@ -151,7 +151,7 @@ export const ptBR: SiteContent = {
           ul: [
             '**Nada é inventado.** Nenhum dado bibliográfico, página ou trecho é inventado; valores desconhecidos aparecem como indisponíveis.',
             '**Rótulo não é prova.** A comparação automática só sugere trechos. Quem decide é sempre uma pessoa.',
-            '**Privado por padrão.** Os seus PDFs ficam no seu navegador. Não há analytics, rastreadores nem scripts de terceiros.',
+            '**Privado por padrão.** Os seus PDFs ficam no seu navegador. Não há rastreadores nem scripts de terceiros. Um total anônimo de visitas à página inicial pode aparecer quando passar de 1.000 em 30 dias.',
             '**Só fontes legais.** Os PDFs gratuitos vêm de editoras de acesso aberto, repositórios e servidores de preprints.',
           ],
         },
@@ -172,7 +172,7 @@ export const ptBR: SiteContent = {
       nav: 'Privacidade',
       title: 'Privacidade: os seus PDFs ficam no seu navegador',
       description:
-        'O que o Fontexto guarda, o que envia e para quem. Os seus PDFs nunca saem do navegador; sem cookies, analytics ou anúncios.',
+        'O que o Fontexto guarda, o que envia e para quem. Os seus PDFs nunca saem do navegador; sem cookies, analytics de terceiros ou anúncios.',
       h1: 'Privacidade',
       lead: 'O Fontexto foi feito para que os seus documentos nunca saiam do seu dispositivo. Esta página explica exatamente o que é guardado, o que é enviado e para quem.',
       sections: [
@@ -192,11 +192,18 @@ export const ptBR: SiteContent = {
           ],
         },
         {
+          h2: 'Total anônimo de visitas',
+          p: [
+            'A página inicial guarda um único total de quantas vezes foi aberta nos últimos 30 dias. Só são armazenados totais diários: sem cookies, sem endereços IP, sem identificadores de dispositivo e sem dados pessoais. Uma aba pode lembrar, no armazenamento da sessão, que já foi contada, para um recarregamento na mesma aba não contar duas vezes. Essa marca não é um identificador e some quando a aba é fechada.',
+            'O total só aparece na página inicial depois de passar de 1.000 visitas em 30 dias, como um número arredondado do tipo “1,2 mil pessoas usaram o Fontexto nos últimos 30 dias”.',
+          ],
+        },
+        {
           h2: 'O que não fazemos',
           ul: [
-            'Sem contas, sem cookies, sem analytics, sem publicidade, sem pixels de rastreamento.',
+            'Sem contas, sem cookies, sem analytics de terceiros, sem publicidade, sem pixels de rastreamento.',
             'Sem scripts, fontes ou conteúdos de terceiros: tudo o que a página carrega vem de fontexto.com.',
-            'Sem venda ou compartilhamento de dados, porque não os coletamos.',
+            'Sem venda ou compartilhamento de dados pessoais, porque não os coletamos. O total de visitas é só um número anônimo.',
           ],
         },
         {

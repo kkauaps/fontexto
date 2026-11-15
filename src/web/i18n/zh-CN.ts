@@ -48,6 +48,7 @@ export const zhCN: Messages = {
   recommended: '推荐',
   heroHint:
     '「仅主文档」会从开放库为参考文献查找免费 PDF（OpenAlex、Semantic Scholar、arXiv）。有 .bib 吗？',
+  recentVisits: (count: string) => `过去 30 天有 ${count} 人使用了 Fontexto`,
   ctaWithBib: '使用 .bib 发送',
   previewDocAlt: 'Fontexto 屏幕：带有标记引文的文章文本，旁边是在源中找到的段落',
   howItWorks: '工作原理',
@@ -63,7 +64,7 @@ export const zhCN: Messages = {
   previewGraphCaption: '该图显示了谁引用了谁；文档选项卡显示文本中的每个引文。',
   privacyTitle: '您的文件随身携带',
   privacyBody:
-    '您的 PDF 从未发送。仅当您请求免费搜索PDF时，每个参考文献的DOI、标题、年份和第一作者才会转到我们的服务器，该服务器会查阅开放数据库并返回PDF而不保存任何内容。没有广告或跟踪器。',
+    '您的 PDF 从未发送。仅当您请求免费搜索PDF时，每个参考文献的DOI、标题、年份和第一作者才会转到我们的服务器，该服务器会查阅开放数据库并返回PDF而不保存任何内容。没有广告或跟踪器。过去 30 天的访问总量在超过 1,000 次后，可能以匿名合计显示在此页。',
   openProject: '打开项目',
   createdOn: (date: string) => `创建于${date}`,
   footerNote: '每个引文的标签只是阅读辅助工具，而不是证据。请务必检查来源的摘录。',

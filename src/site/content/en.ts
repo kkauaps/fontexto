@@ -151,7 +151,7 @@ export const en: SiteContent = {
           ul: [
             '**Nothing is invented.** No bibliographic data, page or passage is made up; unknown values are shown as unavailable.',
             '**Labels are not proof.** Automatic matching only suggests passages. A person always decides.',
-            '**Private by design.** Your PDFs stay in your browser. There are no analytics, trackers or third-party scripts.',
+            '**Private by design.** Your PDFs stay in your browser. There are no trackers or third-party scripts. An anonymous total of landing-page visits may be shown once it passes 1,000 in 30 days.',
             '**Legal sources only.** Free PDFs come from open-access publishers, repositories and preprint servers.',
           ],
         },
@@ -172,7 +172,7 @@ export const en: SiteContent = {
       nav: 'Privacy',
       title: 'Privacy: your PDFs stay in your browser',
       description:
-        'What Fontexto stores, what it sends and to whom. Your PDFs never leave the browser; no cookies, analytics or ads.',
+        'What Fontexto stores, what it sends and to whom. Your PDFs never leave the browser; no cookies, third-party analytics or ads.',
       h1: 'Privacy',
       lead: 'Fontexto is built so that your documents never leave your device. This page explains exactly what is stored, what is sent and to whom.',
       sections: [
@@ -192,11 +192,18 @@ export const en: SiteContent = {
           ],
         },
         {
+          h2: 'Anonymous visit count',
+          p: [
+            'The landing page keeps a single running total of how many times it was opened in the last 30 days. Only daily totals are stored: no cookies, no IP addresses, no device identifiers and no personal data. A tab may remember, in session storage, that it has already been counted, so a reload in the same tab is not counted twice. That flag is not an identifier and disappears when the tab is closed.',
+            'The total is shown on the landing page only after it passes 1,000 visits in 30 days, as a rounded figure such as “1.2k people used Fontexto in the last 30 days”.',
+          ],
+        },
+        {
           h2: 'What we do not do',
           ul: [
-            'No accounts, no cookies, no analytics, no advertising, no tracking pixels.',
+            'No accounts, no cookies, no third-party analytics, no advertising, no tracking pixels.',
             'No third-party scripts, fonts or embeds: everything the page loads comes from fontexto.com.',
-            'No sale or sharing of data, because we do not collect it.',
+            'No sale or sharing of personal data, because we do not collect it. The visit total is an anonymous number only.',
           ],
         },
         {

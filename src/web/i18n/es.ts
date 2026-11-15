@@ -48,6 +48,7 @@ export const es: Messages = {
   recommended: 'Recomendado',
   heroHint:
     '“Solo mi documento” busca los PDFs gratuitos de las referencias (OpenAlex, Semantic Scholar, arXiv). ¿Tienes un .bib?',
+  recentVisits: (count: string) => `${count} personas usaron Fontexto en los últimos 30 días`,
   ctaWithBib: 'Envíalo con el .bib',
   previewDocAlt: 'Pantalla de Fontexto: el texto del artículo con las citas marcadas y, al lado, el pasaje encontrado en la fuente',
   howItWorks: 'Cómo funciona',
@@ -63,7 +64,7 @@ export const es: Messages = {
   previewGraphCaption: 'El grafo muestra quién cita a quién; la pestaña Documento muestra cada cita en el texto.',
   privacyTitle: 'Tus archivos se quedan contigo',
   privacyBody:
-    'Tus PDFs nunca se suben. Solo cuando pides buscar PDFs gratuitos, el DOI, el título, el año y el primer autor de cada referencia van a nuestro servidor, que consulta bases abiertas y devuelve el PDF sin guardar nada. No hay anuncios ni rastreadores.',
+    'Tus PDFs nunca se suben. Solo cuando pides buscar PDFs gratuitos, el DOI, el título, el año y el primer autor de cada referencia van a nuestro servidor, que consulta bases abiertas y devuelve el PDF sin guardar nada. No hay anuncios ni rastreadores. En esta página puede aparecer un total anónimo de visitas cuando supera las 1.000 en 30 días.',
   openProject: 'Abrir un proyecto',
   createdOn: (date: string) => `creado el ${date}`,
   footerNote: 'La etiqueta de cada cita es una ayuda de lectura, no una prueba. Revisa siempre el pasaje en la fuente.',

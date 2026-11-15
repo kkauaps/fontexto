@@ -1,3 +1,9 @@
 name = "fontexto"
 pages_build_output_dir = "dist/site"
 compatibility_date = "2026-11-13"
+
+# Anonymous daily visit totals only (not a secret). Preview uses its own namespace.
+[[kv_namespaces]]
+binding = "VISITS"
+id = "e972ee2ed9714d53b41b87f8cb224b05"
+preview_id = "2ce52636998d4f63bc771a533d639fbf"

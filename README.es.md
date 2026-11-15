@@ -13,7 +13,7 @@ Fontexto relaciona cada cita de un documento académico (tesis, disertación, ar
 - **PDF gratuitos, de forma legal.** Las copias en acceso abierto se buscan en OpenAlex, Crossref, Unpaywall, Europe PMC, arXiv, Semantic Scholar y CORE. Del navegador solo salen el DOI, el título, el año y el primer autor de la referencia.
 - **Red de referencias (grafo v2).** Con un clic en *Buscar vínculos entre referencias*, OpenAlex indica cuáles de tus referencias se citan entre sí (flechas) y cuáles comparten referencias (líneas discontinuas). Los nodos se colorean por tema, y la leyenda, en la que se puede hacer clic, alterna entre tema, subcampo y campo en bibliografías amplias. Zoom, desplazamiento y pellizco, vecinos al pasar el ratón, tamaño de los nodos por citas en el texto o globales, línea de tiempo por año, filtros por año, tipo y tema, y exportación a PNG o SVG de 1600×900. Sin la búsqueda, las referencias se agrupan por palabras clave del título.
 - **Cuatro idiomas.** La interfaz está en inglés (predeterminado), español, ruso y portugués de Brasil.
-- **Privado por diseño.** En la edición web, tus PDF nunca salen del navegador (IndexedDB). No hay analítica ni scripts de terceros.
+- **Privado por diseño.** En la edición web, tus PDF nunca salen del navegador (IndexedDB). No hay analítica de terceros ni scripts ajenos. La portada puede mostrar un total anónimo de visitas a 30 días cuando supera las 1.000.
 
 ![Red de referencias: referencias que se citan entre sí, coloreadas por tema](docs/screenshots/graph.png)
 

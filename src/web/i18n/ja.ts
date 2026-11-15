@@ -47,6 +47,7 @@ export const ja: Messages = {
   ctaDocAndPdfs: '文書 + 参考文献 PDF',
   recommended: 'おすすめ',
   heroHint: '「文書のみ」は、参考文献の無料 PDF を公開カタログ（OpenAlex、Semantic Scholar、arXiv）から探します。.bib をお持ちですか？',
+  recentVisits: (count: string) => `過去30日間に ${count} 人が Fontexto を利用しました`,
   ctaWithBib: '.bibで送信',
   previewDocAlt: 'Fontextoの画面：引用がマークされた記事の本文と、その横にある出典で見つかった箇所',
   howItWorks: 'ご使用方法',
@@ -62,7 +63,7 @@ export const ja: Messages = {
   previewGraphCaption: 'グラフは誰が誰を引用しているかを示し、「文書」タブは本文内の各引用を示します。',
   privacyTitle: 'ファイルはご自身の手元に',
   privacyBody:
-    'お客様のPDFが送信されることは決してありません。無料のPDFの検索をリクエストした場合にのみ、各参考文献のDOI、タイトル、発行年、第1著者が当社のサーバーに送信され、サーバーがオープンデータベースを検索し、何も保存せずにPDFを返します。広告やトラッカーはありません。',
+    'お客様のPDFが送信されることは決してありません。無料のPDFの検索をリクエストした場合にのみ、各参考文献のDOI、タイトル、発行年、第1著者が当社のサーバーに送信され、サーバーがオープンデータベースを検索し、何も保存せずにPDFを返します。広告やトラッカーはありません。直近30日間の訪問合計が1,000を超えた場合、このページに匿名の合計が表示されることがあります。',
   openProject: 'プロジェクトを開く',
   createdOn: (date: string) => `${date}に作成`,
   footerNote: '各引用のラベルは、読解を助けるものであり、証拠ではありません。必ず原文の該当箇所を確認してください。',

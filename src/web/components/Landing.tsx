@@ -3,6 +3,7 @@ import { BRAND } from '../brand';
 import { HeaderControls } from './HeaderControls';
 import { BrandMark } from './BrandMark';
 import { HeroPreview } from './HeroPreview';
+import { RecentVisits } from './RecentVisits';
 import { formatDate, privacyNote, sitePath, useI18n } from '../i18n';
 
 export type FlowMode = 'doc' | 'bib' | 'nobib';
@@ -56,6 +57,7 @@ export function Landing({ projects, error, onStart, onOpen }: Props) {
                 {t.ctaWithBib}
               </button>
             </p>
+            <RecentVisits />
           </div>
           <HeroPreview />
         </section>

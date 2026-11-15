@@ -151,7 +151,7 @@ export const es: SiteContent = {
           ul: [
             '**Nada se inventa.** Ningún dato bibliográfico, página o pasaje es inventado; los valores desconocidos se muestran como no disponibles.',
             '**Las etiquetas no son pruebas.** La comparación automática solo sugiere pasajes. Siempre decide una persona.',
-            '**Privado por diseño.** Tus PDF se quedan en tu navegador. No hay analítica, rastreadores ni scripts de terceros.',
+            '**Privado por diseño.** Tus PDF se quedan en tu navegador. No hay rastreadores ni scripts de terceros. Puede mostrarse un total anónimo de visitas a la página de inicio cuando supera las 1.000 en 30 días.',
             '**Solo fuentes legales.** Los PDF gratuitos vienen de editores de acceso abierto, repositorios y servidores de preprints.',
           ],
         },
@@ -172,7 +172,7 @@ export const es: SiteContent = {
       nav: 'Privacidad',
       title: 'Privacidad: tus PDF se quedan en tu navegador',
       description:
-        'Qué guarda Fontexto, qué envía y a quién. Tus PDF nunca salen del navegador; sin cookies, analítica ni anuncios.',
+        'Qué guarda Fontexto, qué envía y a quién. Tus PDF nunca salen del navegador; sin cookies, analítica de terceros ni anuncios.',
       h1: 'Privacidad',
       lead: 'Fontexto está hecho para que tus documentos nunca salgan de tu dispositivo. Esta página explica con exactitud qué se guarda, qué se envía y a quién.',
       sections: [
@@ -192,11 +192,18 @@ export const es: SiteContent = {
           ],
         },
         {
+          h2: 'Total anónimo de visitas',
+          p: [
+            'La página de inicio guarda un único total de cuántas veces se abrió en los últimos 30 días. Solo se almacenan totales diarios: ni cookies, ni direcciones IP, ni identificadores de dispositivo ni datos personales. Una pestaña puede recordar, en el almacenamiento de sesión, que ya fue contada, para no contar dos veces una recarga en la misma pestaña. Esa marca no es un identificador y desaparece al cerrar la pestaña.',
+            'El total se muestra en la página de inicio solo cuando supera las 1.000 visitas en 30 días, como una cifra redondeada del tipo “1,2 mil personas usaron Fontexto en los últimos 30 días”.',
+          ],
+        },
+        {
           h2: 'Lo que no hacemos',
           ul: [
-            'Sin cuentas, sin cookies, sin analítica, sin publicidad, sin píxeles de seguimiento.',
+            'Sin cuentas, sin cookies, sin analítica de terceros, sin publicidad, sin píxeles de seguimiento.',
             'Sin scripts, fuentes ni contenidos de terceros: todo lo que carga la página viene de fontexto.com.',
-            'Sin venta ni cesión de datos, porque no los recopilamos.',
+            'Sin venta ni cesión de datos personales, porque no los recopilamos. El total de visitas es solo un número anónimo.',
           ],
         },
         {

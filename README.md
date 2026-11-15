@@ -13,7 +13,7 @@ Fontexto links every citation in an academic document (thesis, dissertation, art
 - **Free PDFs, legally.** Open-access copies are looked up in OpenAlex, Crossref, Unpaywall, Europe PMC, arXiv, Semantic Scholar and CORE. Only the reference's DOI, title, year and first author leave the browser.
 - **Reference network (graph v2).** One click on *Find links between references* asks OpenAlex which of your references cite each other (arrows) and which share references (dashed lines). Nodes are coloured by topic, and the clickable legend switches between topic, subfield and field for broad bibliographies. Zoom, pan and pinch, hover to see neighbours, size nodes by in-text or global citations, switch to a timeline by year, filter by year, type and topic, and export a 1600×900 PNG or SVG. Without the lookup, references are grouped by title keywords.
 - **Four languages.** The interface is in English (default), Spanish, Russian and Brazilian Portuguese.
-- **Private by design.** In the web edition your PDFs never leave the browser (IndexedDB). There are no analytics or third-party scripts.
+- **Private by design.** In the web edition your PDFs never leave the browser (IndexedDB). There are no third-party analytics or scripts. The landing page may show an anonymous 30-day visit total once it passes 1,000.
 
 ![Reference network: references that cite each other, coloured by topic](docs/screenshots/graph.png)
 
@@ -91,7 +91,7 @@ See [`src/core/evidence.ts`](src/core/evidence.ts), the design notes in [`docs/a
 
 ## Web edition (fontexto.com)
 
-`npm run build:site` builds a static site (`dist/site`) with **no application server**: PDF parsing (pdf.js), reference extraction, linking and matching run in Web Workers (`src/web/local/`, on top of the platform-neutral `src/core/coreStore.ts`), and projects live in the browser's IndexedDB. The only server code is the small open-access proxy in `functions/api/oa/` (Cloudflare Pages Functions).
+`npm run build:site` builds a static site (`dist/site`) with **no application server**: PDF parsing (pdf.js), reference extraction, linking and matching run in Web Workers (`src/web/local/`, on top of the platform-neutral `src/core/coreStore.ts`), and projects live in the browser's IndexedDB. The only server code is the small open-access proxy in `functions/api/oa/` and an anonymous visit counter in `functions/api/visits.ts` (Cloudflare Pages Functions).
 
 - Optional semantic search (a multilingual sentence-embedding model, ~135 MB, downloaded once and cached) needs the model files: `npm run fetch-model` (SHA-256 pinned) before `npm run build:site`.
 - Cloudflare Pages: `npx wrangler pages deploy dist/site --project-name fontexto --branch <branch>`. The `_headers` file (strict CSP + Trusted Types, COOP/COEP/CORP, HSTS) is generated from `src/server/securityHeaders.ts`.

@@ -47,6 +47,7 @@ export const ptBR: Messages = {
   ctaDocAndPdfs: 'Documento + PDFs das referências',
   recommended: 'Recomendado',
   heroHint: '“Só o meu documento” busca os PDFs gratuitos das referências (OpenAlex, Semantic Scholar, arXiv). Tem um .bib?',
+  recentVisits: (count: string) => `${count} pessoas usaram o Fontexto nos últimos 30 dias`,
   ctaWithBib: 'Envie com o .bib',
   previewDocAlt: 'Tela do Fontexto: o texto do artigo com as citações marcadas e, ao lado, a passagem encontrada na fonte',
   howItWorks: 'Como funciona',
@@ -62,7 +63,7 @@ export const ptBR: Messages = {
   previewGraphCaption: 'O grafo mostra quem cita quem; a aba Documento mostra cada citação no texto.',
   privacyTitle: 'Seus arquivos ficam com você',
   privacyBody:
-    'Seus PDFs nunca são enviados. Só quando você pede a busca de PDFs gratuitos, o DOI, o título, o ano e o 1º autor de cada referência vão ao nosso servidor, que consulta bases abertas e devolve o PDF sem guardar nada. Não há anúncios nem rastreadores.',
+    'Seus PDFs nunca são enviados. Só quando você pede a busca de PDFs gratuitos, o DOI, o título, o ano e o 1º autor de cada referência vão ao nosso servidor, que consulta bases abertas e devolve o PDF sem guardar nada. Não há anúncios nem rastreadores. Um total anônimo de visitas pode aparecer nesta página quando passar de 1.000 em 30 dias.',
   openProject: 'Abrir projeto',
   createdOn: (date: string) => `criado em ${date}`,
   footerNote: 'O rótulo de cada citação é um apoio à leitura, não uma prova. Confira sempre o trecho na fonte.',

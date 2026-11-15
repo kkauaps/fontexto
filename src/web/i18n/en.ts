@@ -49,6 +49,7 @@ export const en = {
   heroHint:
     '“Just my document” looks up free PDFs of the references (OpenAlex, Semantic Scholar, arXiv). Have a .bib?',
   ctaWithBib: 'Upload it with the .bib',
+  recentVisits: (count: string) => `${count} people used Fontexto in the last 30 days`,
   previewDocAlt: 'Fontexto screen: the article text with citations highlighted and, beside it, the passage found in the source',
   howItWorks: 'How it works',
   step1Title: 'Send your document',
@@ -63,7 +64,7 @@ export const en = {
   previewGraphCaption: 'The graph shows who cites whom; the Document tab shows each citation in the text.',
   privacyTitle: 'Your files stay with you',
   privacyBody:
-    'Your PDFs are never uploaded. Only when you ask to look up free PDFs do the DOI, title, year and first author of each reference go to our server, which queries open databases and returns the PDF without keeping anything. No ads, no trackers.',
+    'Your PDFs are never uploaded. Only when you ask to look up free PDFs do the DOI, title, year and first author of each reference go to our server, which queries open databases and returns the PDF without keeping anything. No ads, no trackers. An anonymous visit total may appear on this page once it passes 1,000 in 30 days.',
   openProject: 'Open a project',
   createdOn: (date: string) => `created on ${date}`,
   footerNote: 'The label on each citation is a reading aid, not proof. Always check the passage in the source.',

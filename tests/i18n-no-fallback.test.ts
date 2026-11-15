@@ -30,6 +30,7 @@ function sampleFn(key: string, fn: (...args: unknown[]) => unknown): unknown {
     pageTitle: () => fn('Test'),
     tabCitations: () => fn(3),
     createdOn: () => fn('2020-01-01'),
+    recentVisits: () => fn('1.2k'),
     dropRefs: () => fn('2', true),
     stepUploadRefs: () => fn(2),
     stepProgress: () => fn(1, 5),

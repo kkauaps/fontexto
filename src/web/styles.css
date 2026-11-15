@@ -2311,6 +2311,14 @@ button.primary:hover, .primary:hover { background: var(--accent-hover); }
 
 .lp-hint { font-size: 12.5px; color: var(--faint); line-height: 1.45; max-width: 44ch; }
 
+.lp-visits {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  color: var(--faint);
+  line-height: 1.45;
+  max-width: 44ch;
+}
+
 .lp-preview {
   margin: 0;
   background: var(--surface);
