@@ -592,7 +592,7 @@ export function computeEvidence(input: ComputeEvidenceInput): EvidenceReport {
 
   if (mainFile && mainText) {
     const bibPubs = Object.values(graph.nodes).filter((n): n is PublicationNode => n.kind === 'publication' && n.inMainBibliography);
-    const bounds = referenceSectionBounds(mainText);
+    const bounds = referenceSectionBounds(mainText, { fallback: true });
     const flow = buildFlow(mainText, (page, line) => {
       if (!bounds) return false;
       const after = page > bounds.start.page || (page === bounds.start.page && line >= bounds.start.line);

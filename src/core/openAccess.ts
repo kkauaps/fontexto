@@ -17,6 +17,8 @@ export interface OaQuery {
   title?: string;
   year?: number;
   author?: string;
+  /** "thesis": title searches look among dissertations, with a wider year window (defence vs. deposit year). */
+  kind?: 'thesis';
 }
 
 export type OaStatus = 'oa' | 'closed' | 'not_found';
@@ -137,8 +139,9 @@ export function parseOaQuery(params: URLSearchParams): OaQuery | undefined {
   const title = params.get('title')?.replace(/\s+/g, ' ').trim().slice(0, 300);
   const year = Number(params.get('year')) || undefined;
   const author = params.get('author')?.trim().slice(0, 80);
-  if (doi && DOI_RE.test(doi)) return { doi, title, year, author };
-  if (title && title.length >= 8) return { title, year: year && year > 1500 && year < 2100 ? year : undefined, author };
+  const kind = params.get('kind') === 'thesis' ? ('thesis' as const) : undefined;
+  if (doi && DOI_RE.test(doi)) return { doi, title, year, author, ...(kind ? { kind } : {}) };
+  if (title && title.length >= 8) return { title, year: year && year > 1500 && year < 2100 ? year : undefined, author, ...(kind ? { kind } : {}) };
   return undefined;
 }
 
@@ -282,7 +285,16 @@ let defaultCache = memoryCache();
 export const oaContext = (f: Fetch, opts: OaOptions = {}): Ctx => ({ f, env: opts.env ?? {}, timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, now: opts.now ?? Date.now });
 export const foldText = (s: string) => fold(s);
 // v3: v2 folded non-Latin titles to "", so every Russian/Chinese title of one year shared a cache entry
-export const oaCacheKey = (q: OaQuery) => (q.doi ? `v3|doi|${q.doi}` : `v3|t|${fold(q.title ?? '')}|${q.year ?? ''}|${fold(q.author ?? '')}`);
+export const oaCacheKey = (q: OaQuery) => (q.doi ? `v3|doi|${q.doi}` : `v3|t|${fold(q.title ?? '')}|${q.year ?? ''}|${fold(q.author ?? '')}${q.kind ? `|${q.kind}` : ''}`);
+
+/** OpenAlex `filter=` for a title search: ±1 year, or for theses type:dissertation with ±2 years. */
+export function openAlexTitleFilter(q: OaQuery): string {
+  const parts: string[] = [];
+  if (q.kind === 'thesis') parts.push('type:dissertation');
+  const w = q.kind === 'thesis' ? 2 : 1;
+  if (q.year) parts.push(`publication_year:${q.year - w}-${q.year + w}`);
+  return parts.length ? `&filter=${parts.join(',')}` : '';
+}
 
 /* ------------------------------------------------------------------------------------------------------------ */
 /* Candidates: classification, dedupe, ranking                                                                    */
@@ -490,7 +502,7 @@ async function findWorkOpenAlex(ctx: Ctx, q: OaQuery): Promise<OpenAlexWork | un
     if (w) return w;
   }
   if (!q.title) return undefined;
-  const filter = q.year ? `&filter=publication_year:${q.year - 1}-${q.year + 1}` : '';
+  const filter = openAlexTitleFilter(q);
   const res = await callJson<{ results: OpenAlexWork[] }>(ctx, 'OpenAlex', withOpenAlexKey(ctx, `https://api.openalex.org/works?search=${encodeURIComponent(q.title)}${filter}&per-page=8`), undefined, 'OpenAlex:search');
   return bestMatch(res?.results ?? [], q, (w) => w.title ?? w.display_name ?? '', (w) => (w.authorships ?? []).map((a) => a.author?.display_name ?? ''), (w) => w.publication_year);
 }

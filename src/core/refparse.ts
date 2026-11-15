@@ -11,7 +11,7 @@
 import { findDois } from './normalize.js';
 import type { ReferenceEntry } from './references.js';
 
-export type ReferenceStyle = 'abnt' | 'apa' | 'ieee' | 'vancouver' | 'unknown';
+export type ReferenceStyle = 'abnt' | 'apa' | 'ieee' | 'vancouver' | 'gbt' | 'unknown';
 
 export interface ParsedReference {
   index: number;
@@ -26,6 +26,8 @@ export interface ParsedReference {
   key: string;
   /** Printed numeric label ("[3]"), when the list is numbered. */
   label?: string;
+  /** A thesis or dissertation (ABNT "Tese (Doutorado)", APA "[Doctoral dissertation]", GOST "дис.", GB/T "[D]"). */
+  thesis?: boolean;
 }
 
 const PARTICLE = /^(?:van|von|de|da|der|den|dos|das|del|della|di|du|le|la)$/i;
@@ -144,6 +146,8 @@ function titleAfter(text: string, from: number): string | undefined {
   let t = m[1];
   // keep a trailing "?" or "!" that belongs to the title
   if (/[?!]\s/.test(rest.slice(t.length, t.length + 2))) t += rest[t.length];
+  // APA thesis/description in brackets after the title: "Title [Doctoral dissertation, University]"
+  t = t.replace(/\s*\[[^\]]*(?:dissertation|thesis|tesis|tese|disserta[cç][aã]o|диссертац)[^\]]*\]\s*$/iu, '').trim();
   // GB/T 7714 document-type marks: "标题[J]", "Title[M]", "[EB/OL]"
   t = t.replace(/\s*\[(?:J|M|D|C|N|R|S|P|Z|A|G|EB\/OL|DB\/OL|J\/OL|M\/OL|CP)\]\s*$/, '').trim();
   return t.length >= 3 ? t : undefined;
@@ -219,8 +223,55 @@ function familyInitialsBlock(text: string): { authors: string; year?: number; en
   return { authors: m[1].replace(/\.$/, ''), year: m[2] ? Number(m[2]) : undefined, end: m[0].length };
 }
 
+// GB/T 7714: "张三, 李四, 王五, 等. 标题[J]. 期刊, 2020, 78(3): 1-10." or "ZHOU Q H, LI S, et al. Title[J]. ...".
+const GBT_RE = /^(.{1,200}?)[.．]\s*(.+?)\s*\[(?:J|M|D|C|N|R|S|P|Z|A|G|EB\/OL|DB\/OL|J\/OL|M\/OL|CP)\]/su;
+const HAN_RE = /^[\p{Script=Han}·]+$/u;
+/** Authors of a GB/T 7714 entry, or undefined when the entry is not GB/T-shaped. */
+export function gbtAuthors(text: string): { authors: ParsedReference['authors']; etAl: boolean; title: string } | undefined {
+  const m = GBT_RE.exec(text);
+  if (!m) return undefined;
+  const block = m[1].trim();
+  const parts = block.split(/\s*[,，、;；]\s*/).map((p) => p.trim()).filter(Boolean);
+  let etAl = false;
+  const authors: ParsedReference['authors'] = [];
+  for (const p of parts) {
+    if (/^(?:等|et\s*al\.?)$/i.test(p)) {
+      etAl = true;
+      continue;
+    }
+    // Chinese names stay whole: in-text author-year citations ("（张越, 2025）") and catalogues use the full name.
+    if (HAN_RE.test(p)) {
+      authors.push({ family: p.replace(/\s+/g, '') });
+      continue;
+    }
+    // Pinyin/Latin: the family name comes first, in capitals ("ZHOU Q H", "ZHANG San", "HOPEWELL S").
+    const w = /^(\p{Lu}[\p{Lu}'’\-]+)(?:\s+(.+))?$/u.exec(p);
+    if (!w) return undefined;
+    authors.push({ family: titleCaseName(w[1]), given: w[2]?.trim() || undefined });
+  }
+  if (!authors.length) return undefined;
+  return { authors, etAl, title: m[2].trim() };
+}
+
+const THESIS_RE = /\b(?:tese\s*\((?:doutorado|mestrado|livre)|disserta[cç][aã]o\s*\(mestrado|ph\.?\s?d\.?\s+(?:thesis|dissertation)|doctoral\s+(?:thesis|dissertation)|master'?s\s+(?:thesis|dissertation)|m\.?\s?sc\.?\s+thesis|tesis\s+(?:doctoral|de\s+(?:maestr[ií]a|doctorado|licenciatura))|th[eè]se\s+de\s+doctorat|dissertation\s+zur)|дис\.|диссертация\s+на\s+соискание|автореф|\[D\]|学位论文/iu;
+/** True when the entry text describes a thesis or dissertation. */
+export function isThesisText(text: string): boolean {
+  return THESIS_RE.test(text);
+}
+// GOST thesis without the "//" part: "Петров И. И. Методы синтетических решёток : дис. … канд. техн. наук. – М., 2018."
+const GOST_THESIS_RE = /^(\p{Lu}[\p{L}'’\-]+)\s((?:\p{Lu}\.\s?){1,3})\s*(.+?)\s+:\s+(?:дис|автореф)/u;
+
 export function parseReferenceText(text: string, index = 0, label?: string): Omit<ParsedReference, 'key'> {
   const doi = findDois(text)[0];
+  const gostThesis = GOST_THESIS_RE.exec(text);
+  if (gostThesis) {
+    return { index, text, style: 'vancouver', authors: [{ family: gostThesis[1], given: gostThesis[2].replace(/\s+/g, '') }], etAl: false, year: pickYear(text, gostThesis[0].length), title: gostThesis[3].trim(), doi, label, thesis: true };
+  }
+  const gbt = gbtAuthors(text);
+  if (gbt) {
+    const after = text.indexOf(gbt.title) + gbt.title.length;
+    return { index, text, style: 'gbt', authors: gbt.authors, etAl: gbt.etAl, year: pickYear(text, after) ?? pickYear(text), title: gbt.title.length >= 2 ? gbt.title : undefined, doi, label };
+  }
   const gost = GOST_RE.exec(text);
   if (gost) {
     const authors = gost[1]
@@ -329,6 +380,7 @@ export function parseReferences(entries: Pick<ReferenceEntry, 'index' | 'text' |
   const used = new Map<string, number>();
   return entries.map((e) => {
     const p = parseReferenceText(e.text, e.index, e.label);
+    if (isThesisText(e.text)) p.thesis = true;
     const base = `${fold(p.authors[0]?.family ?? 'ref') || 'ref'}${p.year ?? ''}`;
     const n = used.get(base) ?? 0;
     used.set(base, n + 1);
@@ -349,7 +401,7 @@ export function toBibtex(refs: ParsedReference[]): string {
     if (r.title) fields.push(`title = {{${esc(r.title)}}}`);
     if (r.doi) fields.push(`doi = {${r.doi}}`);
     fields.push(`note = {Extraído da lista de referências do artigo}`);
-    out.push(`@misc{${r.key},\n  ${fields.join(',\n  ')}\n}`);
+    out.push(`@${r.thesis ? 'phdthesis' : 'misc'}{${r.key},\n  ${fields.join(',\n  ')}\n}`);
   }
   return out.join('\n\n') + '\n';
 }

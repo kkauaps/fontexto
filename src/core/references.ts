@@ -91,8 +91,8 @@ export function repeatedLines(pdf: PdfText): Set<string> {
   return out;
 }
 
-export function findReferenceHeading(pdf: PdfText): { page: number; line: number } | undefined {
-  let found: { page: number; line: number } | undefined;
+export function findReferenceHeading(pdf: PdfText): ReferenceStart | undefined {
+  let found: ReferenceStart | undefined;
   for (const p of pdf.pages) {
     p.lines.forEach((l, idx) => {
       if (HEADING_RE.test(l.text.normalize('NFKC').trim())) found = { page: p.page, line: idx };
@@ -101,19 +101,86 @@ export function findReferenceHeading(pdf: PdfText): { page: number; line: number
   return found;
 }
 
+export interface ReferenceStart {
+  page: number;
+  /** Heading line, or (when `implicit`) the first entry line. */
+  line: number;
+  /** True when no heading was found and the list was detected from the shape of the lines at the end of the text. */
+  implicit?: boolean;
+}
+
+const TAIL_NUMBER_RE = /^(?:\[(\d{1,3})\]|(\d{1,3})\.)\s+\S/;
+
+/**
+ * Fallback for documents whose bibliography has no recognisable heading (or a heading in a language we do not know):
+ * finds the last dense run of lines that look like reference entries (numbered "[n]"/"n." in order, or author-first
+ * lines with a year close by) after the first fifth of the text. Returns the first entry of that run.
+ */
+export function findReferenceTail(pdf: PdfText): ReferenceStart | undefined {
+  const repeated = repeatedLines(pdf);
+  const lines: { page: number; line: number; text: string }[] = [];
+  for (const p of pdf.pages) {
+    p.lines.forEach((l, i) => {
+      const t = l.text.normalize('NFKC').trim();
+      if (!t || isPageNumber(t) || repeated.has(t.replace(/\d+/g, '#').toLowerCase())) return;
+      lines.push({ page: p.page, line: i, text: t });
+    });
+  }
+  if (lines.length < 6) return undefined;
+  const yearNear = (i: number) => lines.slice(i, i + 4).some((l) => HAS_YEAR_RE.test(l.text));
+  const starts: { i: number; n?: number }[] = [];
+  lines.forEach((l, i) => {
+    const m = TAIL_NUMBER_RE.exec(l.text);
+    if (m && yearNear(i)) starts.push({ i, n: Number(m[1] ?? m[2]) });
+    else if (AUTHOR_START_RE.test(l.text) && yearNear(i)) starts.push({ i });
+  });
+  if (starts.length < 3) return undefined;
+  // Walk back from the last candidate while the gaps stay small: that is the trailing list.
+  const MAX_GAP = 8;
+  let first = starts.length - 1;
+  while (first > 0 && starts[first].i - starts[first - 1].i <= MAX_GAP) first--;
+  let run = starts.slice(first);
+  // Numbered list: start at the entry numbered 1 (or 2) and keep the run only when the numbers mostly ascend.
+  const numbered = run.filter((s) => s.n !== undefined);
+  if (numbered.length >= run.length * 0.6) {
+    const one = run.findIndex((s) => s.n !== undefined && s.n <= 2);
+    if (one < 0) return undefined;
+    run = run.slice(one);
+    const ns = run.map((s) => s.n).filter((n): n is number => n !== undefined);
+    let asc = 0;
+    for (let k = 1; k < ns.length; k++) if (ns[k] === ns[k - 1] + 1) asc++;
+    if (asc < Math.max(2, (ns.length - 1) * 0.6)) return undefined;
+  }
+  if (run.length < 3) return undefined;
+  // The list must come after the opening of the text (not a title-page author list) and cover most of what follows it.
+  const begin = run[0].i;
+  if (begin < lines.length * 0.2) return undefined;
+  const span = lines.length - begin;
+  if (run.length / span < 0.12) return undefined;
+  return { page: lines[begin].page, line: lines[begin].line, implicit: true };
+}
+
+/** Heading of the bibliography, or the detected start of a trailing reference list without a heading. */
+export function findReferenceStart(pdf: PdfText): ReferenceStart | undefined {
+  return findReferenceHeading(pdf) ?? findReferenceTail(pdf);
+}
+
 /**
  * Location of the bibliography inside a PDF: from its heading up to the next
  * section that clearly follows it (appendix, acknowledgements, ...), if any.
  * `end` is exclusive and undefined when the list runs to the end of the file.
  */
-export function referenceSectionBounds(pdf: PdfText): { start: { page: number; line: number }; end?: { page: number; line: number } } | undefined {
-  const start = findReferenceHeading(pdf);
+export function referenceSectionBounds(
+  pdf: PdfText,
+  opts: { fallback?: boolean } = {},
+): { start: ReferenceStart; end?: { page: number; line: number } } | undefined {
+  const start = opts.fallback ? findReferenceStart(pdf) : findReferenceHeading(pdf);
   if (!start) return undefined;
   const repeated = repeatedLines(pdf);
   let seen = false;
   for (const p of pdf.pages) {
     if (p.page < start.page) continue;
-    const from = p.page === start.page ? start.line + 1 : 0;
+    const from = p.page === start.page ? start.line + (start.implicit ? 0 : 1) : 0;
     for (let i = from; i < p.lines.length; i++) {
       const t = p.lines[i].text.trim();
       if (!t || isPageNumber(t)) continue;
@@ -129,12 +196,12 @@ interface SectionLine extends TextLine {
   page: number;
 }
 
-function sectionLines(pdf: PdfText, start: { page: number; line: number }): SectionLine[] {
+function sectionLines(pdf: PdfText, start: ReferenceStart): SectionLine[] {
   const repeated = repeatedLines(pdf);
   const out: SectionLine[] = [];
   for (const p of pdf.pages) {
     if (p.page < start.page) continue;
-    const from = p.page === start.page ? start.line + 1 : 0;
+    const from = p.page === start.page ? start.line + (start.implicit ? 0 : 1) : 0;
     for (let i = from; i < p.lines.length; i++) {
       const l = p.lines[i];
       const t = l.text.trim();
@@ -171,7 +238,7 @@ function parseYears(text: string): number[] {
 }
 
 export function extractReferenceEntries(pdf: PdfText): ReferenceEntry[] {
-  const heading = findReferenceHeading(pdf);
+  const heading = findReferenceStart(pdf);
   if (!heading) return [];
   const lines = sectionLines(pdf, heading);
   if (lines.length === 0) return [];

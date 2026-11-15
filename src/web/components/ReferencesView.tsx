@@ -46,7 +46,8 @@ export async function withRetry<T>(run: () => Promise<T>, waits: number[] = [200
 }
 
 function query(pub: PublicationNode) {
-  return { doi: pub.doi, title: pub.title, year: pub.year, author: pub.authors[0]?.family };
+  const thesis = /thesis|dissertation/i.test(pub.entryType ?? '');
+  return { doi: pub.doi, title: pub.title, year: pub.year, author: pub.authors[0]?.family, ...(thesis ? { kind: 'thesis' as const } : {}) };
 }
 
 const safeName = (pub: PublicationNode) => `${(pub.bibKeys[0] ?? pub.label).replace(/[^\p{L}\p{N}_-]+/gu, '_').slice(0, 60) || 'referencia'}.pdf`;
