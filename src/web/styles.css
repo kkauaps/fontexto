@@ -3269,3 +3269,14 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   .net-tip { max-width: 220px; }
   .view-switch-float { top: 6px; }
 }
+
+/* Upload flow: "Back" lives under the header, aligned with the card's left edge (the header keeps logo + theme + language) */
+.uf-backbar { display: flex; width: calc(100% - 32px); max-width: 820px; margin: 16px auto 0; box-sizing: border-box; }
+.uf-backbar + .uf-main { margin-top: 12px; }
+.uf-backbar .hdr-back { min-height: 40px; }
+@media (max-width: 760px) {
+  .uf-backbar { width: calc(100% - 24px); margin-top: 8px; }
+  .uf-backbar + .uf-main { margin-top: 10px; }
+  .uf-backbar .hdr-back { width: auto; height: 44px; min-height: 44px; padding: 0 14px 0 10px; }
+  .uf-backbar .hdr-back .hdr-back-text { display: inline; }
+}

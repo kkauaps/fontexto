@@ -241,11 +241,13 @@ export function UploadFlow({ mode, onBack, onDone }: Props) {
         <button className="linklike brand-btn" onClick={onBack} aria-label={t.backToStart}>
           <BrandMark />
         </button>
-        <BackPill onClick={onBack} label={t.back} />
         <div className="lp-nav-right">
           <HeaderControls />
         </div>
       </header>
+      <div className="uf-backbar">
+        <BackPill className="uf-back" onClick={onBack} label={t.back} />
+      </div>
       <main className="uf-main">
         {phase === 'form' && (
           <>
