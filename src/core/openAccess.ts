@@ -135,15 +135,23 @@ export function titleSimilarity(a: string, b: string): number {
   return inter / Math.max(x.size, y.size);
 }
 
-const ARXIV_ID_RE = /^(?:\d{4}\.\d{4,5}|[a-z][a-z\-]*\/\d{7})$/i;
+const ARXIV_NEW_RE = /^\d{4}\.\d{4,5}$/;
+const ARXIV_OLD_RE = /^[a-z]{1,32}(?:-[a-z]{1,32}){0,4}\/\d{7}$/;
 
 /** Normalises an arXiv id from a query param, a URL, or "arXiv:...." */
 export function parseArxivId(raw: string | null | undefined): string | undefined {
-  const s = raw?.trim();
+  if (!raw) return undefined;
+  let s = raw.trim().slice(0, 120).toLowerCase();
   if (!s) return undefined;
-  const m = /(?:arxiv(?:\.org\/(?:abs|pdf)\/|:))?\s*((?:\d{4}\.\d{4,5}|[a-z][a-z\-]*\/\d{7}))(?:v\d+)?(?:\.pdf)?$/i.exec(s);
-  const id = (m?.[1] ?? s.replace(/^arxiv:/i, '').replace(/v\d+$/i, '')).toLowerCase();
-  return ARXIV_ID_RE.test(id) ? id : undefined;
+  const abs = s.indexOf('arxiv.org/abs/');
+  const pdf = s.indexOf('arxiv.org/pdf/');
+  if (abs >= 0) s = s.slice(abs + 14);
+  else if (pdf >= 0) s = s.slice(pdf + 14);
+  else if (s.startsWith('arxiv:')) s = s.slice(6).trimStart();
+  if (s.endsWith('.pdf')) s = s.slice(0, -4);
+  const v = s.search(/v\d+$/);
+  if (v > 0) s = s.slice(0, v);
+  return ARXIV_NEW_RE.test(s) || ARXIV_OLD_RE.test(s) ? s : undefined;
 }
 
 /** Validates and normalises a query coming from the network. */
