@@ -40,7 +40,7 @@ export function PdfViewer({ projectId, request: initial, backLabel, onClose, emb
   const scrollToHighlight = () => {
     const host = bodyRef.current;
     const el = host?.querySelector('.hl');
-    el?.scrollIntoView({ block: 'center', inline: 'nearest' });
+    el?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
   };
   const [phraseBoxes, setPhraseBoxes] = useState<{ boxes: BoxRect[]; exact: boolean } | undefined>();
   const [pageSize, setPageSize] = useState<{ w: number; h: number; base: { width: number; height: number } }>();
@@ -102,6 +102,24 @@ export function PdfViewer({ projectId, request: initial, backLabel, onClose, emb
     };
   }, [doc, page, scale, request.phrase]);
 
+  const ok = target?.ok ? target : undefined;
+  const showHighlights = ok && ok.exactHighlight && page === ok.page && pageSize;
+
+  useEffect(() => {
+    if (!pageSize || !bodyRef.current) return;
+    const hasPhrase = (phraseBoxes?.boxes.length ?? 0) > 0;
+    const hasAnchor = Boolean(showHighlights && ok?.highlights.length);
+    if (!hasPhrase && !hasAnchor) return;
+    let frames = 0;
+    let raf = 0;
+    const tick = () => {
+      if (bodyRef.current?.querySelector('.hl')) scrollToHighlight();
+      else if (frames++ < 90) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [pageSize, phraseBoxes, showHighlights, ok?.highlights, page]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -132,8 +150,6 @@ export function PdfViewer({ projectId, request: initial, backLabel, onClose, emb
     };
   }, [doc, page, target?.ok]);
 
-  const ok = target?.ok ? target : undefined;
-  const showHighlights = ok && ok.exactHighlight && page === ok.page && pageSize;
   const sx = pageSize && ok?.pageSize ? pageSize.w / ok.pageSize.width : scale;
   const sy = pageSize && ok?.pageSize ? pageSize.h / ok.pageSize.height : scale;
 

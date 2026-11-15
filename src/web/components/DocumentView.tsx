@@ -18,6 +18,20 @@ export interface DocumentFocus {
   nonce: number;
 }
 
+const DocFloatIcon = {
+  filters: (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M4 6h16M7 12h10M10 18h4" strokeLinecap="round" />
+    </svg>
+  ),
+  citations: (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M8 6h13M8 12h13M8 18h9" strokeLinecap="round" />
+      <path d="M4 6h.01M4 12h.01M4 18h.01" strokeLinecap="round" strokeWidth="2.6" />
+    </svg>
+  ),
+};
+
 interface Props {
   projectId: string;
   graph: CitationGraph;
@@ -324,23 +338,35 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
       <div className="doc-main">
         {phone && (
           <div className="doc-float-bar" role="toolbar" aria-label={t.tabDocument}>
-            <button type="button" className="doc-float-btn" onClick={() => setFilterSheet(true)}>
-              {t.mobileFilters}
+            <button type="button" className="doc-float-btn" onClick={() => setFilterSheet(true)} aria-label={t.mobileFilters}>
+              {DocFloatIcon.filters}
             </button>
-            <button type="button" className="doc-float-btn" onClick={() => setCitSheet(true)} disabled={filtered.length === 0}>
-              {t.mobileCitationList} ({filtered.length})
+            <button
+              type="button"
+              className="doc-float-btn"
+              onClick={() => setCitSheet(true)}
+              disabled={filtered.length === 0}
+              aria-label={`${t.mobileCitationList} (${filtered.length})`}
+            >
+              {DocFloatIcon.citations}
+              {filtered.length > 0 ? <span className="doc-float-badge" aria-hidden="true">{filtered.length}</span> : null}
             </button>
             <span className="doc-nav doc-nav-float">
-              <button type="button" onClick={() => step(-1)} disabled={filtered.length === 0} title={t.previousCitation}>
+              <button type="button" onClick={() => step(-1)} disabled={filtered.length === 0} aria-label={t.previousCitation} title={t.previousCitation}>
                 ‹
               </button>
-              <button type="button" onClick={() => step(1)} disabled={filtered.length === 0} title={t.nextCitation}>
+              <button type="button" onClick={() => step(1)} disabled={filtered.length === 0} aria-label={t.nextCitation} title={t.nextCitation}>
                 ›
               </button>
-              <button type="button" onClick={() => setScale((s) => Math.max(0.4, +(s - 0.15).toFixed(2)))} title={t.zoomOut}>
+              <button
+                type="button"
+                onClick={() => setScale((s) => Math.max(0.4, +(s - 0.15).toFixed(2)))}
+                aria-label={t.zoomOut}
+                title={t.zoomOut}
+              >
                 −
               </button>
-              <button type="button" onClick={() => setScale((s) => Math.min(2.4, +(s + 0.15).toFixed(2)))} title={t.zoomIn}>
+              <button type="button" onClick={() => setScale((s) => Math.min(2.4, +(s + 0.15).toFixed(2)))} aria-label={t.zoomIn} title={t.zoomIn}>
                 +
               </button>
             </span>

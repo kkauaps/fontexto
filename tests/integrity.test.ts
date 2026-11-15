@@ -19,7 +19,10 @@ describe('page and anchor integrity', () => {
 
   it('highlights only when the text is on the page and rects fit the page', () => {
     const good = { fileId: file.id, page: 2, text: 'Gradient lattices', rects: [{ x: 56, y: 60, w: 200, h: 12 }], pageSize: { width: 595, height: 842 } };
-    expect(viewerTarget(good, file, text)).toMatchObject({ ok: true, page: 2, exactHighlight: true });
+    const trusted = viewerTarget(good, file, text);
+    expect(trusted).toMatchObject({ ok: true, page: 2, exactHighlight: true });
+    expect(trusted.ok && trusted.highlights.length).toBeGreaterThan(0);
+    expect(trusted.ok && trusted.highlights.every((r) => r.w > 0 && r.h > 0 && r.x >= 0 && r.y >= 0)).toBe(true);
 
     const wrongPage = { ...good, page: 1 };
     const t1 = viewerTarget(wrongPage, file, text);
