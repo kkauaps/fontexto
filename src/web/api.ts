@@ -46,13 +46,14 @@ const base = (p: string) => `/api/projects/${encodeURIComponent(p)}`;
 export type { OaCandidate, OaHost, OaResult, OaVersion } from '../core/openAccess';
 export type OaFetch = { file: File; source: string; host?: OaHost; version?: OaVersion } | { file?: undefined; result: OaResult; error?: string };
 
-/** Asks the proxy for a free PDF of one reference. Only DOI/title/year/first author leave the browser. */
-async function oaFetchPdf(q: { doi?: string; title?: string; year?: number; author?: string; kind?: 'thesis' }, name: string, signal?: AbortSignal): Promise<OaFetch> {
+/** Asks the proxy for a free PDF of one reference. Only DOI/title/year/first author/arXiv id leave the browser. */
+async function oaFetchPdf(q: { doi?: string; title?: string; year?: number; author?: string; arxiv?: string; kind?: 'thesis' }, name: string, signal?: AbortSignal): Promise<OaFetch> {
   const u = new URLSearchParams();
   if (q.doi) u.set('doi', q.doi);
   if (q.title) u.set('title', q.title);
   if (q.year) u.set('year', String(q.year));
   if (q.author) u.set('author', q.author);
+  if (q.arxiv) u.set('arxiv', q.arxiv);
   if (q.kind) u.set('kind', q.kind);
   const res = await fetch(`/api/oa/pdf?${u}`, { signal, credentials: 'omit' });
   const type = res.headers.get('content-type') ?? '';

@@ -72,6 +72,14 @@ type PubRecord = Omit<PublicationNode, 'label'> & { priority: number };
 
 const MAX_CITATION_ANCHORS = 40;
 
+function urlFromEprint(f: Record<string, string>): string | undefined {
+  const id = (f.eprint ?? '').trim().replace(/^arxiv:/i, '').replace(/v\d+$/i, '');
+  if (!id) return undefined;
+  const prefix = (f.archiveprefix ?? '').toLowerCase();
+  if (prefix === 'arxiv' || /^\d{4}\.\d{4,5}$/.test(id) || /^[a-z][a-z-]*\/\d{7}$/i.test(id)) return `https://arxiv.org/abs/${id}`;
+  return undefined;
+}
+
 function bibToRecord(entry: BibEntry, fileId: string): PubRecord {
   const f = entry.fields;
   const title = f.title ? decodeLatex(f.title) : undefined;
@@ -79,7 +87,8 @@ function bibToRecord(entry: BibEntry, fileId: string): PubRecord {
   const y = parseYear(f.year ?? f.date);
   const doi = normalizeDoi(f.doi) ?? (f.url ? normalizeDoi(f.url) : undefined);
   const venueRaw = f.journal ?? f.journaltitle ?? f.booktitle ?? f.publisher ?? f.institution ?? f.school;
-  const fields = Object.entries({ title, authors: authors.length ? 1 : undefined, year: y.year, doi, venue: venueRaw, abstract: f.abstract, url: f.url })
+  const url = f.url || urlFromEprint(f);
+  const fields = Object.entries({ title, authors: authors.length ? 1 : undefined, year: y.year, doi, venue: venueRaw, abstract: f.abstract, url })
     .filter(([, v]) => v !== undefined)
     .map(([k]) => k);
   return {
@@ -92,7 +101,7 @@ function bibToRecord(entry: BibEntry, fileId: string): PubRecord {
     doi,
     venue: venueRaw ? decodeLatex(venueRaw) : undefined,
     abstract: f.abstract ? decodeLatex(f.abstract) : undefined,
-    url: f.url,
+    url,
     bibKeys: [entry.key],
     entryType: entry.type,
     fileIds: [],

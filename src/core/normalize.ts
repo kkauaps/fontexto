@@ -79,20 +79,93 @@ export function normalizeDoi(input: string | undefined | null): string | undefin
   s = s.replace(/^doi:\s*/i, '');
   s = s.replace(/\s+/g, '');
   s = s.replace(/[.,;:)\]}>"']+$/, '');
+  s = s.replace(/\((?:1[5-9]|20)\d{2}$/, '');
   if (!/^10\.\d{4,9}\/\S+$/.test(s)) return undefined;
   return s.toLowerCase();
 }
 
+/**
+ * Reconstructs DOIs that PDF extractors split with zero-width spaces or gaps
+ * ("h t t p s : / / d o i . o r g / 1 0 . 1 0 1 6 / j . m e d i a").
+ */
+export function reconstructSpacedDois(text: string): string {
+  if (!text) return '';
+  const s = text.replace(/\p{Cf}+/gu, '');
+  const prefixRe = /(?:h\s*t\s*t\s*p\s*s?\s*:\s*\/\s*\/\s*)?(?:d\s*x\s*\.\s*)?d\s*o\s*i\s*(?:\s*\.\s*o\s*r\s*g\s*\/|\s*:\s*)/gi;
+  let result = '';
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = prefixRe.exec(s))) {
+    result += s.slice(last, m.index);
+    result += m[0].replace(/\s+/g, '');
+    let i = m.index + m[0].length;
+    let body = '';
+    const isYearParen = (at: number) => {
+      if (s[at] !== '(') return false;
+      const compact = s.slice(at + 1).replace(/\s+/g, '');
+      return /^(?:1[5-9]|20)\d{2}(?:\)|$|[^0-9])/.test(compact) && !/^(?:1[5-9]|20)\d{2}\d/.test(compact);
+    };
+    while (i < s.length) {
+      if (/\s/.test(s[i])) {
+        let j = i + 1;
+        while (j < s.length && /\s/.test(s[j])) j++;
+        if (j >= s.length || isYearParen(j) || !/[A-Za-z0-9.\-_/():;<>]/.test(s[j])) break;
+        i = j;
+        continue;
+      }
+      const ch = s[i];
+      if (isYearParen(i)) break;
+      if (!/[A-Za-z0-9.\-_/():;<>]/.test(ch)) break;
+      if ((ch === '.' || ch === ',' || ch === ';') && body.length >= 8) {
+        let j = i + 1;
+        while (j < s.length && /\s/.test(s[j])) j++;
+        const n = s[j];
+        const continues = n !== undefined && (ch === '.' ? /[A-Za-z0-9/_-]/ : /[0-9/<>()-]/).test(n);
+        if (!continues) break;
+      }
+      body += ch;
+      i++;
+      if (body.length > 200) break;
+    }
+    result += body;
+    last = i;
+    prefixRe.lastIndex = i;
+  }
+  return result + s.slice(last);
+}
+
 /** Finds DOIs inside free text (e.g. a reference entry or a PDF first page). */
 export function findDois(text: string): string[] {
+  if (!text) return [];
   const out: string[] = [];
   // SICI-style DOIs carry <...> segments: 10.1002/(SICI)1097-4636(199704)35:1<129::AID-JBM13>3.0.CO;2-E
   const re = /\b(10\.\d{4,9}\/(?:[^\s"<>]|<[^\s"<>]{1,40}>)+)/gi;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) {
-    const d = normalizeDoi(m[1]);
-    if (d && !out.includes(d)) out.push(d);
+  for (const hay of [text, reconstructSpacedDois(text)]) {
+    let m: RegExpExecArray | null;
+    re.lastIndex = 0;
+    while ((m = re.exec(hay))) {
+      const d = normalizeDoi(m[1]);
+      if (d && !out.includes(d)) out.push(d);
+    }
   }
+  return out;
+}
+
+/** New-style (YYMM.nnnnn) or old-style (subject/0000000) arXiv identifiers in free text. */
+export function findArxivIds(text: string): string[] {
+  if (!text) return [];
+  const hay = text.replace(/\p{Cf}+/gu, '');
+  const out: string[] = [];
+  const push = (id: string | undefined) => {
+    const v = id?.replace(/v\d+$/i, '').toLowerCase();
+    if (v && !out.includes(v)) out.push(v);
+  };
+  const re = /\barxiv(?:\.org\/(?:abs|pdf)\/|:?\s*)(\d{4}\.\d{4,5}(?:v\d+)?|[a-z\-]+\/\d{7}(?:v\d+)?)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(hay))) push(m[1]);
+  // "Segment Anything. 2304.02643 (2023)" — bare new-style id, only when not already captured
+  const bare = /(?<!\d)((?:0[7-9]|1\d|2[0-6])(?:0[1-9]|1[0-2])\.\d{4,5})(?:v\d+)?(?!\d)/g;
+  while ((m = bare.exec(hay))) push(m[1]);
   return out;
 }
 

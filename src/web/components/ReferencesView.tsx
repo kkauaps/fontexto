@@ -19,8 +19,8 @@ export type OaState =
   | { kind: 'error'; message: string };
 
 const CONCURRENCY = 3;
-/** /api/oa/* allows 20 requests per 10 s per IP; starting one every 550 ms keeps a long list under it (≈18/10 s). */
-const OA_MIN_GAP_MS = 550;
+/** Site allows 20 /api/oa/* requests per 10 s; 1100 ms also keeps Semantic Scholar (1 rps) from stacking in the server queue. */
+const OA_MIN_GAP_MS = 1100;
 
 /** Spaces out request starts shared by all workers, so concurrency never bursts past the site's rate limit. */
 export function makePacer(gapMs: number, now = () => Date.now(), sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))) {
@@ -45,9 +45,17 @@ export async function withRetry<T>(run: () => Promise<T>, waits: number[] = [200
   }
 }
 
+/** arXiv id carried on the publication URL (from BibTeX eprint / archivePrefix). */
+export function arxivFromPub(pub: Pick<PublicationNode, 'url'>): string | undefined {
+  const u = pub.url ?? '';
+  const m = /arxiv\.org\/(?:abs|pdf)\/([^\s?#]+?)(?:\.pdf)?(?:v\d+)?$/i.exec(u);
+  return m?.[1]?.replace(/v\d+$/i, '').toLowerCase();
+}
+
 function query(pub: PublicationNode) {
   const thesis = /thesis|dissertation/i.test(pub.entryType ?? '');
-  return { doi: pub.doi, title: pub.title, year: pub.year, author: pub.authors[0]?.family, ...(thesis ? { kind: 'thesis' as const } : {}) };
+  const arxiv = arxivFromPub(pub);
+  return { doi: pub.doi, title: pub.title, year: pub.year, author: pub.authors[0]?.family, ...(arxiv ? { arxiv } : {}), ...(thesis ? { kind: 'thesis' as const } : {}) };
 }
 
 const safeName = (pub: PublicationNode) => `${(pub.bibKeys[0] ?? pub.label).replace(/[^\p{L}\p{N}_-]+/gu, '_').slice(0, 60) || 'referencia'}.pdf`;
@@ -63,7 +71,7 @@ export async function fetchOpenAccess(
   onState: (pubId: string, s: OaState) => void,
   onGraph?: (g: CitationGraph) => void,
 ): Promise<{ got: number; graph?: CitationGraph }> {
-  const queue = pubs.filter((p) => p.doi || (p.title && p.title.length >= 8));
+  const queue = pubs.filter((p) => p.doi || arxivFromPub(p) || (p.title && p.title.length >= 8));
   for (const p of pubs) if (!queue.includes(p)) onState(p.id, { kind: 'not_found' });
   const files: { file: File; publicationId: string }[] = [];
   let i = 0;

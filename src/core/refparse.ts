@@ -8,7 +8,7 @@
  * Heuristic and conservative: a field that cannot be read is left out, never guessed. Keys are derived from
  * the first family name and the year (`ronneberger2015`, `silva2020b`).
  */
-import { findDois } from './normalize.js';
+import { findArxivIds, findDois } from './normalize.js';
 import type { ReferenceEntry } from './references.js';
 
 export type ReferenceStyle = 'abnt' | 'apa' | 'ieee' | 'vancouver' | 'gbt' | 'unknown';
@@ -23,6 +23,8 @@ export interface ParsedReference {
   year?: number;
   title?: string;
   doi?: string;
+  /** arXiv id (e.g. "1809.10486"), when the entry cites a preprint. */
+  arxiv?: string;
   key: string;
   /** Printed numeric label ("[3]"), when the list is numbered. */
   label?: string;
@@ -51,7 +53,7 @@ export function titleCaseName(s: string): string {
 function detectStyle(text: string, label?: string): ReferenceStyle {
   if (/^\p{Lu}{2,}[\p{Lu}'’\- ]*,\s*["“]/u.test(text)) return 'ieee';
   if (/^\p{Lu}{2,}[\p{Lu}'’\- ]*,\s/u.test(text) || /^\p{Lu}{2,}(?:\.\p{Lu}{1,3})?\.\s+\p{Lu}/u.test(text)) return 'abnt';
-  if (/^[^()]{3,200}\(\s*(?:\d{4}[a-z]?|n\.d\.)\s*\)\./u.test(text)) return 'apa';
+  if (/^[^()]{3,200}\(\s*(?:\d{4}[a-z]?|n\.d\.)\s*\)\.\s+\S/u.test(text)) return 'apa';
   if (label || /^(?:\p{Lu}\.\s?){1,3}\p{Lu}[\p{L}'’\-]+/u.test(text) || /["“]/.test(text.slice(0, 250))) return /^\p{Lu}[\p{L}'’\-]+\s\p{Lu}{1,3}[,.]/u.test(text) ? 'vancouver' : 'ieee';
   if (/^\p{Lu}[\p{L}'’\-]+(?:\s\p{Lu}[\p{L}'’\-]+)?\s\p{Lu}{1,3}[,.]/u.test(text)) return 'vancouver';
   if (/^\p{Lu}[\p{L}'’\-]+,\s*(?:\p{Lu}\.|\p{Lu}\p{Ll}+)/u.test(text)) return 'apa';
@@ -161,7 +163,8 @@ function pickYear(text: string, from = 0): number | undefined {
     .replace(/(?:\b(?:pp?|S|vol|v|no|n|nr)\.?|С\.|Т\.|№)\s*\d+(?:\s*[–—-]\s*\d+)?/gu, ' ')
     .replace(/:\s*\d+\s*[–—-]\s*\d+/g, ' ')
     .replace(/https?:\/\/\S+/g, ' ')
-    .replace(/\b10\.\d{4,9}\/\S+/g, ' ');
+    .replace(/\b10\.\d{4,9}\/\S+/g, ' ')
+    .replace(/\b(?:arxiv:?\s*)?\d{4}\.\d{4,5}(?:v\d+)?\b/gi, ' ');
   const max = new Date().getFullYear() + 1;
   for (const m of clean.matchAll(/\b(1[5-9]\d{2}|20\d{2})[a-z]?\b/g)) {
     const y = Number(m[1]);
@@ -209,7 +212,7 @@ function parseAuthorsGeneric(block: string): { authors: ParsedReference['authors
 const FAMILY = String.raw`(?:(?:van|von|de|da|der|den|dos|das|del|della|di|du|le|la)\s+)*\p{Lu}[\p{L}\p{M}'’¨´\-]+(?:\s(?:\p{Lu}[\p{L}\p{M}'’¨´\-]+))?`;
 const INITIALS = String.raw`\p{Lu}\.(?:\s?-?\p{Lu}\.)*`;
 const FAMILY_INITIALS_BLOCK = new RegExp(
-  String.raw`^(${FAMILY},\s${INITIALS}(?:(?:,\s|,?\s&\s|,?\sand\s)${FAMILY},\s${INITIALS})*(?:,?\s(?:et\s+al\.|\.\.\.\s${FAMILY},\s${INITIALS}))?)(?:,?\s((?:1[5-9]|20)\d{2})[a-z]?\.|:(?=\s)|(?=\s(?:\p{Lu}[\p{Ll}\d\-]|["“\d]|\p{Lu}{2,}[\s:\-])))`,
+  String.raw`^(${FAMILY},\s${INITIALS}(?:(?:,\s|,?\s&\s|,?\sand\s)${FAMILY},\s${INITIALS})*(?:,?\s(?:et\s+al\.|\.\.\.\s${FAMILY},\s${INITIALS}))?)(?:,?\s((?:1[5-9]|20)\d{2})[a-z]?\.|:(?=\s)|(?=\s(?:\p{Lu}[\p{Ll}\d\-]|["“\d]|\p{Lu}{2,}[\s:\-]|\p{Ll}+\p{Lu})))`,
   'u',
 );
 
@@ -261,16 +264,34 @@ export function isThesisText(text: string): boolean {
 // GOST thesis without the "//" part: "Петров И. И. Методы синтетических решёток : дис. … канд. техн. наук. – М., 2018."
 const GOST_THESIS_RE = /^(\p{Lu}[\p{L}'’\-]+)\s((?:\p{Lu}\.\s?){1,3})\s*(.+?)\s+:\s+(?:дис|автореф)/u;
 
+/** Drops leftover author fragments that the splitter sometimes returns as a "title". */
+function usableTitle(t: string | undefined): string | undefined {
+  if (!t) return undefined;
+  const s = t.trim();
+  if (s.length < 3) return undefined;
+  // "et al." in the middle of a Nature entry is an author mark, not the title.
+  if (/^(?:et\s+al\.?|&|and)\s*$/i.test(s)) return undefined;
+  if (/^et\s+al\.?\s+/i.test(s)) {
+    const rest = s.replace(/^et\s+al\.?\s+/i, '').trim();
+    return usableTitle(rest);
+  }
+  if (/^(?:&|and)\s+$/i.test(s)) return undefined;
+  if (/^(?:&\s*)?(?:\p{Lu}\.\s*)+\p{Lu}\.?$/u.test(s)) return undefined;
+  if (/^\p{Lu}\.\s*et\s+al\.?$/u.test(s)) return undefined;
+  return s;
+}
+
 export function parseReferenceText(text: string, index = 0, label?: string): Omit<ParsedReference, 'key'> {
   const doi = findDois(text)[0];
+  const arxiv = findArxivIds(text)[0];
   const gostThesis = GOST_THESIS_RE.exec(text);
   if (gostThesis) {
-    return { index, text, style: 'vancouver', authors: [{ family: gostThesis[1], given: gostThesis[2].replace(/\s+/g, '') }], etAl: false, year: pickYear(text, gostThesis[0].length), title: gostThesis[3].trim(), doi, label, thesis: true };
+    return { index, text, style: 'vancouver', authors: [{ family: gostThesis[1], given: gostThesis[2].replace(/\s+/g, '') }], etAl: false, year: pickYear(text, gostThesis[0].length), title: usableTitle(gostThesis[3].trim()), doi, arxiv, label, thesis: true };
   }
   const gbt = gbtAuthors(text);
   if (gbt) {
     const after = text.indexOf(gbt.title) + gbt.title.length;
-    return { index, text, style: 'gbt', authors: gbt.authors, etAl: gbt.etAl, year: pickYear(text, after) ?? pickYear(text), title: gbt.title.length >= 2 ? gbt.title : undefined, doi, label };
+    return { index, text, style: 'gbt', authors: gbt.authors, etAl: gbt.etAl, year: pickYear(text, after) ?? pickYear(text), title: gbt.title.length >= 2 ? gbt.title : undefined, doi, arxiv, label };
   }
   const gost = GOST_RE.exec(text);
   if (gost) {
@@ -283,7 +304,7 @@ export function parseReferenceText(text: string, index = 0, label?: string): Omi
         return m ? { family: m[1], given: m[2].replace(/\s+/g, '') } : { family: a };
       });
     const title = gost[3].trim().replace(/[\s.]+$/, '');
-    return { index, text, style: 'vancouver', authors, etAl: Boolean(gost[2]), year: pickYear(gost[4]) ?? pickYear(text), title: title.length >= 3 ? title : undefined, doi, label };
+    return { index, text, style: 'vancouver', authors, etAl: Boolean(gost[2]), year: pickYear(gost[4]) ?? pickYear(text), title: title.length >= 3 ? title : undefined, doi, arxiv, label };
   }
   // French/European author-year with capitals and no comma: "BARJOT D. (2012), « Titre », Revue..."
   const fr = /^((?:\p{Lu}[\p{Lu}'’\-]+(?:\s\p{Lu}[\p{Lu}'’\-]+)?\s(?:\p{Lu}\.\s?){1,3},?\s*)+(?:et\s+al\.)?)\s*\(\s*((?:1[5-9]|20)\d{2})[a-z]?\s*\)[,.:]?\s*/u.exec(text);
@@ -297,7 +318,7 @@ export function parseReferenceText(text: string, index = 0, label?: string): Omi
         const m = /^(.+?)\s((?:\p{Lu}\.\s?){1,3})$/u.exec(a);
         return m ? { family: titleCaseName(m[1]), given: m[2].trim() } : { family: titleCaseName(a) };
       });
-    return { index, text, style: 'apa', authors, etAl: /et\s+al\./.test(fr[1]), year: Number(fr[2]), title: titleAfter(text, fr[0].length), doi, label };
+    return { index, text, style: 'apa', authors, etAl: /et\s+al\./.test(fr[1]), year: Number(fr[2]), title: usableTitle(titleAfter(text, fr[0].length)), doi, arxiv, label };
   }
   let style = detectStyle(text, label);
   let authors: ParsedReference['authors'] = [];
@@ -330,13 +351,34 @@ export function parseReferenceText(text: string, index = 0, label?: string): Omi
       title = titleAfter(text, m[0].length - 1);
     }
   } else if (style === 'ieee' || style === 'vancouver') {
+    // IEEE usually quotes the title; numbered Nature/Harvard lists do not, and splitting on the
+    // first ". " cuts through initials ("Family, I., Family, I. Title.").
     const q = /["“]([^"”]+?)[,.]?["”]/u.exec(text);
-    if (q) {
+    const etAlHead = new RegExp(
+      String.raw`^(${FAMILY},\s${INITIALS}(?:(?:,\s|,?\s&\s|,?\sand\s)${FAMILY},\s${INITIALS})*)\s+et\s+al\.\s+`,
+      'u',
+    ).exec(text);
+    const fb = familyInitialsBlock(text);
+    // "Zhou Wang, A. Bovik, H. Sheikh" can look like "Family, I." if we stop after the first initials.
+    const fbComplete = Boolean(fb && !/^\s*\p{Lu}[\p{L}'’\-]+,\s*\p{Lu}\./u.test(text.slice(fb.end)));
+    if (q && (!etAlHead || q.index < etAlHead[0].length) && (!fbComplete || q.index < (fb?.end ?? Infinity))) {
       const g = parseAuthorsGeneric(text.slice(0, q.index).trim().replace(/[,.]$/, ''));
       authors = g.authors;
       etAl = g.etAl;
       title = q[1].trim();
       year = pickYear(text, q.index + q[0].length);
+    } else if (etAlHead) {
+      const g = parseAuthorsGeneric(etAlHead[1]);
+      authors = g.authors;
+      etAl = true;
+      title = titleAfter(text, etAlHead[0].length);
+      year = pickYear(text, etAlHead[0].length);
+    } else if (fbComplete && fb) {
+      const g = parseAuthorsGeneric(fb.authors);
+      authors = g.authors;
+      etAl = g.etAl;
+      year = fb.year ?? pickYear(text, fb.end);
+      title = titleAfter(text, fb.end);
     } else {
       const dot = text.indexOf('. ');
       if (dot > 0) {
@@ -372,7 +414,7 @@ export function parseReferenceText(text: string, index = 0, label?: string): Omi
     }
   }
   if (year === undefined) year = pickYear(text);
-  return { index, text, style, authors, etAl, year, title, doi, label };
+  return { index, text, style, authors, etAl, year, title: usableTitle(title), doi, arxiv, label };
 }
 
 /** Parses every entry and assigns unique keys (`family` + `year` + optional letter). */
@@ -400,6 +442,11 @@ export function toBibtex(refs: ParsedReference[]): string {
     const fields = [...(r.authors.length ? [`author = {${authors}}`] : []), ...(r.year ? [`year = {${r.year}}`] : [])];
     if (r.title) fields.push(`title = {{${esc(r.title)}}}`);
     if (r.doi) fields.push(`doi = {${r.doi}}`);
+    if (r.arxiv) {
+      fields.push(`eprint = {${r.arxiv}}`);
+      fields.push(`archivePrefix = {arXiv}`);
+      fields.push(`url = {https://arxiv.org/abs/${r.arxiv}}`);
+    }
     fields.push(`note = {Extraído da lista de referências do artigo}`);
     out.push(`@${r.thesis ? 'phdthesis' : 'misc'}{${r.key},\n  ${fields.join(',\n  ')}\n}`);
   }

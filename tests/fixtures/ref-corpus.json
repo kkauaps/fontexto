@@ -1,0 +1,1511 @@
+{
+ "note": "Regression corpus for reference parsing: a slice of the public gold_all set (real works, synthetic typography in generated PDFs) plus synthetic Nature/IEEE/arXiv/spaced-DOI cases. No PTCC material.",
+ "cases": [
+  {
+   "id": "pt-abnt:g316",
+   "doc": "pt-abnt",
+   "lang": "pt",
+   "style": "abnt",
+   "source": "corpus",
+   "text": "ZANDAVALLI, C. B. Avaliação da educação superior no Brasil: os antecedentes históricos do SINAES. Avaliação: Revista da Avaliação da Educação Superior (Campinas), v. 14, n. 2, p. 385-438, 2009. DOI: 10.1590/s1414-40772009000200008.",
+   "label": null,
+   "expect": {
+    "family": "Zandavalli",
+    "year": 2009,
+    "title": "Avaliação da educação superior no Brasil: os antecedentes históricos do SINAES",
+    "doi": "10.1590/s1414-40772009000200008"
+   }
+  },
+  {
+   "id": "pt-abnt:g319",
+   "doc": "pt-abnt",
+   "lang": "pt",
+   "style": "abnt",
+   "source": "corpus",
+   "text": "ZAINKO, M. A. S. Avaliação da educação superior no Brasil: processo de construção histórica. Avaliação: Revista da Avaliação da Educação Superior (Campinas), v. 13, n. 3, p. 827-831, 2008. DOI: 10.1590/s1414-40772008000300012.",
+   "label": null,
+   "expect": {
+    "family": "Zainko",
+    "year": 2008,
+    "title": "Avaliação da educação superior no Brasil: processo de construção histórica",
+    "doi": "10.1590/s1414-40772008000300012"
+   }
+  },
+  {
+   "id": "pt-abnt:g004",
+   "doc": "pt-abnt",
+   "lang": "pt",
+   "style": "abnt",
+   "source": "corpus",
+   "text": "SOUZA, A. C. d. et al. Propriedades psicométricas na avaliação de instrumentos: avaliação da confiabilidade e da validade. Epidemiologia e Serviços de Saúde, v. 26, n. 3, p. 649- 659, 2017. DOI: 10.5123/s1679-49742017000300022. W3C. Web Content Accessibility Guidelines (WCAG) 2.1. 2018. Disponível em: https://www.w3.org/TR/WCAG21/. Acesso em: 10 out. 2026.",
+   "label": null,
+   "expect": {
+    "family": "Souza",
+    "year": 2017,
+    "title": "Propriedades psicométricas na avaliação de instrumentos: avaliação da confiabilidade e da validade",
+    "doi": "10.5123/s1679-49742017000300022"
+   }
+  },
+  {
+   "id": "pt-abnt:g015",
+   "doc": "pt-abnt",
+   "lang": "pt",
+   "style": "abnt",
+   "source": "corpus",
+   "text": "SIQUEIRA, D. S.; COSTA, B. E. P. d.; FIGUEIREDO, A. E. P. L. Coping e qualidade de vida em pacientes em lista de espera para transplante renal. Acta Paulista de Enfermagem, v. 30, n. 6, p. 582-589, 2017. DOI: 10.1590/1982-0194201700082.",
+   "label": null,
+   "expect": {
+    "family": "Siqueira",
+    "year": 2017,
+    "title": "Coping e qualidade de vida em pacientes em lista de espera para transplante renal",
+    "doi": "10.1590/1982-0194201700082"
+   }
+  },
+  {
+   "id": "pt-abnt-semdoi:g319",
+   "doc": "pt-abnt-semdoi",
+   "lang": "pt",
+   "style": "abnt",
+   "source": "corpus",
+   "text": "ZAINKO, M. A. S. Avaliação da educação superior no Brasil: processo de construção histórica. Avaliação: Revista da Avaliação da Educação Superior (Campinas), v. 13, n. 3, p. 827-831, 2008.",
+   "label": null,
+   "expect": {
+    "family": "Zainko",
+    "year": 2008,
+    "title": "Avaliação da educação superior no Brasil: processo de construção histórica"
+   }
+  },
+  {
+   "id": "pt-abnt-semdoi:g136",
+   "doc": "pt-abnt-semdoi",
+   "lang": "pt",
+   "style": "abnt",
+   "source": "corpus",
+   "text": "VAPNIK, V. N. The Nature of Statistical Learning Theory. [S. l.]: [s. n.], 1995.",
+   "label": null,
+   "expect": {
+    "family": "Vapnik",
+    "year": 1995,
+    "title": "The Nature of Statistical Learning Theory"
+   }
+  },
+  {
+   "id": "pt-abnt-semdoi:g322",
+   "doc": "pt-abnt-semdoi",
+   "lang": "pt",
+   "style": "abnt",
+   "source": "corpus",
+   "text": "TREVISAN, A. L.; DEVECHI, C. P. V.; DIAS, E. D. Avaliação da avaliação da pós-graduação em educação do Brasil: quanta verdade é suportável?. Avaliação: Revista da Avaliação da Educação Superior (Campinas), v. 18, n. 2, p. 373-392, 2013.",
+   "label": null,
+   "expect": {
+    "family": "Trevisan",
+    "year": 2013,
+    "title": "Avaliação da avaliação da pós-graduação em educação do Brasil: quanta verdade é suportável?"
+   }
+  },
+  {
+   "id": "pt-abnt-semdoi:g004",
+   "doc": "pt-abnt-semdoi",
+   "lang": "pt",
+   "style": "abnt",
+   "source": "corpus",
+   "text": "SOUZA, A. C. d. et al. Propriedades psicométricas na avaliação de instrumentos: avaliação da confiabilidade e da validade. Epidemiologia e Serviços de Saúde, v. 26, n. 3, p. 649- 659, 2017.",
+   "label": null,
+   "expect": {
+    "family": "Souza",
+    "year": 2017,
+    "title": "Propriedades psicométricas na avaliação de instrumentos: avaliação da confiabilidade e da validade"
+   }
+  },
+  {
+   "id": "en-apa:g151",
+   "doc": "en-apa",
+   "lang": "en",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, Ł., & Polosukhin, I. (2017). Attention Is All You Need. arXiv. https://doi.org/10.48550/arxiv.1706.03762 W3C (2018). Web Content Accessibility Guidelines (WCAG) 2.1. https://www.w3.org/TR/WCAG21/",
+   "label": null,
+   "expect": {
+    "family": "Vaswani",
+    "year": 2017,
+    "title": "Attention Is All You Need",
+    "doi": "10.48550/arxiv.1706.03762"
+   }
+  },
+  {
+   "id": "en-apa:g123",
+   "doc": "en-apa",
+   "lang": "en",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Tricco, A. C., Lillie, E., Zarin, W., O'Brien, K. K., Colquhoun, H., Levac, D., Moher, D., Peters, M. D., Horsley, T., Weeks, L., Hempel, S., & Akl, E. A. (2018). PRISMA Extension for Scoping Reviews (PRISMA-ScR): Checklist and Explanation. Annals of Internal Medicine, 169(7), 467–473. https://doi.org/10.7326/m18-0850",
+   "label": null,
+   "expect": {
+    "family": "Tricco",
+    "year": 2018,
+    "title": "PRISMA Extension for Scoping Reviews (PRISMA-ScR): Checklist and Explanation",
+    "doi": "10.7326/m18-0850"
+   }
+  },
+  {
+   "id": "en-apa:g138",
+   "doc": "en-apa",
+   "lang": "en",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Taur, Y., & Ning, T. H. (2009). Fundamentals of Modern VLSI Devices. https://doi.org/10.1017/cbo9781139195065",
+   "label": null,
+   "expect": {
+    "family": "Taur",
+    "year": 2009,
+    "title": "Fundamentals of Modern VLSI Devices",
+    "doi": "10.1017/cbo9781139195065"
+   }
+  },
+  {
+   "id": "en-apa:g125",
+   "doc": "en-apa",
+   "lang": "en",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Tamura, K., Stecher, G., Peterson, D., Filipski, A., & Kumar, S. (2013). MEGA6: Molecular Evolutionary Genetics Analysis Version 6.0. Molecular Biology and Evolution, 30(12), 2725–2729. https://doi.org/10.1093/molbev/mst197",
+   "label": null,
+   "expect": {
+    "family": "Tamura",
+    "year": 2013,
+    "title": "MEGA6: Molecular Evolutionary Genetics Analysis Version 6.0",
+    "doi": "10.1093/molbev/mst197"
+   }
+  },
+  {
+   "id": "en-ieee:g160",
+   "doc": "en-ieee",
+   "lang": "en",
+   "style": "ieee",
+   "source": "corpus",
+   "text": "S. Ioffe and C. Szegedy, “Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift,” 2015, arXiv. doi:10.48550/arxiv.1502.03167",
+   "label": "[26]",
+   "expect": {
+    "family": "Ioffe",
+    "year": 2015,
+    "title": "Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift",
+    "doi": "10.48550/arxiv.1502.03167"
+   }
+  },
+  {
+   "id": "en-ieee:g159",
+   "doc": "en-ieee",
+   "lang": "en",
+   "style": "ieee",
+   "source": "corpus",
+   "text": "A. Paszke et al., “PyTorch: An Imperative Style, High-Performance Deep Learning Library,” 2019, arXiv. doi:10.48550/arxiv.1912.01703",
+   "label": "[25]",
+   "expect": {
+    "family": "Paszke",
+    "year": 2019,
+    "title": "PyTorch: An Imperative Style, High-Performance Deep Learning Library",
+    "doi": "10.48550/arxiv.1912.01703"
+   }
+  },
+  {
+   "id": "en-ieee:g158",
+   "doc": "en-ieee",
+   "lang": "en",
+   "style": "ieee",
+   "source": "corpus",
+   "text": "T. Kipf and M. Welling, “Semi-Supervised Classification with Graph Convolutional Networks,” 2016, arXiv. doi:10.48550/arxiv.1609.02907",
+   "label": "[24]",
+   "expect": {
+    "family": "Kipf",
+    "year": 2016,
+    "title": "Semi-Supervised Classification with Graph Convolutional Networks",
+    "doi": "10.48550/arxiv.1609.02907"
+   }
+  },
+  {
+   "id": "en-ieee:g157",
+   "doc": "en-ieee",
+   "lang": "en",
+   "style": "ieee",
+   "source": "corpus",
+   "text": "T. Mikolov, K. Chen, G. S. Corrado, and D. Jeffrey, “Efficient Estimation of Word Representations in Vector Space,” 2013, arXiv. doi:10.48550/arxiv.1301.3781",
+   "label": "[23]",
+   "expect": {
+    "family": "Mikolov",
+    "year": 2013,
+    "title": "Efficient Estimation of Word Representations in Vector Space",
+    "doi": "10.48550/arxiv.1301.3781"
+   }
+  },
+  {
+   "id": "en-ieee-2col:g155",
+   "doc": "en-ieee-2col",
+   "lang": "en",
+   "style": "ieee",
+   "source": "corpus",
+   "text": "A. Dosovitskiy et al., “An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale,” 2020, arXiv. doi:10.48550/arxiv.2010.11929 Revista Genérica de Métodos · v. 1",
+   "label": "[30]",
+   "expect": {
+    "family": "Dosovitskiy",
+    "year": 2020,
+    "title": "An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale",
+    "doi": "10.48550/arxiv.2010.11929"
+   }
+  },
+  {
+   "id": "en-ieee-2col:g154",
+   "doc": "en-ieee-2col",
+   "lang": "en",
+   "style": "ieee",
+   "source": "corpus",
+   "text": "J. Devlin, M. W. Chang, K. Lee, and K. Toutanova, “BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding,” 2018, arXiv. doi:10.48550/arxiv.1810.04805",
+   "label": "[29]",
+   "expect": {
+    "family": "Devlin",
+    "year": 2018,
+    "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+    "doi": "10.48550/arxiv.1810.04805"
+   }
+  },
+  {
+   "id": "en-ieee-2col:g153",
+   "doc": "en-ieee-2col",
+   "lang": "en",
+   "style": "ieee",
+   "source": "corpus",
+   "text": "D. P. Kingma and J. L. Ba, “Adam: A Method for Stochastic Optimization,” 2014, arXiv. doi:10.48550/arxiv.1412.6980",
+   "label": "[28]",
+   "expect": {
+    "family": "Kingma",
+    "year": 2014,
+    "title": "Adam: A Method for Stochastic Optimization",
+    "doi": "10.48550/arxiv.1412.6980"
+   }
+  },
+  {
+   "id": "en-ieee-2col:g152",
+   "doc": "en-ieee-2col",
+   "lang": "en",
+   "style": "ieee",
+   "source": "corpus",
+   "text": "K. Simonyan and A. Zisserman, “Very Deep Convolutional Networks for Large-Scale Image Recognition,” 2014, arXiv. doi:10.48550/arxiv.1409.1556",
+   "label": "[27]",
+   "expect": {
+    "family": "Simonyan",
+    "year": 2014,
+    "title": "Very Deep Convolutional Networks for Large-Scale Image Recognition",
+    "doi": "10.48550/arxiv.1409.1556"
+   }
+  },
+  {
+   "id": "en-vancouver:g121",
+   "doc": "en-vancouver",
+   "lang": "en",
+   "style": "vancouver",
+   "source": "corpus",
+   "text": "Deb K, Pratap A, Agarwal S, Meyarivan T. A fast and elitist multiobjective genetic algorithm: NSGA-II. IEEE Transactions on Evolutionary Computation. 2002;6(2):182- 197. doi:10.1109/4235.996017",
+   "label": "25.",
+   "expect": {
+    "family": "Deb",
+    "year": 2002,
+    "title": "A fast and elitist multiobjective genetic algorithm: NSGA-II",
+    "doi": "10.1109/4235.996017"
+   }
+  },
+  {
+   "id": "en-vancouver:g100",
+   "doc": "en-vancouver",
+   "lang": "en",
+   "style": "vancouver",
+   "source": "corpus",
+   "text": "Sheldrick GM. A short history of SHELX. Acta Crystallographica Section A Foundations of Crystallography. 2008;64(1):112-122. doi:10.1107/s0108767307043930",
+   "label": "24.",
+   "expect": {
+    "family": "Sheldrick",
+    "year": 2008,
+    "title": "A short history of\n                    SHELX",
+    "doi": "10.1107/s0108767307043930"
+   }
+  },
+  {
+   "id": "en-vancouver:g111",
+   "doc": "en-vancouver",
+   "lang": "en",
+   "style": "vancouver",
+   "source": "corpus",
+   "text": "Zhou Wang, Bovik A, Sheikh H, Simoncelli E. Image quality assessment: from error visibility to structural similarity. IEEE Transactions on Image Processing. 2004;13(4):600-612. doi:10.1109/tip.2003.819861",
+   "label": "23.",
+   "expect": {
+    "family": "Zhou Wang",
+    "year": 2004,
+    "title": "Image quality assessment: from error visibility to structural similarity",
+    "doi": "10.1109/tip.2003.819861"
+   }
+  },
+  {
+   "id": "en-vancouver:g120",
+   "doc": "en-vancouver",
+   "lang": "en",
+   "style": "vancouver",
+   "source": "corpus",
+   "text": "Dobin A, Davis CA, Schlesinger F, Drenkow J, Zaleski C, Jha S, et al. STAR: ultrafast universal RNA-seq aligner. Bioinformatics. 2013;29(1):15-21. doi:10.1093/bioinformatics/bts635",
+   "label": "22.",
+   "expect": {
+    "family": "Dobin",
+    "year": 2013,
+    "title": "STAR: ultrafast universal RNA-seq aligner",
+    "doi": "10.1093/bioinformatics/bts635"
+   }
+  },
+  {
+   "id": "en-harvard:g119",
+   "doc": "en-harvard",
+   "lang": "en",
+   "style": "harvard",
+   "source": "corpus",
+   "text": "Venkatesh, V. et al. 2003. User Acceptance of Information Technology: Toward A Unified View1. MIS Quarterly, 27(3), pp. 425–478. doi:10.2307/30036540 Revista Genérica de Métodos · v. 1",
+   "label": null,
+   "expect": {
+    "family": "Venkatesh",
+    "year": 2003,
+    "title": "User Acceptance of Information Technology: Toward A Unified View1",
+    "doi": "10.2307/30036540"
+   }
+  },
+  {
+   "id": "en-harvard:g095",
+   "doc": "en-harvard",
+   "lang": "en",
+   "style": "harvard",
+   "source": "corpus",
+   "text": "Sung, H. et al. 2026. Global cancer statistics 2024: GLOBOCAN estimates of incidence and mortality worldwide for 34 cancers in 186 countries. CA: A Cancer Journal for Clinicians, 71(3), pp. 209–249. doi:10.3322/caac.70090",
+   "label": null,
+   "expect": {
+    "family": "Sung",
+    "year": 2026,
+    "title": "Global cancer statistics 2024: GLOBOCAN estimates of incidence and mortality worldwide for 34 cancers in 186 countries",
+    "doi": "10.3322/caac.70090"
+   }
+  },
+  {
+   "id": "en-harvard:g100",
+   "doc": "en-harvard",
+   "lang": "en",
+   "style": "harvard",
+   "source": "corpus",
+   "text": "Sheldrick, G. M. 2008. A short history of SHELX. Acta Crystallographica Section A Foundations of Crystallography, 64(1), pp. 112–122. doi:10.1107/s0108767307043930",
+   "label": null,
+   "expect": {
+    "family": "Sheldrick",
+    "year": 2008,
+    "title": "A short history of\n                    SHELX",
+    "doi": "10.1107/s0108767307043930"
+   }
+  },
+  {
+   "id": "en-harvard:g106",
+   "doc": "en-harvard",
+   "lang": "en",
+   "style": "harvard",
+   "source": "corpus",
+   "text": "Schneider, C. A., Rasband, W. S. and Eliceiri, K. W. 2012. NIH Image to ImageJ: 25 years of image analysis. Nature Methods, 9(7), pp. 671–675. doi:10.1038/nmeth.2089",
+   "label": null,
+   "expect": {
+    "family": "Schneider",
+    "year": 2012,
+    "title": "NIH Image to ImageJ: 25 years of image analysis",
+    "doi": "10.1038/nmeth.2089"
+   }
+  },
+  {
+   "id": "es-apa:g035",
+   "doc": "es-apa",
+   "lang": "es",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Yeh, S. W., Kug, J. S., Dewitte, B., Kwon, M. H., Kirtman, B. P., & Jin, F. F. (2009). El Niño in a changing climate. Nature, 461(7263), 511–514. https://doi.org/10.1038/nature08316",
+   "label": null,
+   "expect": {
+    "family": "Yeh",
+    "year": 2009,
+    "title": "El Niño in a changing climate",
+    "doi": "10.1038/nature08316"
+   }
+  },
+  {
+   "id": "es-apa:g036",
+   "doc": "es-apa",
+   "lang": "es",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Vizcaíno Zúñiga, P. I., Cedeño Cedeño, R. J., & Maldonado Palacios, I. A. (2023). Metodología de la investigación científica: guía práctica. Ciencia Latina Revista Científica Multidisciplinar, 7(4), 9723–9762. https://doi.org/10.37811/cl_rcm.v7i4.7658",
+   "label": null,
+   "expect": {
+    "family": "Vizcaíno Zúñiga",
+    "year": 2023,
+    "title": "Metodología de la investigación científica: guía práctica",
+    "doi": "10.37811/cl_rcm.v7i4.7658"
+   }
+  },
+  {
+   "id": "es-apa:g294",
+   "doc": "es-apa",
+   "lang": "es",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Vargas Morales, C. (2023). Evaluación de la Calidad de la Educación Universitaria a través del Análisis de la Percepción de los Estudiantes. Revista Boaciencia Educación y Ciencias Sociales, 3(1), 69–84. https://doi.org/10.59801/ecs.v3i1.115",
+   "label": null,
+   "expect": {
+    "family": "Vargas Morales",
+    "year": 2023,
+    "title": "Evaluación de la Calidad de la Educación Universitaria a través del Análisis de la Percepción de los Estudiantes",
+    "doi": "10.59801/ecs.v3i1.115"
+   }
+  },
+  {
+   "id": "es-apa:g034",
+   "doc": "es-apa",
+   "lang": "es",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Urrútia, G., & Bonfill, X. (2010). Declaración PRISMA: una propuesta para mejorar la publicación de revisiones sistemáticas y metaanálisis. Medicina Clínica, 135(11), 507– 511. https://doi.org/10.1016/j.medcli.2010.01.015",
+   "label": null,
+   "expect": {
+    "family": "Urrútia",
+    "year": 2010,
+    "title": "Declaración PRISMA: una propuesta para mejorar la publicación de revisiones sistemáticas y metaanálisis",
+    "doi": "10.1016/j.medcli.2010.01.015"
+   }
+  },
+  {
+   "id": "es-bibliografia:g034",
+   "doc": "es-bibliografia",
+   "lang": "es",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Urrútia, G., & Bonfill, X. (2010). Declaración PRISMA: una propuesta para mejorar la publicación de revisiones sistemáticas y metaanálisis. Medicina Clínica, 135(11), 507– 511. https://doi.org/10.1016/j.medcli.2010.01.015",
+   "label": null,
+   "expect": {
+    "family": "Urrútia",
+    "year": 2010,
+    "title": "Declaración PRISMA: una propuesta para mejorar la publicación de revisiones sistemáticas y metaanálisis",
+    "doi": "10.1016/j.medcli.2010.01.015"
+   }
+  },
+  {
+   "id": "es-bibliografia:g306",
+   "doc": "es-bibliografia",
+   "lang": "es",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Revista Facultad Nacional de Salud Pública (2013). Coloquios de Investigación en Salud Pública: aportes de los doctorados y maestrías en salud pública y epidemiología. Revista Facultad Nacional de Salud Pública, 30, 1–2. https://doi.org/10.17533/udea.rfnsp.14558",
+   "label": null,
+   "expect": {
+    "family": "Revista Facultad Nacional de Salud Pública",
+    "year": 2013,
+    "title": "Coloquios de  Investigación en Salud Pública: aportes de los doctorados y maestrías en salud pública y epidemiología",
+    "doi": "10.17533/udea.rfnsp.14558"
+   }
+  },
+  {
+   "id": "es-bibliografia:g026",
+   "doc": "es-bibliografia",
+   "lang": "es",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Page, M. J., McKenzie, J. E., Bossuyt, P. M., Boutron, I., Hoffmann, T. C., Mulrow, C. D., Shamseer, L., Tetzlaff, J. M., Akl, E. A., Brennan, S. E., Chou, R., & Glanville, J. (2021). Declaración PRISMA 2020: una guía actualizada para la publicación de revisiones sistemáticas. Revista Española de Cardiología, 74(9), 790–799. https://doi.org/10.1016/j.recesp.2021.06.016",
+   "label": null,
+   "expect": {
+    "family": "Page",
+    "year": 2021,
+    "title": "Declaración PRISMA 2020: una guía actualizada para la publicación de revisiones sistemáticas",
+    "doi": "10.1016/j.recesp.2021.06.016"
+   }
+  },
+  {
+   "id": "es-bibliografia:g025",
+   "doc": "es-bibliografia",
+   "lang": "es",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Otzen, T., & Manterola, C. (2017). Técnicas de Muestreo sobre una Población a Estudio. International Journal of Morphology, 35(1), 227–232. https://doi.org/10.4067/s0717-95022017000100037",
+   "label": null,
+   "expect": {
+    "family": "Otzen",
+    "year": 2017,
+    "title": "Técnicas de Muestreo sobre una Población a Estudio",
+    "doi": "10.4067/s0717-95022017000100037"
+   }
+  },
+  {
+   "id": "ru-gost:g212",
+   "doc": "ru-gost",
+   "lang": "ru",
+   "style": "gost",
+   "source": "corpus",
+   "text": "Акынбекова А., Муханова А., Алтаева Г. [и др.] ИССЛЕДОВАНИЕ ВЛИЯНИЯ СОЦИАЛЬНО-ЭКОНОМИЧЕСКИХ ФАКТОРОВ НА РАЗВИТИЕ РЕГИОНА С ИСПОЛЬЗОВАНИЕМ ГИБРИДНОЙ МОДЕЛИ // Вестник КазАТК. – 2025. – Т. 137, No 2. – С. 195–208. – DOI: 10.52167/1609-1817-2025-137-2-195-208.",
+   "label": "25.",
+   "expect": {
+    "family": "Акынбекова",
+    "year": 2025,
+    "title": "ИССЛЕДОВАНИЕ ВЛИЯНИЯ СОЦИАЛЬНО-ЭКОНОМИЧЕСКИХ ФАКТОРОВ НА РАЗВИТИЕ РЕГИОНА С ИСПОЛЬЗОВАНИЕМ ГИБРИДНОЙ МОДЕЛИ",
+    "doi": "10.52167/1609-1817-2025-137-2-195-208"
+   }
+  },
+  {
+   "id": "ru-gost:g061",
+   "doc": "ru-gost",
+   "lang": "ru",
+   "style": "gost",
+   "source": "corpus",
+   "text": "Шарова Е., Медведев С. РЕДОКС-РЕАКЦИИ В АПОПЛАСТЕ РАСТУЩИХ КЛЕТОК // Физиология растений. – 2017., No 1. – С. 3–18. – DOI: 10.7868/s0015330317010146.",
+   "label": "24.",
+   "expect": {
+    "family": "Шарова",
+    "year": 2017,
+    "title": "РЕДОКС-РЕАКЦИИ В АПОПЛАСТЕ РАСТУЩИХ КЛЕТОК",
+    "doi": "10.7868/s0015330317010146"
+   }
+  },
+  {
+   "id": "ru-gost:g203",
+   "doc": "ru-gost",
+   "lang": "ru",
+   "style": "gost",
+   "source": "corpus",
+   "text": "Королева Е.В. МЕТОДЫ РАЗВИТИЯ ГОСУДАРСТВЕННО-ЧАСТНОГО ПАРТНЕРСТВА В ШКОЛЕ // Исследование и развитие сложных социально-экономических систем: сборник статей международной научной конференции (Владимир, Апрель 2024). – 2024.. – С. 22–24. – DOI: 10.58351/240409.2024.29.25.002.",
+   "label": "23.",
+   "expect": {
+    "family": "Королева",
+    "year": 2024,
+    "title": "МЕТОДЫ РАЗВИТИЯ ГОСУДАРСТВЕННО-ЧАСТНОГО ПАРТНЕРСТВА В ШКОЛЕ",
+    "doi": "10.58351/240409.2024.29.25.002"
+   }
+  },
+  {
+   "id": "ru-gost:g211",
+   "doc": "ru-gost",
+   "lang": "ru",
+   "style": "gost",
+   "source": "corpus",
+   "text": "Казанчева Х., Ципинов О. АНАЛИТИЧЕСКОЕ ИССЛЕДОВАНИЕ ПОТЕНЦИАЛЬНЫХ ПЕРСПЕКТИВ СОВЕРШЕНСТВОВАНИЯ СИСТЕМЫ СТРАТЕГИЧЕСКОГО ПЛАНИРОВАНИЯ // Матер. IV Всероссийской научно-практ. конф. «Влияние новой геополитической реальности на государственное управление и развитие РФ». – 2021., No 1. – С. 96–102. – DOI: 10.36684/48-2021-1-96-102.",
+   "label": "22.",
+   "expect": {
+    "family": "Казанчева",
+    "year": 2021,
+    "title": "АНАЛИТИЧЕСКОЕ ИССЛЕДОВАНИЕ ПОТЕНЦИАЛЬНЫХ ПЕРСПЕКТИВ СОВЕРШЕНСТВОВАНИЯ СИСТЕМЫ СТРАТЕГИЧЕСКОГО ПЛАНИРОВАНИЯ",
+    "doi": "10.36684/48-2021-1-96-102"
+   }
+  },
+  {
+   "id": "ru-literatura:g069",
+   "doc": "ru-literatura",
+   "lang": "ru",
+   "style": "gost",
+   "source": "corpus",
+   "text": "Муршед М., Чийоке Ч., Барбер М. Как лучшие системы школьного образования продолжают совершенствоваться (пер. с англ. Н. Микшиной, Е. Шадриной) // Voprosy obrazovaniya / Educational Studies Moscow. – 2013., No 2. – С. 5–122. – DOI: 10.17323/1814-9545-2011-2-5-122.",
+   "label": "20.",
+   "expect": {
+    "family": "Муршед",
+    "year": 2013,
+    "title": "Как лучшие системы школьного образования продолжают совершенствоваться (пер. с англ. Н. Микшиной, Е. Шадриной)",
+    "doi": "10.17323/1814-9545-2011-2-5-122"
+   }
+  },
+  {
+   "id": "ru-literatura:g211",
+   "doc": "ru-literatura",
+   "lang": "ru",
+   "style": "gost",
+   "source": "corpus",
+   "text": "Казанчева Х., Ципинов О. АНАЛИТИЧЕСКОЕ ИССЛЕДОВАНИЕ ПОТЕНЦИАЛЬНЫХ ПЕРСПЕКТИВ СОВЕРШЕНСТВОВАНИЯ СИСТЕМЫ СТРАТЕГИЧЕСКОГО ПЛАНИРОВАНИЯ // Матер. IV Всероссийской научно-практ. конф. «Влияние новой геополитической реальности на государственное управление и развитие РФ». – 2021., No 1. – С. 96–102. – DOI: 10.36684/48-2021-1-96-102.",
+   "label": "19.",
+   "expect": {
+    "family": "Казанчева",
+    "year": 2021,
+    "title": "АНАЛИТИЧЕСКОЕ ИССЛЕДОВАНИЕ ПОТЕНЦИАЛЬНЫХ ПЕРСПЕКТИВ СОВЕРШЕНСТВОВАНИЯ СИСТЕМЫ СТРАТЕГИЧЕСКОГО ПЛАНИРОВАНИЯ",
+    "doi": "10.36684/48-2021-1-96-102"
+   }
+  },
+  {
+   "id": "ru-literatura:g198",
+   "doc": "ru-literatura",
+   "lang": "ru",
+   "style": "gost",
+   "source": "corpus",
+   "text": "Шаповалова М., Сердюкова Е. ИССЛЕДОВАНИЕ ВЛИЯНИЯ МОТИВАЦИИ АФФИЛИАЦИИ НА РАЗВИТИЕ ИНДИВИДУАЛЬНОСТИ СТАРШЕКЛАССНИКОВ // Известия Чеченского государственного университета. – 2023., No 1/29. – С. 77–80. – DOI: 10.36684/12-2023-29-1-77-80.",
+   "label": "18.",
+   "expect": {
+    "family": "Шаповалова",
+    "year": 2023,
+    "title": "ИССЛЕДОВАНИЕ ВЛИЯНИЯ МОТИВАЦИИ АФФИЛИАЦИИ НА РАЗВИТИЕ ИНДИВИДУАЛЬНОСТИ СТАРШЕКЛАССНИКОВ",
+    "doi": "10.36684/12-2023-29-1-77-80"
+   }
+  },
+  {
+   "id": "ru-literatura:g062",
+   "doc": "ru-literatura",
+   "lang": "ru",
+   "style": "gost",
+   "source": "corpus",
+   "text": "Сазонова Т., Болондинский В.К., Придача В. ВЛИЯНИЕ ВОДНОГО ДЕФИЦИТА ХВОИ СОСНЫ ОБЫКНОВЕННОЙ НА ФОТОСИНТЕЗ В УСЛОВИЯХ ДОСТАТОЧНОГО ПОЧВЕННОГО УВЛАЖНЕНИЯ*, \"Лесоведение\" // Лесоведение. – 2017., No 4. – С. 311–318. – DOI: 10.7868/s0024114817040076.",
+   "label": "17.",
+   "expect": {
+    "family": "Сазонова",
+    "year": 2017,
+    "title": "ВЛИЯНИЕ ВОДНОГО ДЕФИЦИТА ХВОИ СОСНЫ ОБЫКНОВЕННОЙ НА ФОТОСИНТЕЗ В УСЛОВИЯХ ДОСТАТОЧНОГО  ПОЧВЕННОГО УВЛАЖНЕНИЯ*, \"Лесоведение\"",
+    "doi": "10.7868/s0024114817040076"
+   }
+  },
+  {
+   "id": "fr-auteur-annee:g078",
+   "doc": "fr-auteur-annee",
+   "lang": "fr",
+   "style": "fr",
+   "source": "corpus",
+   "text": "ZHANG J., DING L., HOLMFELDT L. et al. (2012), « The genetic basis of early T-cell precursor acute lymphoblastic leukaemia », Nature, vol. 481, n° 7380, p. 157-163. DOI: 10.1038/nature10725. Revista Genérica de Métodos · v. 1",
+   "label": null,
+   "expect": {
+    "family": "Zhang",
+    "year": 2012,
+    "title": "The genetic basis of early T-cell precursor acute lymphoblastic leukaemia",
+    "doi": "10.1038/nature10725"
+   }
+  },
+  {
+   "id": "fr-auteur-annee:g252",
+   "doc": "fr-auteur-annee",
+   "lang": "fr",
+   "style": "fr",
+   "source": "corpus",
+   "text": "VIVIER N. (2025), « Les concours agricoles et les mutations de la société française, de 1750 à nos jours », Histoire, économie &amp; société, vol. n° 253, n° 3, p. 104-123. DOI: 10.3917/hes.253.0104.",
+   "label": null,
+   "expect": {
+    "family": "Vivier",
+    "year": 2025,
+    "title": "Les concours agricoles et les mutations de la société française, de 1750 à nos jours",
+    "doi": "10.3917/hes.253.0104"
+   }
+  },
+  {
+   "id": "fr-auteur-annee:g233",
+   "doc": "fr-auteur-annee",
+   "lang": "fr",
+   "style": "fr",
+   "source": "corpus",
+   "text": "VALETTE M. F. (2020), « Le droit à l’éducation des enfants migrants », Administration &amp; Éducation, vol. N° 166, n° 2, p. 45-50. DOI: 10.3917/admed.166.0045.",
+   "label": null,
+   "expect": {
+    "family": "Valette",
+    "year": 2020,
+    "title": "Le droit à l’éducation des enfants migrants",
+    "doi": "10.3917/admed.166.0045"
+   }
+  },
+  {
+   "id": "fr-auteur-annee:g228",
+   "doc": "fr-auteur-annee",
+   "lang": "fr",
+   "style": "fr",
+   "source": "corpus",
+   "text": "TOBATY A., CLAUS P. (2020), « L’accueil des enfants migrants en Franche-Comté », Administration &amp; Éducation, vol. N° 166, n° 2, p. 59-66. DOI: 10.3917/admed.166.0059. UNITED NATIONS CHILDREN'S FUND (2016), « Éducation: Harmoniser les règles du jeu », Situation des enfants dans le monde, p. 40-67. DOI: 10.18356/cb7df945-fr.",
+   "label": null,
+   "expect": {
+    "family": "United Nations Children's Fund",
+    "year": 2016,
+    "title": "Éducation: Harmoniser les règles du jeu",
+    "doi": "10.18356/cb7df945-fr"
+   }
+  },
+  {
+   "id": "fr-bibliographie:g233",
+   "doc": "fr-bibliographie",
+   "lang": "fr",
+   "style": "fr",
+   "source": "corpus",
+   "text": "VALETTE M. F. (2020), « Le droit à l’éducation des enfants migrants », Administration &amp; Éducation, vol. N° 166, n° 2, p. 45-50. DOI: 10.3917/admed.166.0045. Revista Genérica de Métodos · v. 1",
+   "label": null,
+   "expect": {
+    "family": "Valette",
+    "year": 2020,
+    "title": "Le droit à l’éducation des enfants migrants",
+    "doi": "10.3917/admed.166.0045"
+   }
+  },
+  {
+   "id": "fr-bibliographie:g228",
+   "doc": "fr-bibliographie",
+   "lang": "fr",
+   "style": "fr",
+   "source": "corpus",
+   "text": "TOBATY A., CLAUS P. (2020), « L’accueil des enfants migrants en Franche-Comté », Administration &amp; Éducation, vol. N° 166, n° 2, p. 59-66. DOI: 10.3917/admed.166.0059. UNITED NATIONS CHILDREN'S FUND (2016), « Éducation: Harmoniser les règles du jeu », Situation des enfants dans le monde, p. 40-67. DOI: 10.18356/cb7df945-fr.",
+   "label": null,
+   "expect": {
+    "family": "United Nations Children's Fund",
+    "year": 2016,
+    "title": "Éducation: Harmoniser les règles du jeu",
+    "doi": "10.18356/cb7df945-fr"
+   }
+  },
+  {
+   "id": "fr-bibliographie:g235",
+   "doc": "fr-bibliographie",
+   "lang": "fr",
+   "style": "fr",
+   "source": "corpus",
+   "text": "THÉSÉE G., CARR P. R. (2009), « Au-delà des conflits entre religion et science: », Science et religion en éducation, p. 189-212. DOI: 10.2307/j.ctv18ph3g9.23.",
+   "label": null,
+   "expect": {
+    "family": "Thésée",
+    "year": 2009,
+    "title": "Au-delà des conflits entre religion et science:",
+    "doi": "10.2307/j.ctv18ph3g9.23"
+   }
+  },
+  {
+   "id": "fr-bibliographie:g230",
+   "doc": "fr-bibliographie",
+   "lang": "fr",
+   "style": "fr",
+   "source": "corpus",
+   "text": "ROHRMANN E. (2009), « Edouard Séguin: Traitement moral, hygiène et éducation des idiots et des autres enfants arriérés », Hauptwerke der Pädagogik, p. 414-417. DOI: 10.30965/9783657768387_159.",
+   "label": null,
+   "expect": {
+    "family": "Rohrmann",
+    "year": 2009,
+    "title": "Edouard Séguin: Traitement moral, hygiène et éducation des idiots et des autres enfants arriérés",
+    "doi": "10.30965/9783657768387_159"
+   }
+  },
+  {
+   "id": "de-din:g258",
+   "doc": "de-din",
+   "lang": "de",
+   "style": "din",
+   "source": "corpus",
+   "text": "Wulf, Torsten (2000): Analyserahmen zur Untersuchung der Entwicklung von Unternehmen im ostdeutschen Transformationsprozeß. In: Entwicklung ostdeutscher Unternehmen, S. 39–82. DOI: 10.1007/978-3-663-07976-7_3.",
+   "label": null,
+   "expect": {
+    "family": "Wulf",
+    "year": 2000,
+    "title": "Analyserahmen zur Untersuchung der Entwicklung von Unternehmen im ostdeutschen Transformationsprozeß",
+    "doi": "10.1007/978-3-663-07976-7_3"
+   }
+  },
+  {
+   "id": "de-din:g257",
+   "doc": "de-din",
+   "lang": "de",
+   "style": "din",
+   "source": "corpus",
+   "text": "Wulf, Torsten (2000): Ergebnisse der Untersuchung zu Verlauf und Einflußfaktoren der Entwicklung privatisierter, mittelständischer Industrieunternehmen im ostdeutschen Transformationsprozeß. In: Entwicklung ostdeutscher Unternehmen, S. 168–230. DOI: 10.1007/978-3-663-07976-7_6.",
+   "label": null,
+   "expect": {
+    "family": "Wulf",
+    "year": 2000,
+    "title": "Ergebnisse der Untersuchung zu Verlauf und Einflußfaktoren der Entwicklung privatisierter, mittelständischer Industrieunternehmen im ostdeutschen Transformationsprozeß",
+    "doi": "10.1007/978-3-663-07976-7_6"
+   }
+  },
+  {
+   "id": "de-din:g254",
+   "doc": "de-din",
+   "lang": "de",
+   "style": "din",
+   "source": "corpus",
+   "text": "Wulf, Torsten (2000): Der ostdeutsche Transformationsprozeß als äußerer Rahmen für die Untersuchung der Entwicklung von Unternehmen. In: Entwicklung ostdeutscher Unternehmen, S. 7–38. DOI: 10.1007/978-3-663-07976-7_2.",
+   "label": null,
+   "expect": {
+    "family": "Wulf",
+    "year": 2000,
+    "title": "Der ostdeutsche Transformationsprozeß als äußerer Rahmen für die Untersuchung der Entwicklung von Unternehmen",
+    "doi": "10.1007/978-3-663-07976-7_2"
+   }
+  },
+  {
+   "id": "de-din:g262",
+   "doc": "de-din",
+   "lang": "de",
+   "style": "din",
+   "source": "corpus",
+   "text": "Städtke, Klaus (1971): Die Entwicklung der Russischen Erzählung (1800–1825). In: Zeitschrift. DOI: 10.1515/9783112535387.",
+   "label": null,
+   "expect": {
+    "family": "Städtke",
+    "year": 1971,
+    "title": "Die Entwicklung der Russischen Erzählung (1800–1825)",
+    "doi": "10.1515/9783112535387"
+   }
+  },
+  {
+   "id": "zh-gbt:g189",
+   "doc": "zh-gbt",
+   "lang": "zh",
+   "style": "gb",
+   "source": "corpus",
+   "text": "朱莉华. 大学英语教学中“中国文化失语症”的对策研究[J]. 教育研究, 2019, 2(6). DOI: 10.32629/er.v2i6.1875. Revista Genérica de Métodos · v. 1",
+   "label": "[25]",
+   "expect": {
+    "family": "朱",
+    "year": 2019,
+    "title": "大学英语教学中“中国文化失语症”的对策研究",
+    "doi": "10.32629/er.v2i6.1875"
+   }
+  },
+  {
+   "id": "zh-gbt:g171",
+   "doc": "zh-gbt",
+   "lang": "zh",
+   "style": "gb",
+   "source": "corpus",
+   "text": "白俊卿张昕晖. 深度学习算法在地质图像识别与解释中的应用研究[J]. 科技创新发展, 2025, 2(1). DOI: 10.69979/3041-0673.25.01.058.",
+   "label": "[24]",
+   "expect": {
+    "family": "白俊卿",
+    "year": 2025,
+    "title": "深度学习算法在地质图像识别与解释中的应用研究",
+    "doi": "10.69979/3041-0673.25.01.058"
+   }
+  },
+  {
+   "id": "zh-gbt:g181",
+   "doc": "zh-gbt",
+   "lang": "zh",
+   "style": "gb",
+   "source": "corpus",
+   "text": "蒋香香. 基于深度学习的图像目标检测算法优化研究[J]. 数据期刊, 2026. DOI: 10.67328/wslwpp1194.",
+   "label": "[23]",
+   "expect": {
+    "family": "蒋香香",
+    "year": 2026,
+    "title": "基于深度学习的图像目标检测算法优化研究",
+    "doi": "10.67328/wslwpp1194"
+   }
+  },
+  {
+   "id": "zh-gbt:g192",
+   "doc": "zh-gbt",
+   "lang": "zh",
+   "style": "gb",
+   "source": "corpus",
+   "text": "胡玉琴. 国际中文教育文化类微课的价值与设计研究[J]. 教育研究, 2026, 9(6): 156. DOI: 10.32629/er.v9i6.7158.",
+   "label": "[22]",
+   "expect": {
+    "family": "胡",
+    "year": 2026,
+    "title": "国际中文教育文化类微课的价值与设计研究",
+    "doi": "10.32629/er.v9i6.7158"
+   }
+  },
+  {
+   "id": "mix-pt-multilingue:g181",
+   "doc": "mix-pt-multilingue",
+   "lang": "pt",
+   "style": "abnt",
+   "source": "corpus",
+   "text": "МУРШЕД, М.; ЧИЙОКЕ, Ч.; БАРБЕР, М. Как лучшие системы школьного образования продолжают совершенствоваться (пер. с англ. Н. Микшиной, Е. Шадриной). Voprosy obrazovaniya / Educational Studies Moscow, n. 2, p. 5-122, 2013. DOI: 10.17323/1814-9545-2011-2-5-122. 倪序南. 基于深度学习的智能语音识别技术探索. 电子通信与计算机科学, v. 7, n. 7, p. 209-211, 2025. DOI: 10.37155/2717-5170-0707-70. 夏巧刚,阮同江, 俞. 基于深度学习的无人机巡查图像识别技术及其应用研究. 社会经济导刊, v. 1, n. 2, 2025. DOI: 10.64216/3080-1486.25.02.052. 蒋香香. 基于深度学习的图像目标检测算法优化研究. 数据期刊, 2026. DOI: 10.67328/wslwpp1194.",
+   "label": null,
+   "expect": {
+    "family": "蒋香香",
+    "year": 2026,
+    "title": "基于深度学习的图像目标检测算法优化研究",
+    "doi": "10.67328/wslwpp1194"
+   }
+  },
+  {
+   "id": "mix-pt-multilingue:g216",
+   "doc": "mix-pt-multilingue",
+   "lang": "pt",
+   "style": "abnt",
+   "source": "corpus",
+   "text": "ЛАПШИНА, Е. Исследование влияния пандемии на развитие малого бизнеса в РФ. Вопросы устойчивого развития общества, n. 5(3), 2021. DOI: 10.34755/irok.2021.92.17.153.",
+   "label": null,
+   "expect": {
+    "family": "Лапшина",
+    "year": 2021,
+    "title": "Исследование влияния пандемии на развитие малого бизнеса в РФ",
+    "doi": "10.34755/irok.2021.92.17.153"
+   }
+  },
+  {
+   "id": "mix-pt-multilingue:g220",
+   "doc": "mix-pt-multilingue",
+   "lang": "pt",
+   "style": "abnt",
+   "source": "corpus",
+   "text": "ГУМАРОВА, Р. ЭКОЛОГИЧЕСКОЕ ОБРАЗОВАНИЕ ДЛЯ СТУДЕНТОВ НЕПРОФИЛЬНЫХ НАПРАВЛЕНИЙ ПОДГОТОВКИ. Бизнес. Образование. Право, n. 3(52), 2020. DOI: 10.25683/volbi.2020.52.351.",
+   "label": null,
+   "expect": {
+    "family": "Гумарова",
+    "year": 2020,
+    "title": "ЭКОЛОГИЧЕСКОЕ ОБРАЗОВАНИЕ ДЛЯ СТУДЕНТОВ НЕПРОФИЛЬНЫХ НАПРАВЛЕНИЙ ПОДГОТОВКИ",
+    "doi": "10.25683/volbi.2020.52.351"
+   }
+  },
+  {
+   "id": "mix-pt-multilingue:g125",
+   "doc": "mix-pt-multilingue",
+   "lang": "pt",
+   "style": "abnt",
+   "source": "corpus",
+   "text": "TAMURA, K. et al. MEGA6: Molecular Evolutionary Genetics Analysis Version 6.0. Molecular Biology and Evolution, v. 30, n. 12, p. 2725-2729, 2013. DOI: 10.1093/molbev/mst197.",
+   "label": null,
+   "expect": {
+    "family": "Tamura",
+    "year": 2013,
+    "title": "MEGA6: Molecular Evolutionary Genetics Analysis Version 6.0",
+    "doi": "10.1093/molbev/mst197"
+   }
+  },
+  {
+   "id": "en-oddDOI-apa:g436",
+   "doc": "en-oddDOI-apa",
+   "lang": "en",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Zhang, Q., Ming, H., & Zhai, Y. (1996). A novel unclad Nd3‐doped polymer optical fiber. Journal of Applied Polymer Science, 62(6), 887–892. https://doi.org/10.1002/(sici)1097-4628(19961107)62:6<887::aid-app4>3.3.co;2-3",
+   "label": null,
+   "expect": {
+    "family": "Zhang",
+    "year": 1996,
+    "title": "A novel unclad Nd3‐doped polymer optical fiber",
+    "doi": "10.1002/(sici)1097-4628(19961107)62:6<887::aid-app4>3.3.co;2-3"
+   }
+  },
+  {
+   "id": "en-oddDOI-apa:g350",
+   "doc": "en-oddDOI-apa",
+   "lang": "en",
+   "style": "apa",
+   "source": "corpus",
+   "text": "West, J. K. (1997). Theoretical analysis of hydrolysis of polydimethylsiloxane (PDMS). Journal of Biomedical Materials Research, 35(4), 505–511. https://doi.org/10.1002/(sici)1097-4636(19970615)35:4<505::aid-jbm10>3.0.co;2-a",
+   "label": null,
+   "expect": {
+    "family": "West",
+    "year": 1997,
+    "title": "Theoretical analysis of hydrolysis of polydimethylsiloxane (PDMS)",
+    "doi": "10.1002/(sici)1097-4636(19970615)35:4<505::aid-jbm10>3.0.co;2-a"
+   }
+  },
+  {
+   "id": "en-oddDOI-apa:g459",
+   "doc": "en-oddDOI-apa",
+   "lang": "en",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Watson, C. (1999). Festphasensynthesen nichtoligomerer Naturstoffe. Angewandte Chemie, 111(13-14), 2025–2031. https://doi.org/10.1002/(sici)1521-3757(19990712)111:13/14<2025::aid-ange2025>3.0.co;2-4",
+   "label": null,
+   "expect": {
+    "family": "Watson",
+    "year": 1999,
+    "title": "Festphasensynthesen nichtoligomerer Naturstoffe",
+    "doi": "10.1002/(sici)1521-3757(19990712)111:13/14<2025::aid-ange2025>3.0.co;2-4"
+   }
+  },
+  {
+   "id": "en-oddDOI-apa:g449",
+   "doc": "en-oddDOI-apa",
+   "lang": "en",
+   "style": "apa",
+   "source": "corpus",
+   "text": "VOGL, O. (1996). Editorial. Progress in Polymer Science, 21(1), v. https://doi.org/10.1016/s0079-6700(96)90009-x",
+   "label": null,
+   "expect": {
+    "family": "VOGL",
+    "year": 1996,
+    "title": "Editorial",
+    "doi": "10.1016/s0079-6700(96)90009-x"
+   }
+  },
+  {
+   "id": "en-oddDOI-vancouver:g412",
+   "doc": "en-oddDOI-vancouver",
+   "lang": "en",
+   "style": "vancouver",
+   "source": "corpus",
+   "text": "Cvetkovska M, Grchev T, Obradovic T. Electroconductive polymer composite: Fibrous carrier‐polypyrrole. Journal of Applied Polymer Science. 1996;60(12):2049-2058. doi:10.1002/(sici)1097-4628(19960620)60:12<2049::aid-app2>3.3.co;2-c",
+   "label": "25.",
+   "expect": {
+    "family": "Cvetkovska",
+    "year": 1996,
+    "title": "Electroconductive polymer composite: Fibrous carrier‐polypyrrole",
+    "doi": "10.1002/(sici)1097-4628(19960620)60:12<2049::aid-app2>3.3.co;2-c"
+   }
+  },
+  {
+   "id": "en-oddDOI-vancouver:g437",
+   "doc": "en-oddDOI-vancouver",
+   "lang": "en",
+   "style": "vancouver",
+   "source": "corpus",
+   "text": "Takemura S, Kitagawa Y, Kato H, Nakajima Y. UPS studies of conducting polymers: dopant effect on conjugated polymer systems sensitive to conductivity. Applied Surface Science. 1996;100-101:107-111. doi:10.1016/0169-4332(96)00266-8",
+   "label": "24.",
+   "expect": {
+    "family": "Takemura",
+    "year": 1996,
+    "title": "UPS studies of conducting polymers: dopant effect on conjugated polymer systems sensitive to conductivity",
+    "doi": "10.1016/0169-4332(96)00266-8"
+   }
+  },
+  {
+   "id": "en-oddDOI-vancouver:g356",
+   "doc": "en-oddDOI-vancouver",
+   "lang": "en",
+   "style": "vancouver",
+   "source": "corpus",
+   "text": "Radhika M, Sehgal PK. Studies on the desamidation of bovine collagen. Journal of Biomedical Materials Research. 1997;35(4):497-503. doi:10.1002/(sici)1097-4636(19970615)35:4<497::aid-jbm9>3.3.co;2-#",
+   "label": "23.",
+   "expect": {
+    "family": "Radhika",
+    "year": 1997,
+    "title": "Studies on the desamidation of bovine collagen",
+    "doi": "10.1002/(sici)1097-4636(19970615)35:4<497::aid-jbm9>3.3.co;2-#"
+   }
+  },
+  {
+   "id": "en-oddDOI-vancouver:g508",
+   "doc": "en-oddDOI-vancouver",
+   "lang": "en",
+   "style": "vancouver",
+   "source": "corpus",
+   "text": "Brunner H. Optisch aktive metallorganische Verbindungen der Übergangselemente mit chiralen Metallatomen. Angewandte Chemie. 1999;111(9):1248-1263. doi:10.1002/(sici)1521-3757(19990503)111:9<1248::aid-ange1248>3.0.co;2-k",
+   "label": "22.",
+   "expect": {
+    "family": "Brunner",
+    "year": 1999,
+    "title": "Optisch aktive metallorganische Verbindungen der Übergangselemente mit chiralen Metallatomen",
+    "doi": "10.1002/(sici)1521-3757(19990503)111:9<1248::aid-ange1248>3.0.co;2-k"
+   }
+  },
+  {
+   "id": "en-apa-ruidoso:g119",
+   "doc": "en-apa-ruidoso",
+   "lang": "en",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Venkatesh, V., Morris, M. G., Davis, G. B., & Davis, F. D. (2003). User Acceptance of Information Technology: Toward A Unified View1. MIS Quarterly, 27(3), 425–478. https://doi.org/10.2307/30036540",
+   "label": null,
+   "expect": {
+    "family": "Venkatesh",
+    "year": 2003,
+    "title": "User Acceptance of Information Technology: Toward A Unified View1",
+    "doi": "10.2307/30036540"
+   }
+  },
+  {
+   "id": "en-apa-ruidoso:g095",
+   "doc": "en-apa-ruidoso",
+   "lang": "en",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Sung, H., Filho, A. M., Laversanne, M., Ferlay, J., Siegel, R. L., Soerjomataram, I., Jemal, A., & Bray, F. (2026). Global cancer statistics 2024: GLOBOCAN estimates of incidence and mortality worldwide for 34 cancers in 186 countries. CA: A Cancer Journal for Clinicians, 71(3), 209–249. https://doi.org/10.3322/caac.70090",
+   "label": null,
+   "expect": {
+    "family": "Sung",
+    "year": 2026,
+    "title": "Global cancer statistics 2024: GLOBOCAN estimates of incidence and mortality worldwide for 34 cancers in 186 countries",
+    "doi": "10.3322/caac.70090"
+   }
+  },
+  {
+   "id": "en-apa-ruidoso:g117",
+   "doc": "en-apa-ruidoso",
+   "lang": "en",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Shel- drick, G. M. (2008). A short history of SHELX. Acta Crystallographica Section A Foundations of Crystallography, 64(1), 112–122. https://doi.org/10.1107/s0108767307043930 Subr- amanian, A., Tamayo, P., Mootha, V. K., Mukherjee, S., Ebert, B. L., Gillette, M. A., Paulovich, A., Pomeroy, S. L., Golub, T. R., Lander, E. S., & Mesirov, J. P. (2005). Gene set enrichment analysis: A knowledge-based approach for interpreting genome-wide expression profiles. Proceedings of the National Academy of Sciences, 102(43), 15545– 15550. https://doi.org/10.1073/pnas.0506580102",
+   "label": null,
+   "expect": {
+    "family": "Subramanian",
+    "year": 2005,
+    "title": "Gene set enrichment analysis: A knowledge-based approach for interpreting genome-wide expression profiles",
+    "doi": "10.1073/pnas.0506580102"
+   }
+  },
+  {
+   "id": "en-apa-ruidoso:g106",
+   "doc": "en-apa-ruidoso",
+   "lang": "en",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Ryan, R. M., & Deci, E. L. (2000). Self-determination theory and the facilitation of intrinsic motivation, social development, and well-being.. American Psychologist, 55(1), 68–78. https://doi.org/10.1037/0003-066x.55.1.68 Schinde1in, J., Arganda-Carreras, I., Frise, E., Kaynig, V., Longair, M., Pietzsch, T., Preibisch, S., Rueden, C., Saalfeld, S., Schmid, B., Tinevez, J. Y., & White, D. J. (2012). Fiji: an opensource platform for biological-image analysis. Nature Methods, 9(7), 676–682. https://doi.org/10.1038/nmeth.2019 Schn- eider, C.A., Rasband, W. S., & E1iceiri, K. W. (2012). NIH Image to ImageJ: 25 years of image analysis. Nature Methods, 9(7), 671–675. https://doi.org/10.1038/nmeth.2089",
+   "label": null,
+   "expect": {
+    "family": "Schneider",
+    "year": 2012,
+    "title": "NIH Image to ImageJ: 25 years of image analysis",
+    "doi": "10.1038/nmeth.2089"
+   }
+  },
+  {
+   "id": "en-apa-longa-150:g474",
+   "doc": "en-apa-longa-150",
+   "lang": "en",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Zhang, A. J., & Burgess, K. (1999). Totalsynthese von Vancomycin. Angewandte Chemie, 111(5), 666–669. https://doi.org/10.1002/(sici)1521-3757(19990301)111:5<666::aid-ange666>3.0.co;2-#",
+   "label": null,
+   "expect": {
+    "family": "Zhang",
+    "year": 1999,
+    "title": "Totalsynthese von Vancomycin",
+    "doi": "10.1002/(sici)1521-3757(19990301)111:5<666::aid-ange666>3.0.co;2-#"
+   }
+  },
+  {
+   "id": "en-apa-longa-150:g428",
+   "doc": "en-apa-longa-150",
+   "lang": "en",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Zhang, Q., Ming, H., & Zhai, Y. (1996). A novel unclad Nd3+-doped polymer optical fiber. Journal of Applied Polymer Science, 62(6), 887–892. https://doi.org/10.1002/(sici)1097-4628(19961107)62:6<887::aid-app4>3.0.co;2-l",
+   "label": null,
+   "expect": {
+    "family": "Zhang",
+    "year": 1996,
+    "title": "A novel unclad Nd3+-doped polymer optical fiber",
+    "doi": "10.1002/(sici)1097-4628(19961107)62:6<887::aid-app4>3.0.co;2-l"
+   }
+  },
+  {
+   "id": "en-apa-longa-150:g316",
+   "doc": "en-apa-longa-150",
+   "lang": "en",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Zandavalli, C. B. (2009). Avaliação da educação superior no Brasil: os antecedentes históricos do SINAES. Avaliação: Revista da Avaliação da Educação Superior (Campinas), 14(2), 385–438. https://doi.org/10.1590/s1414-40772009000200008",
+   "label": null,
+   "expect": {
+    "family": "Zandavalli",
+    "year": 2009,
+    "title": "Avaliação da educação superior no Brasil: os antecedentes históricos do SINAES",
+    "doi": "10.1590/s1414-40772009000200008"
+   }
+  },
+  {
+   "id": "en-apa-longa-150:g319",
+   "doc": "en-apa-longa-150",
+   "lang": "en",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Zainko, M. A. S. (2008). Avaliação da educação superior no Brasil: processo de construção histórica. Avaliação: Revista da Avaliação da Educação Superior (Campinas), 13(3), 827– 831. https://doi.org/10.1590/s1414-40772008000300012",
+   "label": null,
+   "expect": {
+    "family": "Zainko",
+    "year": 2008,
+    "title": "Avaliação da educação superior no Brasil: processo de construção histórica",
+    "doi": "10.1590/s1414-40772008000300012"
+   }
+  },
+  {
+   "id": "en-ieee-longa-120:g321",
+   "doc": "en-ieee-longa-120",
+   "lang": "en",
+   "style": "ieee",
+   "source": "corpus",
+   "text": "J. Dias Sobrinho, “Avaliação e transformações da educação superior brasileira (1995-2009): do provão ao Sinaes,” Avaliação: Revista da Avaliação da Educação Superior (Campinas), vol. 15, no. 1, pp. 195–224, 2010, doi:10.1590/s1414-40772010000100011.",
+   "label": "[120]",
+   "expect": {
+    "family": "Dias Sobrinho",
+    "year": 2010,
+    "title": "Avaliação e transformações da educação superior brasileira (1995-2009): do provão ao Sinaes",
+    "doi": "10.1590/s1414-40772010000100011"
+   }
+  },
+  {
+   "id": "en-ieee-longa-120:g418",
+   "doc": "en-ieee-longa-120",
+   "lang": "en",
+   "style": "ieee",
+   "source": "corpus",
+   "text": "A. Follestad, “A method for determining diffusion resistance in polymer particles during polymerization,” Journal of Applied Polymer Science, vol. 61, no. 12, pp. 2091–2097, 1996, doi:10.1002/(sici)1097-4628(19960919)61:12<2091::aid-app6>3.0.co;2-5.",
+   "label": "[119]",
+   "expect": {
+    "family": "Follestad",
+    "year": 1996,
+    "title": "A method for determining diffusion resistance in polymer particles during polymerization",
+    "doi": "10.1002/(sici)1097-4628(19960919)61:12<2091::aid-app6>3.0.co;2-5"
+   }
+  },
+  {
+   "id": "en-ieee-longa-120:g392",
+   "doc": "en-ieee-longa-120",
+   "lang": "en",
+   "style": "ieee",
+   "source": "corpus",
+   "text": "J. Karger-Kocsis, “Polymer reinforcement,” Composites Part A: Applied Science and Manufacturing, vol. 27, no. 3, pp. 241, 1996, doi:10.1016/1359-835x(96)90021-4.",
+   "label": "[118]",
+   "expect": {
+    "family": "Karger-Kocsis",
+    "year": 1996,
+    "title": "Polymer reinforcement",
+    "doi": "10.1016/1359-835x(96)90021-4"
+   }
+  },
+  {
+   "id": "en-ieee-longa-120:g384",
+   "doc": "en-ieee-longa-120",
+   "lang": "en",
+   "style": "ieee",
+   "source": "corpus",
+   "text": "N. P. Rhodes, J. A. Hunt, and D. F. Williams, “Macrophage subpopulation differentiation by stimulation with biomaterials,” Journal of Biomedical Materials Research, vol. 37, no. 4, pp. 481–488, 1997, doi:10.1002/(sici)1097-4636(19971215)37:4<481::aid-jbm6>3.0.co;2-h.",
+   "label": "[117]",
+   "expect": {
+    "family": "Rhodes",
+    "year": 1997,
+    "title": "Macrophage subpopulation differentiation by stimulation with biomaterials",
+    "doi": "10.1002/(sici)1097-4636(19971215)37:4<481::aid-jbm6>3.0.co;2-h"
+   }
+  },
+  {
+   "id": "pt-abnt-com-apendice:g015",
+   "doc": "pt-abnt-com-apendice",
+   "lang": "pt",
+   "style": "abnt",
+   "source": "corpus",
+   "text": "SIQUEIRA, D. S.; COSTA, B. E. P. d.; FIGUEIREDO, A. E. P. L. Coping e qualidade de vida em pacientes em lista de espera para transplante renal. Acta Paulista de Enfermagem, v. 30, n. 6, p. 582-589, 2017. DOI: 10.1590/1982-0194201700082.",
+   "label": null,
+   "expect": {
+    "family": "Siqueira",
+    "year": 2017,
+    "title": "Coping e qualidade de vida em pacientes em lista de espera para transplante renal",
+    "doi": "10.1590/1982-0194201700082"
+   }
+  },
+  {
+   "id": "pt-abnt-com-apendice:g336",
+   "doc": "pt-abnt-com-apendice",
+   "lang": "pt",
+   "style": "abnt",
+   "source": "corpus",
+   "text": "RINGLE, C. M.; DA SILVA, D.; BIDO, D. D. S. Modelagem de Equações Estruturais com Utilização do Smartpls. Revista Brasileira de Marketing, v. 13, n. 2, p. 56-73, 2014. DOI: 10.5585/remark.v13i2.2717. S. SILVEIRA, Z. Setor educacional do MERCOSUL: convergência e integração regional da educação superior brasileira. Avaliação: Revista da Avaliação da Educação Superior (Campinas), v. 21, n. 3, p. 901-927, 2016. DOI: 10.1590/s1414-40772016000300012.",
+   "label": null,
+   "expect": {
+    "family": "S. Silveira",
+    "year": 2016,
+    "title": "Setor educacional do MERCOSUL: convergência e integração regional da educação superior brasileira",
+    "doi": "10.1590/s1414-40772016000300012"
+   }
+  },
+  {
+   "id": "pt-abnt-com-apendice:g324",
+   "doc": "pt-abnt-com-apendice",
+   "lang": "pt",
+   "style": "abnt",
+   "source": "corpus",
+   "text": "PAULA, M. d. F. d. Cartografia da educação superior no município de Niterói. Avaliação: Revista da Avaliação da Educação Superior (Campinas), v. 13, n. 1, p. 63-88, 2008. DOI: 10.1590/s1414-40772008000100004.",
+   "label": null,
+   "expect": {
+    "family": "Paula",
+    "year": 2008,
+    "title": "Cartografia da educação superior no município de Niterói",
+    "doi": "10.1590/s1414-40772008000100004"
+   }
+  },
+  {
+   "id": "pt-abnt-com-apendice:g314",
+   "doc": "pt-abnt-com-apendice",
+   "lang": "pt",
+   "style": "abnt",
+   "source": "corpus",
+   "text": "MOROSINI, M. C. Qualidade da educação superior e contextos emergentes. Avaliação: Revista da Avaliação da Educação Superior (Campinas), v. 19, n. 2, p. 385-405, 2014. DOI: 10.1590/s1414-40772014000200007. Revista Genérica de Métodos · v. 1",
+   "label": null,
+   "expect": {
+    "family": "Morosini",
+    "year": 2014,
+    "title": "Qualidade da educação superior e contextos emergentes",
+    "doi": "10.1590/s1414-40772014000200007"
+   }
+  },
+  {
+   "id": "en-sem-secao:g115",
+   "doc": "en-sem-secao",
+   "lang": "en",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Ryan, R. M., & Deci, E. L. (2000). Self-determination theory and the facilitation of intrinsic motivation, social development, and well-being.. American Psychologist, 55(1), 68–78. https://doi.org/10.1037/0003-066x.55.1.68 Revista Genérica de Métodos · v. 1",
+   "label": null,
+   "expect": {
+    "family": "Ryan",
+    "year": 2000,
+    "title": "Self-determination theory and the facilitation of intrinsic motivation, social development, and well-being.",
+    "doi": "10.1037/0003-066x.55.1.68"
+   }
+  },
+  {
+   "id": "en-sem-secao:g130",
+   "doc": "en-sem-secao",
+   "lang": "en",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Pettersen, E. F., Goddard, T. D., Huang, C. C., Couch, G. S., Greenblatt, D. M., Meng, E. C., & Ferrin, T. E. (2004). UCSF Chimera—A visualization system for exploratory research and analysis. Journal of Computational Chemistry, 25(13), 1605–1612. https://doi.org/10.1002/jcc.20084",
+   "label": null,
+   "expect": {
+    "family": "Pettersen",
+    "year": 2004,
+    "title": "UCSF Chimera—A visualization system for exploratory research and analysis",
+    "doi": "10.1002/jcc.20084"
+   }
+  },
+  {
+   "id": "en-sem-secao:g105",
+   "doc": "en-sem-secao",
+   "lang": "en",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Novoselov, K. S., Geim, A. K., Morozov, S. V., Jiang, D., Zhang, Y., Dubonos, S. V., Grigorieva, I. V., & Firsov, A. A. (2004). Electric Field Effect in Atomically Thin Carbon Films. Science, 306(5696), 666–669. https://doi.org/10.1126/science.1102896 Revista Genérica de Métodos · v. 1",
+   "label": null,
+   "expect": {
+    "family": "Novoselov",
+    "year": 2004,
+    "title": "Electric Field Effect in Atomically Thin Carbon Films",
+    "doi": "10.1126/science.1102896"
+   }
+  },
+  {
+   "id": "en-sem-secao:g098",
+   "doc": "en-sem-secao",
+   "lang": "en",
+   "style": "apa",
+   "source": "corpus",
+   "text": "Love, M. I., Huber, W., & Anders, S. (2014). Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2. Genome Biology, 15(12), 550–550. https://doi.org/10.1186/s13059-014-0550-8",
+   "label": null,
+   "expect": {
+    "family": "Love",
+    "year": 2014,
+    "title": "Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2",
+    "doi": "10.1186/s13059-014-0550-8"
+   }
+  },
+  {
+   "id": "nature-arxiv-nnunet",
+   "doc": "synthetic-nature",
+   "lang": "en",
+   "style": "nature",
+   "source": "synthetic",
+   "text": "Isensee, F., Jaeger, P. F., Kohl, S. A. A., Petersen, J. & Maier-Hein, K. H. nnU-Net: a self-configuring method for deep learning-based biomedical image segmentation. arXiv Preprint arXiv:1809.10486 (2018).",
+   "label": "10.",
+   "expect": {
+    "family": "Isensee",
+    "year": 2018,
+    "title": "nnU-Net: a self-configuring method for deep learning-based biomedical image segmentation",
+    "arxiv": "1809.10486"
+   }
+  },
+  {
+   "id": "nature-spaced-doi",
+   "doc": "synthetic-nature",
+   "lang": "en",
+   "style": "nature",
+   "source": "synthetic",
+   "text": "Ronneberger, O., Fischer, P. & Brox, T. U-Net: convolutional networks for biomedical image segmentation. Lect. Notes Comput. Sci. 9351, 234–241 h t t p s : / / d o i . o r g / 1 0 . 1 0 0 7 / 9 7 8 - 3 - 3 1 9 - 2 4 5 7 4 - 4 _ 2 8 (2015).",
+   "label": "1.",
+   "expect": {
+    "family": "Ronneberger",
+    "year": 2015,
+    "title": "U-Net: convolutional networks for biomedical image segmentation",
+    "doi": "10.1007/978-3-319-24574-4_28"
+   }
+  },
+  {
+   "id": "nature-bare-arxiv",
+   "doc": "synthetic-nature",
+   "lang": "en",
+   "style": "nature",
+   "source": "synthetic",
+   "text": "Kirillov, A., Mintun, E., Ravi, N., Mao, H., Rolland, C., Gustafson, L., Xiao, T., Whitehead, S., Berg, A. C., Lo, W.-Y., Dollár, P. & Girshick, R. Segment Anything. 2304.02643 (2023).",
+   "label": "15.",
+   "expect": {
+    "family": "Kirillov",
+    "year": 2023,
+    "title": "Segment Anything",
+    "arxiv": "2304.02643"
+   }
+  },
+  {
+   "id": "ieee-quoted",
+   "doc": "synthetic-ieee",
+   "lang": "en",
+   "style": "ieee",
+   "source": "synthetic",
+   "text": "Zhou Wang, A. Bovik, H. Sheikh, and E. Simoncelli, “Image quality assessment: from error visibility to structural similarity,” IEEE Transactions on Image Processing, vol. 13, no. 4, pp. 600–612, 2004, doi:10.1109/tip.2003.819861.",
+   "label": "[7]",
+   "expect": {
+    "family": "Wang",
+    "year": 2004,
+    "title": "Image quality assessment: from error visibility to structural similarity",
+    "doi": "10.1109/tip.2003.819861"
+   }
+  },
+  {
+   "id": "apa-pmc",
+   "doc": "synthetic-apa",
+   "lang": "en",
+   "style": "apa",
+   "source": "synthetic",
+   "text": "Litjens, G., Kooi, T., Bejnordi, B. E., Setio, A. A. A., Ciompi, F., Ghafoorian, M., van der Laak, J. A. W. M., van Ginneken, B., & Sánchez, C. I. (2017). A survey on deep learning in medical image analysis. Medical Image Analysis, 42, 60–88. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5709856/ https://doi.org/10.1016/j.media.2017.07.005",
+   "expect": {
+    "family": "Litjens",
+    "year": 2017,
+    "title": "A survey on deep learning in medical image analysis",
+    "doi": "10.1016/j.media.2017.07.005"
+   }
+  },
+  {
+   "id": "abnt-no-doi",
+   "doc": "synthetic-abnt",
+   "lang": "pt",
+   "style": "abnt",
+   "source": "synthetic",
+   "text": "SILVA, João Pedro da. Feridas e tecidos. São Paulo: Atlas, 2022.",
+   "expect": {
+    "family": "Silva",
+    "year": 2022,
+    "title": "Feridas e tecidos"
+   }
+  },
+  {
+   "id": "harvard-year-after-authors",
+   "doc": "synthetic-harvard",
+   "lang": "en",
+   "style": "harvard",
+   "source": "synthetic",
+   "text": "García, A. and Müller, B., 2020. Annotation costs in medical imaging. Journal of Imaging, 6(2), pp.1–12. https://doi.org/10.3390/jimaging6020012",
+   "expect": {
+    "family": "García",
+    "year": 2020,
+    "title": "Annotation costs in medical imaging",
+    "doi": "10.3390/jimaging6020012"
+   }
+  },
+  {
+   "id": "vancouver-doi",
+   "doc": "synthetic-vancouver",
+   "lang": "en",
+   "style": "vancouver",
+   "source": "synthetic",
+   "text": "Litjens G, Kooi T, Bejnordi BE, et al. A survey on deep learning in medical image analysis. Med Image Anal. 2017;42:60-88. doi:10.1016/j.media.2017.07.005",
+   "label": "1.",
+   "expect": {
+    "family": "Litjens",
+    "year": 2017,
+    "title": "A survey on deep learning in medical image analysis",
+    "doi": "10.1016/j.media.2017.07.005"
+   }
+  },
+  {
+   "id": "gost-ru",
+   "doc": "synthetic-gost",
+   "lang": "ru",
+   "style": "gost",
+   "source": "synthetic",
+   "text": "Иванова А. С. Вымышленное исследование потоков / А. С. Иванова // Вестник синтетических наук. — 2018. — № 4. — С. 12–20. — doi: 10.5555/fx.flow.2018.",
+   "expect": {
+    "family": "Иванова",
+    "year": 2018,
+    "title": "Вымышленное исследование потоков",
+    "doi": "10.5555/fx.flow.2018"
+   }
+  }
+ ]
+}

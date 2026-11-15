@@ -112,6 +112,47 @@ const STYLES: Record<string, { lines: string[][]; refs: number; cites: number; y
       ],
     ],
   },
+  harvard: {
+    refs: 3,
+    cites: 3,
+    years: [2015, 2020, 2018],
+    lines: [
+      [
+        'Introduction',
+        'Segmentation networks are standard (Ronneberger et al., 2015). According to García and Müller (2020), annotation is costly.',
+        'Self-configuring pipelines followed (Isensee et al., 2018).',
+      ],
+      [
+        'References',
+        'García, A. and Müller, B., 2020. Annotation costs in medical imaging. Journal of Imaging, 6(2), pp.1–12.',
+        '  https://doi.org/10.3390/jimaging6020012',
+        'Isensee, F., Jaeger, P. F., Kohl, S. A. A., Petersen, J. and Maier-Hein, K. H., 2018. nnU-Net: a self-configuring',
+        '  method for deep learning-based biomedical image segmentation. arXiv Preprint arXiv:1809.10486.',
+        'Ronneberger, O., Fischer, P. and Brox, T., 2015. U-Net: convolutional networks for biomedical image segmentation.',
+        '  In: MICCAI, pp. 234–241. https://doi.org/10.1007/978-3-319-24574-4_28',
+      ],
+    ],
+  },
+  nature: {
+    refs: 3,
+    cites: 4,
+    years: [2015, 2017, 2018],
+    lines: [
+      [
+        'Introduction',
+        'Segmentation networks are standard [1]. Surveys cover the field [2,3]. Self-configuring pipelines followed [3].',
+      ],
+      [
+        'References',
+        '1. Ronneberger, O., Fischer, P. & Brox, T. U-Net: convolutional networks for biomedical image segmentation.',
+        '   Lect. Notes Comput. Sci. 9351, 234–241 h t t p s : / / d o i . o r g / 1 0 . 1 0 0 7 / 9 7 8 - 3 - 3 1 9 - 2 4 5 7 4 - 4 _ 2 8 (2015).',
+        '2. Litjens, G. et al. A survey on deep learning in medical image analysis. Med. Image Anal. 42, 60–88',
+        '   https://doi.org/10.1016/j.media.2017.07.005 (2017).',
+        '3. Isensee, F., Jaeger, P. F., Kohl, S. A. A., Petersen, J. & Maier-Hein, K. H. nnU-Net: a self-configuring',
+        '   method for deep learning-based biomedical image segmentation. arXiv Preprint arXiv:1809.10486 (2018).',
+      ],
+    ],
+  },
 };
 
 describe('document-only extraction, per citation style', () => {
@@ -131,5 +172,13 @@ describe('document-only extraction, per citation style', () => {
     const avila = ex.references.find((r) => r.authors[0]?.family === 'Ávila');
     expect(avila?.title).toMatch(/custos e processos/);
     expect(ex.references.find((r) => r.authors[0]?.family === 'Ronneberger')?.doi).toBe('10.1007/978-3-319-24574-4_28');
+  });
+  it('nature: spaced DOI is reconstructed and arXiv ids are kept', async () => {
+    const { ex } = await run(STYLES.nature.lines);
+    const u = ex.references.find((r) => r.authors[0]?.family === 'Ronneberger');
+    expect(u?.doi).toBe('10.1007/978-3-319-24574-4_28');
+    expect(u?.title).toMatch(/U-Net/i);
+    const n = ex.references.find((r) => r.authors[0]?.family === 'Isensee');
+    expect(n?.arxiv).toBe('1809.10486');
   });
 });

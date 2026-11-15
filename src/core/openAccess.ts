@@ -7,7 +7,7 @@
  * servers. Shadow libraries are deliberately not supported.
  *
  * Runs on the server side (Cloudflare Pages Function, or the local server of the desktop edition) because those
- * PDF hosts do not allow cross-origin downloads. Only the reference's DOI/title/year/author leave the browser,
+ * PDF hosts do not allow cross-origin downloads. Only the reference's DOI/title/year/author/arXiv id leave the browser,
  * never the document. Candidate URLs come from those catalogues, never from the request, so this is not an open
  * proxy. Nothing is logged.
  */
@@ -17,6 +17,8 @@ export interface OaQuery {
   title?: string;
   year?: number;
   author?: string;
+  /** arXiv id (e.g. "1809.10486"), when the reference cites a preprint. */
+  arxiv?: string;
   /** "thesis": title searches look among dissertations, with a wider year window (defence vs. deposit year). */
   kind?: 'thesis';
 }
@@ -133,6 +135,17 @@ export function titleSimilarity(a: string, b: string): number {
   return inter / Math.max(x.size, y.size);
 }
 
+const ARXIV_ID_RE = /^(?:\d{4}\.\d{4,5}|[a-z][a-z\-]*\/\d{7})$/i;
+
+/** Normalises an arXiv id from a query param, a URL, or "arXiv:...." */
+export function parseArxivId(raw: string | null | undefined): string | undefined {
+  const s = raw?.trim();
+  if (!s) return undefined;
+  const m = /(?:arxiv(?:\.org\/(?:abs|pdf)\/|:))?\s*((?:\d{4}\.\d{4,5}|[a-z][a-z\-]*\/\d{7}))(?:v\d+)?(?:\.pdf)?$/i.exec(s);
+  const id = (m?.[1] ?? s.replace(/^arxiv:/i, '').replace(/v\d+$/i, '')).toLowerCase();
+  return ARXIV_ID_RE.test(id) ? id : undefined;
+}
+
 /** Validates and normalises a query coming from the network. */
 export function parseOaQuery(params: URLSearchParams): OaQuery | undefined {
   const doi = params.get('doi')?.trim().replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '').toLowerCase();
@@ -140,8 +153,11 @@ export function parseOaQuery(params: URLSearchParams): OaQuery | undefined {
   const year = Number(params.get('year')) || undefined;
   const author = params.get('author')?.trim().slice(0, 80);
   const kind = params.get('kind') === 'thesis' ? ('thesis' as const) : undefined;
-  if (doi && DOI_RE.test(doi)) return { doi, title, year, author, ...(kind ? { kind } : {}) };
-  if (title && title.length >= 8) return { title, year: year && year > 1500 && year < 2100 ? year : undefined, author, ...(kind ? { kind } : {}) };
+  const arxiv = parseArxivId(params.get('arxiv'));
+  const extra = { ...(kind ? { kind } : {}), ...(arxiv ? { arxiv } : {}) };
+  if (doi && DOI_RE.test(doi)) return { doi, title, year, author, ...extra };
+  if (arxiv) return { arxiv, title, year: year && year > 1500 && year < 2100 ? year : undefined, author, ...(kind ? { kind } : {}) };
+  if (title && title.length >= 8) return { title, year: year && year > 1500 && year < 2100 ? year : undefined, author, ...extra };
   return undefined;
 }
 
@@ -180,8 +196,8 @@ async function call(ctx: Ctx, name: OaSourceName, url: string, headers: Record<s
   const gap = MIN_GAP[name];
   if (gap) {
     const wait = (lastCall.get(name) ?? 0) + gap - now;
-    // never queue for long inside a request: past 1.5 s we skip this catalogue for now
-    if (wait > 1500) throw new RateLimited();
+    // Queue up to 8 s so Semantic Scholar's 1 rps spacing is honoured instead of skipped as rate_limited.
+    if (wait > 8000) throw new RateLimited();
     lastCall.set(name, Math.max(now, (lastCall.get(name) ?? 0) + gap));
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
   }
@@ -284,8 +300,9 @@ let defaultCache = memoryCache();
 /** Shared catalogue context (timeouts, keys, clock) for other /api/oa/* handlers. */
 export const oaContext = (f: Fetch, opts: OaOptions = {}): Ctx => ({ f, env: opts.env ?? {}, timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, now: opts.now ?? Date.now });
 export const foldText = (s: string) => fold(s);
-// v3: v2 folded non-Latin titles to "", so every Russian/Chinese title of one year shared a cache entry
-export const oaCacheKey = (q: OaQuery) => (q.doi ? `v3|doi|${q.doi}` : `v3|t|${fold(q.title ?? '')}|${q.year ?? ''}|${fold(q.author ?? '')}${q.kind ? `|${q.kind}` : ''}`);
+// v4: v3 baked stale Semantic Scholar rate_limited answers; also keys arXiv-only queries
+export const oaCacheKey = (q: OaQuery) =>
+  q.doi ? `v4|doi|${q.doi}` : q.arxiv ? `v4|arxiv|${q.arxiv}` : `v4|t|${fold(q.title ?? '')}|${q.year ?? ''}|${fold(q.author ?? '')}${q.kind ? `|${q.kind}` : ''}`;
 
 /** OpenAlex `filter=` for a title search: ±1 year, or for theses type:dissertation with ±2 years. */
 export function openAlexTitleFilter(q: OaQuery): string {
@@ -486,6 +503,7 @@ async function findWorkCrossref(ctx: Ctx, q: OaQuery): Promise<OpenAlexWork | un
   if (q.doi) {
     const w = await callJson<{ message?: Parameters<typeof crossrefToWork>[0] }>(ctx, 'Crossref', withMail(`https://api.crossref.org/works/${q.doi}`));
     if (w?.message) return crossrefToWork(w.message);
+    return undefined;
   }
   if (!q.title) return undefined;
   const params = new URLSearchParams({ 'query.bibliographic': q.title, rows: '8' });
@@ -499,7 +517,11 @@ async function findWorkOpenAlex(ctx: Ctx, q: OaQuery): Promise<OpenAlexWork | un
   if (q.doi) {
     // singleton lookups are free: they get their own cool-down, so an exhausted search budget does not block them
     const w = await callJson<OpenAlexWork>(ctx, 'OpenAlex', withOpenAlexKey(ctx, `https://api.openalex.org/works/doi:${encodeURIComponent(q.doi)}`), undefined, 'OpenAlex:get');
-    if (w) return w;
+    if (w) {
+      const found = (w.doi ?? '').replace(/^https?:\/\/doi\.org\//i, '').toLowerCase();
+      if (!found || found === q.doi) return w;
+    }
+    return undefined;
   }
   if (!q.title) return undefined;
   const filter = openAlexTitleFilter(q);
@@ -569,12 +591,13 @@ async function fromUnpaywall(ctx: Ctx, doi: string, pdfs: CandidateSet, reads: C
   return pdfs.hitsOf('Unpaywall') + reads.hitsOf('Unpaywall') > before;
 }
 
-async function fromSemanticScholar(ctx: Ctx, doi: string | undefined, title: string | undefined, pdfs: CandidateSet): Promise<boolean> {
+async function fromSemanticScholar(ctx: Ctx, doi: string | undefined, title: string | undefined, pdfs: CandidateSet, arxiv?: string): Promise<boolean> {
   const headers = ctx.env.S2_API_KEY ? { 'x-api-key': ctx.env.S2_API_KEY } : undefined;
   type S2 = { title?: string; openAccessPdf?: { url?: string; status?: string; license?: string | null } | null; externalIds?: { ArXiv?: string; PubMedCentral?: string } };
   let s2: S2 | undefined;
   if (doi) s2 = await callJson<S2>(ctx, 'Semantic Scholar', `https://api.semanticscholar.org/graph/v1/paper/DOI:${encodeURIComponent(doi)}?fields=openAccessPdf,externalIds`, headers);
-  else if (title) {
+  if (!s2 && arxiv) s2 = await callJson<S2>(ctx, 'Semantic Scholar', `https://api.semanticscholar.org/graph/v1/paper/ARXIV:${encodeURIComponent(arxiv)}?fields=openAccessPdf,externalIds`, headers);
+  if (!s2 && title) {
     const m = await callJson<{ data?: S2[] }>(ctx, 'Semantic Scholar', `https://api.semanticscholar.org/graph/v1/paper/search/match?query=${encodeURIComponent(title)}&fields=title,openAccessPdf,externalIds`, headers);
     s2 = m?.data?.find((p) => titleSimilarity(title, p.title ?? '') >= 0.85);
   }
@@ -654,6 +677,14 @@ async function fromCore(ctx: Ctx, doi: string, pdfs: CandidateSet): Promise<OaSo
  * arXiv e-print whose title matches (>= 0.85 token overlap). Short titles ("Deep learning") match too many papers,
  * so they also need the first author's family name in the entry.
  */
+/** Legal arXiv PDF for a known e-print id (no catalogue call). */
+function fromArxivById(id: string, pdfs: CandidateSet): boolean {
+  const clean = parseArxivId(id);
+  if (!clean) return false;
+  pdfs.add({ url: `https://arxiv.org/pdf/${clean}`, source: 'arXiv', host: 'preprint', version: 'preprint', via: 'arXiv' });
+  return true;
+}
+
 async function fromArxiv(ctx: Ctx, title: string, pdfs: CandidateSet, author?: string): Promise<boolean> {
   const words = fold(title).split(' ').filter((w) => w.length > 3).slice(0, 10);
   const family = author ? (fold(author).split(' ').pop() ?? '') : '';
@@ -703,6 +734,8 @@ export async function lookupOpenAccess(q: OaQuery, f: Fetch = fetch, opts: OaOpt
     via = 'Crossref';
     await step(statuses, 'Crossref', async () => Boolean((w = await findWorkCrossref(ctx, q))));
   }
+  const foundDoi = (w?.doi ?? '').replace(/^https?:\/\/doi\.org\//i, '').toLowerCase();
+  if (q.doi && w && foundDoi && foundDoi !== q.doi) w = undefined;
   const work = w as OpenAlexWork | undefined;
   if (work) {
     openAlexCandidates(work, pdfs, via);
@@ -711,11 +744,14 @@ export async function lookupOpenAccess(q: OaQuery, f: Fetch = fetch, opts: OaOpt
   const doi = (work?.doi ?? '').replace(/^https?:\/\/doi\.org\//i, '').toLowerCase() || q.doi;
   const title = work?.title ?? work?.display_name ?? q.title ?? undefined;
 
+  // Known arXiv id: add the legal preprint PDF without a catalogue call (helps when a book-chapter DOI is closed).
+  if (q.arxiv && fromArxivById(q.arxiv, pdfs)) statuses.set('arXiv', 'found');
+
   // 2) the catalogues of free copies, in parallel (each with its own timeout)
   let epmcEmail: { email?: string; name?: string } = {};
   await Promise.all([
     doi ? step(statuses, 'Unpaywall', () => fromUnpaywall(ctx, doi, pdfs, reads)) : (statuses.set('Unpaywall', 'skipped'), undefined),
-    step(statuses, 'Semantic Scholar', () => fromSemanticScholar(ctx, doi, doi ? undefined : title, pdfs)),
+    step(statuses, 'Semantic Scholar', () => fromSemanticScholar(ctx, doi, doi ? undefined : title, pdfs, q.arxiv)),
     step(statuses, 'Europe PMC', async () => {
       const r = await fromEuropePmc(ctx, doi, { ...q, title }, pdfs, reads);
       epmcEmail = r;
@@ -725,8 +761,10 @@ export async function lookupOpenAccess(q: OaQuery, f: Fetch = fetch, opts: OaOpt
   ]);
   // 3) arXiv by title, last (strict rate limit), only when nothing else gave a PDF
   const firstAuthor = q.author ?? work?.authorships?.[0]?.author?.display_name;
-  if (!pdfs.size && title) await step(statuses, 'arXiv', () => fromArxiv(ctx, title, pdfs, firstAuthor));
-  else statuses.set('arXiv', pdfs.list().some((c) => c.host === 'preprint' && /arxiv/.test(c.url)) ? 'found' : 'skipped');
+  if (!statuses.has('arXiv')) {
+    if (!pdfs.size && title) await step(statuses, 'arXiv', () => fromArxiv(ctx, title, pdfs, firstAuthor));
+    else statuses.set('arXiv', pdfs.list().some((c) => c.host === 'preprint' && /arxiv/.test(c.url)) ? 'found' : 'skipped');
+  }
 
   const sources = [...statuses].map(([name, status]) => ({ name, status }));
   const pdfList = pdfs.list();
@@ -739,7 +777,7 @@ export async function lookupOpenAccess(q: OaQuery, f: Fetch = fetch, opts: OaOpt
   const authors = (work?.authorships ?? []).map((a) => a.author?.display_name).filter((n): n is string => Boolean(n)).slice(0, 3);
 
   let result: OaResult;
-  if (!work && !pdfList.length && !readList.length) result = { status: 'not_found', pdfUrls: [], sources };
+  if (!work && !pdfList.length && !readList.length) result = { status: 'not_found', doi: q.doi, title: q.title, year: q.year, pdfUrls: [], sources };
   else
     result = {
       status: pdfList.length || readList.length ? 'oa' : 'closed',
