@@ -227,7 +227,7 @@ export const ptBR: SiteContent = {
             '**Europe PMC**: textos completos de ciências da vida e biomedicina.',
             '**arXiv**: preprints de física, matemática, computação e áreas afins.',
             '**Semantic Scholar**: links de PDF em acesso aberto do grafo acadêmico dele.',
-            '**CORE**: artigos reunidos de repositórios institucionais e temáticos (quando há uma chave de API configurada).',
+            '**CORE**: artigos reunidos de repositórios institucionais e temáticos.',
           ],
         },
         {

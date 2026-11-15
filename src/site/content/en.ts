@@ -227,7 +227,7 @@ export const en: SiteContent = {
             '**Europe PMC**: full texts in life sciences and biomedicine.',
             '**arXiv**: preprints in physics, mathematics, computer science and related fields.',
             '**Semantic Scholar**: open-access PDF links from its academic graph.',
-            '**CORE**: papers aggregated from institutional and subject repositories (when an API key is configured).',
+            '**CORE**: papers aggregated from institutional and subject repositories.',
           ],
         },
         {
