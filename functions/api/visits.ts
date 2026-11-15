@@ -19,6 +19,18 @@ interface PagesContext {
 
 const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8' };
 
+function cacheControl(): string {
+  return `public, max-age=${VISITS_CACHE_MAX_AGE_SEC}, s-maxage=${VISITS_CACHE_MAX_AGE_SEC}`;
+}
+
+function edgeCache(): Cache | undefined {
+  return (globalThis as { caches?: { default?: Cache } }).caches?.default;
+}
+
+function visitsCacheKey(request: Request): Request {
+  return new Request(new URL('/api/visits', request.url).toString(), { method: 'GET' });
+}
+
 function allowedOrigin(origin: string | null): boolean {
   if (!origin) return true;
   try {
@@ -32,20 +44,30 @@ function allowedOrigin(origin: string | null): boolean {
   }
 }
 
+function json(body: unknown, status: number, headers?: Record<string, string>): Response {
+  return new Response(JSON.stringify(body), { status, headers: { ...JSON_HEADERS, ...headers } });
+}
+
 export const onRequestGet = async (ctx: PagesContext): Promise<Response> => {
+  const cache = edgeCache();
+  const key = visitsCacheKey(ctx.request);
+  if (cache) {
+    const hit = await cache.match(key);
+    if (hit) return hit;
+  }
   const kv = ctx.env?.VISITS;
-  if (!kv) return new Response(JSON.stringify({ error: 'unavailable' }), { status: 503, headers: JSON_HEADERS });
+  if (!kv) return json({ error: 'unavailable' }, 503);
   try {
     const visits = await sumWindow(kv);
-    return new Response(JSON.stringify({ visits }), {
-      status: 200,
-      headers: {
-        ...JSON_HEADERS,
-        'cache-control': `public, max-age=${VISITS_CACHE_MAX_AGE_SEC}, s-maxage=${VISITS_CACHE_MAX_AGE_SEC}`,
-      },
-    });
+    const res = json({ visits }, 200, { 'cache-control': cacheControl() });
+    if (cache) {
+      const put = cache.put(key, res.clone());
+      if (ctx.waitUntil) ctx.waitUntil(put);
+      else await put;
+    }
+    return res;
   } catch {
-    return new Response(JSON.stringify({ error: 'unavailable' }), { status: 503, headers: JSON_HEADERS });
+    return json({ error: 'unavailable' }, 503);
   }
 };
 
