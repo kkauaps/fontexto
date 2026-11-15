@@ -289,7 +289,7 @@ export function UploadFlow({ mode, onBack, onDone }: Props) {
             <ol className="uf-steps" aria-live="polite">
               {steps.map((s, i) => (
                 <li key={i} className={s.state}>
-                  <span className="uf-dot" aria-hidden="true">{s.state === 'ok' ? '✓' : s.state === 'run' ? <span className="spinner" /> : ''}</span>
+                  <span className="uf-dot" aria-hidden="true">{s.state === 'ok' ? '✓' : ''}</span>
                   <span>
                     {s.label}
                     {s.detail && <span className="small muted"> · {s.detail}</span>}

@@ -1710,6 +1710,15 @@ table.files select {
   font-size: 13px;
   font-weight: 700;
   flex: none;
+  box-sizing: border-box;
+  margin: 0;
+}
+/* the in-progress step: the circle itself is the spinner ring, so it stays centred and the same size as the other circles */
+.uf-steps li.run .uf-dot {
+  border-color: var(--line);
+  border-top-color: var(--accent);
+  transform-origin: 50% 50%;
+  animation: ct-spin 0.8s linear infinite;
 }
 .uf-steps li.ok .uf-dot {
   background: var(--brand);
