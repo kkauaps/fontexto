@@ -45,6 +45,7 @@ export const es: Messages = {
     'Envía tu documento. Fontexto encuentra las referencias, busca las versiones gratuitas de los artículos y, para cada cita, muestra la página donde la fuente lo dice, lista para que la revises.',
   ctaJustDoc: 'Solo mi documento',
   ctaDocAndPdfs: 'Documento + PDFs de las referencias',
+  recommended: 'Recomendado',
   heroHint:
     '“Solo mi documento” busca los PDFs gratuitos de las referencias (OpenAlex, Semantic Scholar, arXiv). ¿Tienes un .bib?',
   ctaWithBib: 'Envíalo con el .bib',

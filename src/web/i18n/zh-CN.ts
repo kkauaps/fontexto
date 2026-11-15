@@ -45,6 +45,7 @@ export const zhCN: Messages = {
     '请提交您的文档。Fontexto 会查找参考文献、检索免费论文，并显示来源中该引文所在的页面，供您核对。',
   ctaJustDoc: '仅主文档',
   ctaDocAndPdfs: '文档 + 参考文献 PDF',
+  recommended: '推荐',
   heroHint:
     '「仅主文档」会从开放库为参考文献查找免费 PDF（OpenAlex、Semantic Scholar、arXiv）。有 .bib 吗？',
   ctaWithBib: '使用 .bib 发送',

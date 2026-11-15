@@ -45,6 +45,7 @@ export const ptBR: Messages = {
     'Envie seu documento. O Fontexto encontra as referências, busca os artigos gratuitos e mostra, para cada citação, a página onde a fonte diz aquilo, pronta para você conferir.',
   ctaJustDoc: 'Só o meu documento',
   ctaDocAndPdfs: 'Documento + PDFs das referências',
+  recommended: 'Recomendado',
   heroHint: '“Só o meu documento” busca os PDFs gratuitos das referências (OpenAlex, Semantic Scholar, arXiv). Tem um .bib?',
   ctaWithBib: 'Envie com o .bib',
   previewDocAlt: 'Tela do Fontexto: o texto do artigo com as citações marcadas e, ao lado, a passagem encontrada na fonte',

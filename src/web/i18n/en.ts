@@ -45,6 +45,7 @@ export const en = {
     'Upload your document. Fontexto finds the references, looks up free versions of the papers, and, for each citation, shows the page where the source says that — ready for you to check.',
   ctaJustDoc: 'Just my document',
   ctaDocAndPdfs: 'Document + reference PDFs',
+  recommended: 'Recommended',
   heroHint:
     '“Just my document” looks up free PDFs of the references (OpenAlex, Semantic Scholar, arXiv). Have a .bib?',
   ctaWithBib: 'Upload it with the .bib',

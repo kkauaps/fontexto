@@ -2280,6 +2280,35 @@ button.primary:hover, .primary:hover { background: var(--accent-hover); }
 .lp-lead { font-size: 15px; line-height: 1.55; color: var(--muted); max-width: 42ch; margin-bottom: 22px; }
 .lp-cta { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
 .lp-cta button { height: 42px; padding: 0 18px; font-size: 14px; }
+
+.lp-cta .lp-btn-recommended {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  height: auto;
+  min-height: 42px;
+  white-space: normal;
+  line-height: 1.25;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.lp-rec {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  color: var(--on-accent);
+  background: var(--accent);
+  white-space: nowrap;
+}
+
 .lp-hint { font-size: 12.5px; color: var(--faint); line-height: 1.45; max-width: 44ch; }
 
 .lp-preview {

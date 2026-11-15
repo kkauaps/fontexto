@@ -45,8 +45,9 @@ export function Landing({ projects, error, onStart, onOpen }: Props) {
               <button className="primary lp-btn" onClick={() => onStart('doc')}>
                 {t.ctaJustDoc}
               </button>
-              <button className="lp-btn lp-btn-soft" onClick={() => onStart('nobib')}>
-                {t.ctaDocAndPdfs}
+              <button className="lp-btn lp-btn-soft lp-btn-recommended" onClick={() => onStart('nobib')}>
+                <span className="lp-btn-label">{t.ctaDocAndPdfs}</span>
+                <span className="lp-rec">{t.recommended}</span>
               </button>
             </div>
             <p className="lp-hint small">

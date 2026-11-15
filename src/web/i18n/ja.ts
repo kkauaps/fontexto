@@ -45,6 +45,7 @@ export const ja: Messages = {
     '文書を送信してください。Fontextoが参考文献を見つけ、無料の論文を検索し、各引用について、出典がその内容を述べているページを表示し、確認できるようにします。',
   ctaJustDoc: '文書のみ',
   ctaDocAndPdfs: '文書 + 参考文献 PDF',
+  recommended: 'おすすめ',
   heroHint: '「文書のみ」は、参考文献の無料 PDF を公開カタログ（OpenAlex、Semantic Scholar、arXiv）から探します。.bib をお持ちですか？',
   ctaWithBib: '.bibで送信',
   previewDocAlt: 'Fontextoの画面：引用がマークされた記事の本文と、その横にある出典で見つかった箇所',
