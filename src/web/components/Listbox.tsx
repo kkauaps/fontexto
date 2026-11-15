@@ -1,5 +1,5 @@
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
-import { listboxTypeaheadIndex } from '../listbox';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { listboxTypeaheadIndex, placeAnchoredDropdown } from '../listbox';
 import { isPhoneWidth } from '../fit';
 
 export interface ListboxOption<T extends string> {
@@ -20,6 +20,8 @@ interface Props<T extends string> {
 
 /**
  * Themed combobox/listbox replacing native &lt;select&gt; (native option styling cannot follow glass/dark/light).
+ * On phones the panel is a fixed dropdown anchored to the trigger (right-aligned, clamped to the viewport).
+ * On desktop it stays an absolutely positioned menu under the trigger.
  */
 export function Listbox<T extends string>({ value, options, onChange, ariaLabel, icon, className, block }: Props<T>) {
   const listId = useId();
@@ -27,6 +29,7 @@ export function Listbox<T extends string>({ value, options, onChange, ariaLabel,
   const listRef = useRef<HTMLUListElement>(null);
   const [open, setOpen] = useState(false);
   const [phone, setPhone] = useState(() => isPhoneWidth());
+  const [anchor, setAnchor] = useState<{ top: number; left: number; maxHeight: number; width: number } | null>(null);
   useEffect(() => {
     const onResize = () => setPhone(isPhoneWidth());
     window.addEventListener('resize', onResize);
@@ -61,6 +64,36 @@ export function Listbox<T extends string>({ value, options, onChange, ariaLabel,
       document.removeEventListener('keydown', esc);
     };
   }, [open]);
+
+  const updateAnchor = useCallback(() => {
+    if (!phone) return;
+    const trigger = rootRef.current?.querySelector<HTMLElement>('[data-lb-trigger]');
+    const list = listRef.current;
+    if (!trigger || !list) return;
+    const tr = trigger.getBoundingClientRect();
+    const next = placeAnchoredDropdown(
+      tr,
+      { width: window.innerWidth, height: window.innerHeight },
+      { width: Math.max(list.offsetWidth, list.scrollWidth, tr.width), height: Math.max(list.scrollHeight, list.offsetHeight) },
+    );
+    setAnchor(next);
+  }, [phone]);
+
+  useLayoutEffect(() => {
+    if (!open || !phone) {
+      setAnchor(null);
+      return;
+    }
+    updateAnchor();
+    listRef.current?.focus();
+    const onWin = () => updateAnchor();
+    window.addEventListener('resize', onWin);
+    window.addEventListener('scroll', onWin, true);
+    return () => {
+      window.removeEventListener('resize', onWin);
+      window.removeEventListener('scroll', onWin, true);
+    };
+  }, [open, phone, updateAnchor, options.length]);
 
   useEffect(() => {
     if (!open) return;
@@ -111,6 +144,10 @@ export function Listbox<T extends string>({ value, options, onChange, ariaLabel,
   };
 
   const activeId = `${listId}-opt-${active}`;
+  const panelStyle: CSSProperties | undefined =
+    phone && open && anchor
+      ? { top: anchor.top, left: anchor.left, width: anchor.width, maxHeight: anchor.maxHeight }
+      : undefined;
 
   return (
     <div ref={rootRef} className={`lb${block ? ' lb-block' : ''}${className ? ` ${className}` : ''}`}>
@@ -129,7 +166,6 @@ export function Listbox<T extends string>({ value, options, onChange, ariaLabel,
         <span className="lb-value">{selected?.label ?? value}</span>
         <span className="lb-chevron" aria-hidden="true" />
       </button>
-      {open && phone && <button type="button" className="lb-scrim" aria-label="Close" onClick={() => setOpen(false)} />}
       {open && (
         <ul
           ref={listRef}
@@ -137,7 +173,8 @@ export function Listbox<T extends string>({ value, options, onChange, ariaLabel,
           role="listbox"
           aria-label={ariaLabel}
           aria-activedescendant={activeId}
-          className={`lb-panel${phone ? ' lb-sheet' : ''}`}
+          className={`lb-panel${phone ? ' lb-anchored' : ''}`}
+          style={panelStyle}
           tabIndex={-1}
           onKeyDown={onListKey}
         >
