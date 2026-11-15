@@ -60,7 +60,7 @@ export interface OaResult {
   contactEmail?: string;
   contactName?: string;
   /** What each catalogue answered (diagnostics; no query data). */
-  sources?: { name: OaSourceName; status: OaSourceStatus }[];
+  sources?: { name: OaSourceName; status: OaSourceStatus; detail?: string }[];
   cached?: boolean;
 }
 
@@ -94,7 +94,7 @@ export interface OaOptions {
 
 type Fetch = typeof fetch;
 /** Polite contact required by OpenAlex, Unpaywall and Crossref. */
-export const OA_CONTACT = 'oa@fontexto.com';
+export const OA_CONTACT = 'contact@xoryn.com.br';
 const UA = `Fontexto/1.0 (+https://fontexto.com; mailto:${OA_CONTACT})`;
 const withMail = (url: string) => `${url}${url.includes('?') ? '&' : '?'}mailto=${encodeURIComponent(OA_CONTACT)}`;
 export const withOpenAlexKey = (ctx: { env: OaEnv }, url: string) => {
@@ -102,11 +102,14 @@ export const withOpenAlexKey = (ctx: { env: OaEnv }, url: string) => {
   return ctx.env.OPENALEX_API_KEY ? `${u}&api_key=${encodeURIComponent(ctx.env.OPENALEX_API_KEY)}` : u;
 };
 export const MAX_PDF_BYTES = 40 * 1024 * 1024;
-export const DEFAULT_TIMEOUT_MS = 6000;
+export const MAX_PDF_REDIRECTS = 5;
+export const DEFAULT_TIMEOUT_MS = 8_000;
+export const PDF_FETCH_TIMEOUT_MS = 20_000;
 // no whitespace, '?', '#', '%' or '\\', and no '..' segment: the DOI is put in catalogue URL paths as is
 const DOI_RE = /^10\.\d{4,9}\/(?!(?:.*\/)?\.\.(?:\/|$))[^\s?#%\\]{1,200}$/;
-const TTL_FOUND = 7 * 24 * 3600;
-const TTL_MISS = 12 * 3600;
+const TTL_FOUND = 30 * 24 * 3600;
+const TTL_MISS = 5 * 24 * 3600;
+const TTL_ERROR = 60;
 
 // Unicode-aware: Cyrillic, Greek, CJK... must survive (a-z only turned every Russian or Chinese title into "").
 const fold = (s: string) =>
@@ -221,6 +224,8 @@ const cooldownUntil = new Map<string, number>();
 /** Minimum spacing between calls to catalogues that ask for it (arXiv: one request every 3 s). */
 const MIN_GAP: Partial<Record<OaSourceName, number>> = { arXiv: 3000, 'Semantic Scholar': 1000 };
 const lastCall = new Map<OaSourceName, number>();
+/** Last non-OK HTTP status per upstream bucket (for diagnostics only). */
+const lastHttp = new Map<string, number>();
 /** Catalogues that are often slower than the rest get a longer timeout (multiplier). */
 const SLOW: Partial<Record<OaSourceName, number>> = { 'Europe PMC': 1.5 };
 
@@ -228,7 +233,9 @@ const SLOW: Partial<Record<OaSourceName, number>> = { 'Europe PMC': 1.5 };
 export function resetOaState() {
   cooldownUntil.clear();
   lastCall.clear();
+  lastHttp.clear();
   defaultCache = memoryCache();
+  inflightLookups.clear();
 }
 
 export class RateLimited extends Error {}
@@ -269,9 +276,11 @@ async function call(ctx: Ctx, name: OaSourceName, url: string, headers: Record<s
       throw new RateLimited();
     }
     if (!r.ok) {
+      lastHttp.set(bucket, r.status);
       void r.body?.cancel();
       return undefined;
     }
+    lastHttp.delete(bucket);
     return r;
   } catch (e) {
     if (e instanceof RateLimited) throw e;
@@ -348,12 +357,13 @@ export function edgeCache(cache: EdgeCacheStore, l1: OaCache = memoryCache()): O
 }
 
 let defaultCache = memoryCache();
+const inflightLookups = new Map<string, Promise<OaResult>>();
 /** Shared catalogue context (timeouts, keys, clock) for other /api/oa/* handlers. */
 export const oaContext = (f: Fetch, opts: OaOptions = {}): Ctx => ({ f, env: opts.env ?? {}, timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, now: opts.now ?? Date.now });
 export const foldText = (s: string) => fold(s);
-// v4: v3 baked stale Semantic Scholar rate_limited answers; also keys arXiv-only queries
+// v5: longer edge TTLs, coalescing, contact@xoryn.com.br polite pool
 export const oaCacheKey = (q: OaQuery) =>
-  q.doi ? `v4|doi|${q.doi}` : q.arxiv ? `v4|arxiv|${q.arxiv}` : `v4|t|${fold(q.title ?? '')}|${q.year ?? ''}|${fold(q.author ?? '')}${q.kind ? `|${q.kind}` : ''}`;
+  q.doi ? `v5|doi|${q.doi}` : q.arxiv ? `v5|arxiv|${q.arxiv}` : `v5|t|${fold(q.title ?? '')}|${q.year ?? ''}|${fold(q.author ?? '')}${q.kind ? `|${q.kind}` : ''}`;
 
 /** OpenAlex `filter=` for a title search: ±1 year, or for theses type:dissertation with ±2 years. */
 export function openAlexTitleFilter(q: OaQuery, extra: string[] = []): string {
@@ -809,34 +819,61 @@ async function fromArxiv(ctx: Ctx, title: string, pdfs: CandidateSet, author?: s
   return false;
 }
 
+function sourceDetail(name: OaSourceName, status: OaSourceStatus): string | undefined {
+  if (status === 'rate_limited') return 'http_429';
+  if (status === 'timeout') return 'timeout';
+  const code = lastHttp.get(name) ?? lastHttp.get(`${name}:search`) ?? lastHttp.get(`${name}:get`);
+  if (code && status === 'error') return `http_${code}`;
+  if (code && status === 'none') return `http_${code}`;
+  return undefined;
+}
+
 /** Runs one catalogue and records how it went. */
 async function step(statuses: Map<OaSourceName, OaSourceStatus>, name: OaSourceName, run: () => Promise<boolean | OaSourceStatus>) {
   try {
     const out = await run();
-    statuses.set(name, typeof out === 'string' ? out : out ? 'found' : (statuses.get(name) === 'found' ? 'found' : 'none'));
+    const status = typeof out === 'string' ? out : out ? 'found' : (statuses.get(name) === 'found' ? 'found' : 'none');
+    statuses.set(name, status);
   } catch (e) {
     statuses.set(name, e instanceof RateLimited ? 'rate_limited' : e instanceof TimedOut ? 'timeout' : 'error');
   }
 }
 
-/** Looks the work up and gathers its free legal copies (cached). */
+/** Looks the work up and gathers its free legal copies (cached, coalesced per isolate). */
 export async function lookupOpenAccess(q: OaQuery, f: Fetch = fetch, opts: OaOptions = {}): Promise<OaResult> {
   const cache = opts.cache ?? defaultCache;
   const key = oaCacheKey(q);
   const hit = await cache.get(key);
   if (hit) return { ...hit, cached: true };
+  let work = inflightLookups.get(key);
+  if (!work) {
+    work = lookupOpenAccessWork(q, f, opts, cache, key);
+    inflightLookups.set(key, work);
+    void work.finally(() => inflightLookups.delete(key));
+  }
+  return { ...(await work) };
+}
+
+async function lookupOpenAccessWork(q: OaQuery, f: Fetch, opts: OaOptions, cache: OaCache, key: string): Promise<OaResult> {
   const ctx: Ctx = { f, env: opts.env ?? {}, timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, now: opts.now ?? Date.now };
   const statuses = new Map<OaSourceName, OaSourceStatus>();
   const pdfs = new CandidateSet();
   const reads = new CandidateSet();
 
-  // 1) identify the work: OpenAlex, then Crossref
+  // 1) identify the work: without an OpenAlex key, prefer Crossref for title searches (shared keyless budget).
   let w: OpenAlexWork | undefined;
   let via: OaSourceName = 'OpenAlex';
-  await step(statuses, 'OpenAlex', async () => Boolean((w = await findWorkOpenAlex(ctx, q))));
-  if (!w && (q.doi || q.title)) {
+  const noAlexKey = !ctx.env.OPENALEX_API_KEY;
+  if (noAlexKey && q.title && !q.doi) {
     via = 'Crossref';
     await step(statuses, 'Crossref', async () => Boolean((w = await findWorkCrossref(ctx, q))));
+    if (!w) await step(statuses, 'OpenAlex', async () => Boolean((w = await findWorkOpenAlex(ctx, q))));
+  } else {
+    await step(statuses, 'OpenAlex', async () => Boolean((w = await findWorkOpenAlex(ctx, q))));
+    if (!w && (q.doi || q.title)) {
+      via = 'Crossref';
+      await step(statuses, 'Crossref', async () => Boolean((w = await findWorkCrossref(ctx, q))));
+    }
   }
   const foundDoi = (w?.doi ?? '').replace(/^https?:\/\/doi\.org\//i, '').toLowerCase();
   if (q.doi && w && foundDoi && foundDoi !== q.doi) w = undefined;
@@ -870,7 +907,7 @@ export async function lookupOpenAccess(q: OaQuery, f: Fetch = fetch, opts: OaOpt
     else statuses.set('arXiv', pdfs.list().some((c) => c.host === 'preprint' && /arxiv/.test(c.url)) ? 'found' : 'skipped');
   }
 
-  const sources = [...statuses].map(([name, status]) => ({ name, status }));
+  const sources = [...statuses].map(([name, status]) => ({ name, status, ...(sourceDetail(name, status) ? { detail: sourceDetail(name, status) } : {}) }));
   const pdfList = pdfs.list();
   const pdfKeys = new Set(pdfList.map((c) => candidateKey(c.url)));
   const readList = reads.list().filter((c) => !pdfKeys.has(candidateKey(c.url)) && !(doi && /doi\.org\//i.test(c.url) && c.host !== 'publisher'));
@@ -899,7 +936,10 @@ export async function lookupOpenAccess(q: OaQuery, f: Fetch = fetch, opts: OaOpt
     };
   // don't cache answers spoiled by a catalogue being down or throttled, unless something was found anyway
   const degraded = sources.some((s) => s.status === 'error' || s.status === 'timeout' || s.status === 'rate_limited');
-  if (!degraded || result.pdfUrls.length) await cache.put(key, result, result.status === 'not_found' || result.status === 'closed' ? TTL_MISS : TTL_FOUND);
+  if (!degraded || result.pdfUrls.length) {
+    const ttl = degraded ? TTL_ERROR : result.status === 'not_found' || result.status === 'closed' ? TTL_MISS : TTL_FOUND;
+    await cache.put(key, result, ttl);
+  }
   return result;
 }
 
@@ -927,7 +967,20 @@ export function isFetchableUrl(raw: string): boolean {
   if (u.port && u.port !== '443' && u.port !== '80') return false;
   const h = u.hostname;
   if (h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal') || !h.includes('.')) return false;
-  if (/^\[|^\d+\.\d+\.\d+\.\d+$/.test(h)) return false;
+  if (/^\[|^\d+\.\d+\.\d+\.\d+$/.test(h)) return isPublicIpv4(h) ? true : false;
+  return true;
+}
+
+function isPublicIpv4(host: string): boolean {
+  const m = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(host);
+  if (!m) return false;
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  if (a === 10 || a === 127 || a === 0) return false;
+  if (a === 169 && b === 254) return false;
+  if (a === 172 && b >= 16 && b <= 31) return false;
+  if (a === 192 && b === 168) return false;
+  if (a === 100 && b >= 64 && b <= 127) return false;
+  if (a >= 224) return false;
   return true;
 }
 
@@ -936,23 +989,78 @@ function siteOf(url: string): string {
   return new URL(url).hostname.split('.').slice(-2).join('.');
 }
 
+const CITATION_PDF_RE = /<meta[^>]+name=["']citation_pdf_url["'][^>]+content=["']([^"']+)["']/i;
+const CITATION_PDF_RE2 = /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']citation_pdf_url["']/i;
+
+/** One HTML landing fetch: parse `citation_pdf_url` or a direct .pdf link (SciELO, DOAJ, publishers). */
+export async function pdfUrlFromLanding(landing: string, f: Fetch = fetch): Promise<string | undefined> {
+  if (!isFetchableUrl(landing)) return undefined;
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), PDF_FETCH_TIMEOUT_MS);
+  try {
+    const r = await f(landing, {
+      redirect: 'follow',
+      signal: ac.signal,
+      headers: { 'User-Agent': UA, Accept: 'text/html,application/xhtml+xml,*/*;q=0.5' },
+    });
+    if (!r.ok) return undefined;
+    const type = (r.headers.get('content-type') ?? '').toLowerCase();
+    if (/pdf|octet-stream/.test(type)) {
+      const direct = r.url !== landing ? r.url : landing;
+      return isFetchableUrl(direct) ? direct : landing;
+    }
+    if (!/html|xml/.test(type)) return undefined;
+    const html = await r.text();
+    const meta = CITATION_PDF_RE.exec(html)?.[1] ?? CITATION_PDF_RE2.exec(html)?.[1];
+    if (meta) {
+      try {
+        const abs = new URL(meta, landing).toString();
+        if (isFetchableUrl(abs)) return abs;
+      } catch {
+        /* ignore */
+      }
+    }
+    const m = /href=["']([^"']+\.pdf[^"']*)["']/i.exec(html);
+    if (m) {
+      try {
+        const abs = new URL(m[1], landing).toString();
+        if (isFetchableUrl(abs)) return abs;
+      } catch {
+        /* ignore */
+      }
+    }
+  } catch {
+    /* network / timeout */
+  } finally {
+    clearTimeout(timer);
+  }
+  return undefined;
+}
+
 /**
  * First candidate that really serves a PDF: follows redirects by hand (each hop re-checked against
  * isFetchableUrl), keeps the session cookies a publisher sets while bouncing through its own cookie check
  * (same site only, never the user's), and validates the "%PDF-" magic before accepting the body.
  */
 export async function openPdfResponse<C extends { url: string; source: string }>(candidates: C[], f: Fetch = fetch): Promise<{ stream: ReadableStream<Uint8Array>; source: string; url: string; candidate: C } | undefined> {
-  for (const c of candidates.slice(0, 8)) {
+  const tryList = [...candidates.slice(0, 8)];
+  for (const c of tryList) {
     let url = c.url;
     const jar = new Map<string, Map<string, string>>();
-    for (let hop = 0; hop < 8 && isFetchableUrl(url); hop++) {
+    let sawHtml = false;
+    for (let hop = 0; hop < MAX_PDF_REDIRECTS && isFetchableUrl(url); hop++) {
       let r: Response;
       const site = siteOf(url);
       const cookies = [...(jar.get(site) ?? new Map<string, string>())].map(([k, v]) => `${k}=${v}`).join('; ');
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), PDF_FETCH_TIMEOUT_MS);
       try {
-        r = await f(url, { redirect: 'manual', headers: { 'User-Agent': UA, Accept: 'application/pdf,*/*;q=0.5', ...(cookies ? { Cookie: cookies } : {}) } });
+        r = await f(url, { redirect: 'manual', signal: ac.signal, headers: { 'User-Agent': UA, Accept: 'application/pdf,*/*;q=0.5', ...(cookies ? { Cookie: cookies } : {}) } });
       } catch {
+        clearTimeout(timer);
         break;
+      } finally {
+        clearTimeout(timer);
       }
       const setCookies = typeof r.headers.getSetCookie === 'function' ? r.headers.getSetCookie() : [];
       for (const sc of setCookies) {
@@ -969,14 +1077,28 @@ export async function openPdfResponse<C extends { url: string; source: string }>
       }
       if (!r.ok || !r.body) break;
       const len = Number(r.headers.get('content-length') ?? 0);
-      const type = r.headers.get('content-type') ?? '';
-      if (len > MAX_PDF_BYTES || /html|json|xml/i.test(type)) {
-        void r.body.cancel();
+      const type = (r.headers.get('content-type') ?? '').toLowerCase();
+      const typedHtml = /html|json|xml/.test(type) && !/pdf|octet-stream/.test(type);
+      if (typedHtml) {
+        void r.body?.cancel();
+        sawHtml = true;
         break;
       }
-      const stream = await checkedPdfStream(r.body);
+      if (len > MAX_PDF_BYTES) {
+        void r.body?.cancel();
+        break;
+      }
+      const stream = await checkedPdfStream(r.body!);
       if (stream) return { stream, source: c.source, url, candidate: c };
       break;
+    }
+    if (sawHtml && isFetchableUrl(url)) {
+      const fromMeta = await pdfUrlFromLanding(url, f);
+      if (fromMeta && fromMeta !== url) {
+        const extra = { ...c, url: fromMeta } as C;
+        const nested = await openPdfResponse([extra], f);
+        if (nested) return nested;
+      }
     }
   }
   return undefined;
@@ -1050,6 +1172,17 @@ export async function handleOaRequest(url: URL, f: Fetch = fetch, opts: OaOption
   const result = await lookupOpenAccess(q, f, opts);
   if (url.pathname.endsWith('/pdf')) {
     let opened = result.pdfUrls.length ? await openPdfResponse(result.pdfUrls, f) : undefined;
+    if (!opened && result.landingUrl && isFetchableUrl(result.landingUrl)) {
+      const fromLanding = await pdfUrlFromLanding(result.landingUrl, f);
+      if (fromLanding) {
+        const c: OaCandidate = { url: fromLanding, source: hostLabel(fromLanding), host: hostFromUrl(fromLanding), version: 'unknown', via: [] };
+        result.pdfUrls.push(c);
+        opened = await openPdfResponse([c], f);
+      }
+    }
+    if (!opened && result.readUrls?.length) {
+      opened = await openPdfResponse(result.readUrls, f);
+    }
     // last resort: the arXiv version found by title (publisher PDFs often sit behind cookies/logins)
     const title = result.title ?? q.title;
     if (!opened && title && !result.pdfUrls.some((c) => c.source === 'arXiv')) {

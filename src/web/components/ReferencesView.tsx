@@ -8,6 +8,7 @@ import { refStatusText, translateRuntime, useI18n, type Messages } from '../i18n
 import { OA_CATALOGS_BUSY } from '../i18n/runtime';
 import { libraryLink, saveLibraryPrefix, useLibraryPrefix } from '../library';
 import { askAuthorMailto } from '../askAuthor';
+import { makePacer, OA_DEFAULT_CONCURRENCY, OA_MIN_GAP_MS, oaBatchLookup, oaEligible, oaQueryFromPub, withRetry } from '../../core/oaClient';
 
 /** Outcome of the free-PDF search for one reference (kept for the session only). */
 export type OaState =
@@ -18,45 +19,7 @@ export type OaState =
   | { kind: 'not_found'; result?: OaResult }
   | { kind: 'error'; message: string };
 
-const CONCURRENCY = 3;
-/** Site allows 20 /api/oa/* requests per 10 s; 1100 ms also keeps Semantic Scholar (1 rps) from stacking in the server queue. */
-const OA_MIN_GAP_MS = 1100;
-
-/** Spaces out request starts shared by all workers, so concurrency never bursts past the site's rate limit. */
-export function makePacer(gapMs: number, now = () => Date.now(), sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))) {
-  let next = 0;
-  return async () => {
-    const t = now();
-    const at = Math.max(t, next);
-    next = at + gapMs;
-    if (at > t) await sleep(at - t);
-  };
-}
-
-/** Retries a lookup that hit the site's or a catalogue's rate limit (429) or a 5xx, with backoff (2 s, 6 s). */
-export async function withRetry<T>(run: () => Promise<T>, waits: number[] = [2000, 6000], sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))): Promise<T> {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      return await run();
-    } catch (e) {
-      if (attempt >= waits.length || !/^(?:429|5\d\d)\b/.test((e as Error).message)) throw e;
-      await sleep(waits[attempt]);
-    }
-  }
-}
-
-/** arXiv id carried on the publication URL (from BibTeX eprint / archivePrefix). */
-export function arxivFromPub(pub: Pick<PublicationNode, 'url'>): string | undefined {
-  const u = pub.url ?? '';
-  const m = /arxiv\.org\/(?:abs|pdf)\/([^\s?#]+?)(?:\.pdf)?(?:v\d+)?$/i.exec(u);
-  return m?.[1]?.replace(/v\d+$/i, '').toLowerCase();
-}
-
-function query(pub: PublicationNode) {
-  const thesis = /thesis|dissertation/i.test(pub.entryType ?? '');
-  const arxiv = arxivFromPub(pub);
-  return { doi: pub.doi, title: pub.title, year: pub.year, author: pub.authors[0]?.family, ...(arxiv ? { arxiv } : {}), ...(thesis ? { kind: 'thesis' as const } : {}) };
-}
+export { arxivFromPub, makePacer, withRetry } from '../../core/oaClient';
 
 const safeName = (pub: PublicationNode) => `${(pub.bibKeys[0] ?? pub.label).replace(/[^\p{L}\p{N}_-]+/gu, '_').slice(0, 60) || 'referencia'}.pdf`;
 const doiUrl = (doi?: string) => (doi ? `https://doi.org/${doi}` : undefined);
@@ -71,9 +34,14 @@ export async function fetchOpenAccess(
   onState: (pubId: string, s: OaState) => void,
   onGraph?: (g: CitationGraph) => void,
 ): Promise<{ got: number; graph?: CitationGraph }> {
-  const queue = pubs.filter((p) => p.doi || arxivFromPub(p) || (p.title && p.title.length >= 8));
+  const queue = pubs.filter(oaEligible);
   for (const p of pubs) if (!queue.includes(p)) onState(p.id, { kind: 'not_found' });
   const files: { file: File; publicationId: string }[] = [];
+  try {
+    await withRetry(() => oaBatchLookup(queue.map(oaQueryFromPub)));
+  } catch {
+    /* metadata batch is an optimisation; /api/oa/pdf still resolves each ref */
+  }
   let i = 0;
   const pace = makePacer(OA_MIN_GAP_MS);
   const worker = async () => {
@@ -81,7 +49,7 @@ export async function fetchOpenAccess(
       const pub = queue[i++];
       onState(pub.id, { kind: 'busy' });
       try {
-        const r = await withRetry(async () => (await pace(), api.oaFetchPdf(query(pub), safeName(pub))));
+        const r = await withRetry(async () => (await pace(), api.oaFetchPdf(oaQueryFromPub(pub), safeName(pub))));
         if (r.file) {
           files.push({ file: r.file, publicationId: pub.id });
           onState(pub.id, { kind: 'got', source: r.source, host: r.host, version: r.version });
@@ -95,7 +63,7 @@ export async function fetchOpenAccess(
       }
     }
   };
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, worker));
+  await Promise.all(Array.from({ length: Math.min(OA_DEFAULT_CONCURRENCY, queue.length) }, worker));
   if (!files.length) return { got: 0 };
   const graph = await api.addLinkedFiles(projectId, files);
   onGraph?.(graph);

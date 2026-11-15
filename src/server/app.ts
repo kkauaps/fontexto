@@ -15,6 +15,8 @@ import type { Anchor, FileRole, ReviewAction, Visibility } from '../core/model.j
 import { securityHeaders } from './securityHeaders.js';
 import { lookupMany } from './metadata.js';
 import { NotFoundError, ProjectStore, ValidationError } from './store.js';
+import { handleOaBatchRequest } from '../core/oaBatch.js';
+import { checkClientRateLimit, clientIpFromHeaders, rateLimitResponse } from '../core/oaRateLimit.js';
 import { handleOaRequest } from '../core/openAccess.js';
 import { handleGraphRequest } from '../core/openAlexGraph.js';
 
@@ -63,8 +65,18 @@ export function createApp(cfg: AppConfig) {
   });
 
   // Open-access lookup/proxy (same code as the Pages Function). Only DOI/title/year/author arrive here.
+  const oaGuard = (req: import('express').Request) => {
+    const rl = checkClientRateLimit(clientIpFromHeaders(req.headers));
+    return rl.ok ? undefined : rateLimitResponse(rl.retryAfterSec);
+  };
   for (const route of ['/api/oa/lookup', '/api/oa/pdf']) {
     app.get(route, h(async (req, res) => {
+      const blocked = oaGuard(req);
+      if (blocked) {
+        res.status(blocked.status);
+        blocked.headers.forEach((v, k) => res.setHeader(k, v));
+        return void res.end(await blocked.text());
+      }
       const r = await handleOaRequest(new URL(req.originalUrl, 'http://localhost'), fetch, { env: { CORE_API_KEY: process.env.CORE_API_KEY, S2_API_KEY: process.env.S2_API_KEY, OPENALEX_API_KEY: process.env.OPENALEX_API_KEY } });
       res.status(r.status);
       r.headers.forEach((v, k) => res.setHeader(k, v));
@@ -79,6 +91,20 @@ export function createApp(cfg: AppConfig) {
     }));
   }
   // Links between references (OpenAlex). Same code as the Pages Function /api/oa/graph.
+  app.post('/api/oa/batch', h(async (req, res) => {
+    const blocked = oaGuard(req);
+    if (blocked) {
+      res.status(blocked.status);
+      blocked.headers.forEach((v, k) => res.setHeader(k, v));
+      return void res.end(await blocked.text());
+    }
+    const r = await handleOaBatchRequest(req.body, fetch, {
+      env: { CORE_API_KEY: process.env.CORE_API_KEY, S2_API_KEY: process.env.S2_API_KEY, OPENALEX_API_KEY: process.env.OPENALEX_API_KEY },
+    });
+    res.status(r.status);
+    r.headers.forEach((v, k) => res.setHeader(k, v));
+    res.end(await r.text());
+  }));
   app.post('/api/oa/graph', h(async (req, res) => {
     const body = JSON.stringify(req.body ?? {});
     const r = await handleGraphRequest(new Request('http://localhost/api/oa/graph', { method: 'POST', headers: { 'content-type': 'application/json' }, body }), fetch, { env: { OPENALEX_API_KEY: process.env.OPENALEX_API_KEY } });

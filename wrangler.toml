@@ -7,3 +7,16 @@ compatibility_date = "2026-11-13"
 binding = "VISITS"
 id = "e972ee2ed9714d53b41b87f8cb224b05"
 preview_id = "2ce52636998d4f63bc771a533d639fbf"
+
+# Preview-only bindings (Pablo: create the same in production before enabling global rate limits).
+# Pages Functions do not yet expose the ratelimits binding on all accounts; prefer WAF (below) + in-isolate limiter.
+# [[unsafe.bindings]]
+# name = "OA_RL"
+# type = "ratelimit"
+# namespace_id = "1001"
+# simple = { limit = 250, period = 60 }
+#
+# [[kv_namespaces]]
+# binding = "OA_RATE"
+# id = "<preview-kv-id>"
+# preview_id = "<preview-kv-id>"

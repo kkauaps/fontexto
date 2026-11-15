@@ -8,7 +8,7 @@ import { parseReferenceText, parseReferences, toBibtex } from '../src/core/refpa
 import { findDois } from '../src/core/normalize';
 import { joinLines, type PdfText } from '../src/core/text';
 import { oaCacheKey, titleSimilarity } from '../src/core/openAccess';
-import { makePacer, withRetry } from '../src/web/components/ReferencesView';
+import { makePacer, withRetry } from '../src/core/oaClient';
 import { pdfText } from './helpers/fixtures';
 
 const listFor = (heading: string, entries: string[]) => pdfText([['Corpo do texto genérico.', heading, ...entries]]);

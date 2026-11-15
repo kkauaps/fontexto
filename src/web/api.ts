@@ -56,6 +56,10 @@ async function oaFetchPdf(q: { doi?: string; title?: string; year?: number; auth
   if (q.arxiv) u.set('arxiv', q.arxiv);
   if (q.kind) u.set('kind', q.kind);
   const res = await fetch(`/api/oa/pdf?${u}`, { signal, credentials: 'omit' });
+  if (res.status === 429 || res.status >= 500) {
+    const ra = res.headers.get('retry-after');
+    throw new Error(ra ? `${res.status} retry-after: ${ra}` : `${res.status} ${res.statusText}`);
+  }
   const type = res.headers.get('content-type') ?? '';
   if (res.ok && type.startsWith('application/pdf')) {
     const blob = await res.blob();
