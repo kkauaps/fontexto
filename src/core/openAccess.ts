@@ -126,6 +126,14 @@ const tokens = (s: string) => {
   }
   return out;
 };
+/** Drops trailing access-date / URL tails common in ABNT and similar styles. */
+export function normalizeBibliographicTitle(title: string): string {
+  let t = title.replace(/\s+/g, ' ').trim();
+  t = t.replace(/\s+(Dispon[ií]vel em|Acesso em|Available at|Accessed|Retrieved).*/i, '');
+  t = t.replace(/\s+DOI:.*$/i, '');
+  return t.trim();
+}
+
 export function titleSimilarity(a: string, b: string): number {
   const x = tokens(a);
   const y = tokens(b);
@@ -157,7 +165,8 @@ export function parseArxivId(raw: string | null | undefined): string | undefined
 /** Validates and normalises a query coming from the network. */
 export function parseOaQuery(params: URLSearchParams): OaQuery | undefined {
   const doi = params.get('doi')?.trim().replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '').toLowerCase();
-  const title = params.get('title')?.replace(/\s+/g, ' ').trim().slice(0, 300);
+  const titleRaw = params.get('title')?.replace(/\s+/g, ' ').trim().slice(0, 300);
+  const title = titleRaw ? normalizeBibliographicTitle(titleRaw) : undefined;
   const year = Number(params.get('year')) || undefined;
   const author = params.get('author')?.trim().slice(0, 80);
   const kind = params.get('kind') === 'thesis' ? ('thesis' as const) : undefined;
@@ -494,14 +503,33 @@ function crossrefToWork(m: {
   };
 }
 
+export function scoreBibliographicMatch(
+  q: Pick<OaQuery, 'title' | 'year' | 'author'>,
+  title: string,
+  authors: string[],
+  year?: number | null,
+): number {
+  const qt = normalizeBibliographicTitle(q.title ?? '');
+  if (!qt) return 0;
+  let s = titleSimilarity(qt, normalizeBibliographicTitle(title));
+  const author = q.author ? (fold(q.author).split(' ').pop() ?? '') : '';
+  if (author && authors.some((a) => fold(a).split(' ').includes(author))) s += 0.12;
+  if (q.year && year != null) {
+    const delta = Math.abs(year - q.year);
+    if (delta === 0) s += 0.06;
+    else if (delta === 1) s += 0.02;
+    else if (delta > 1) s -= Math.min(0.45, 0.1 + delta * 0.02);
+  }
+  return s;
+}
+
 function bestMatch<T>(items: T[], q: OaQuery, titleOf: (w: T) => string, authorsOf: (w: T) => string[], yearOf: (w: T) => number | null | undefined, min = 0.8): T | undefined {
   if (!q.title) return undefined;
   const author = q.author ? (fold(q.author).split(' ').pop() ?? '') : '';
   let best: { w: T; s: number } | undefined;
   for (const w of items) {
-    let s = titleSimilarity(q.title, titleOf(w));
-    if (author && authorsOf(w).some((a) => fold(a).split(' ').includes(author))) s += 0.1;
-    if (q.year && yearOf(w) === q.year) s += 0.05;
+    const s = scoreBibliographicMatch(q, titleOf(w), authorsOf(w), yearOf(w));
+    if (author && s < 0.88 && !authorsOf(w).some((a) => fold(a).split(' ').includes(author))) continue;
     if (!best || s > best.s) best = { w, s };
   }
   return best && best.s >= min ? best.w : undefined;
