@@ -9,7 +9,7 @@ import { CitationList, CitationPanel } from './CitationPanel';
 import { SetupChecklist, UploadButton } from './SetupChecklist';
 import type { OpenRequest } from './SidePanel';
 import { evidenceStatusText, translateRuntime, useI18n } from '../i18n';
-import { phoneFitScale } from '../fit';
+import { isPhoneWidth, phoneFitScale } from '../fit';
 
 export interface DocumentFocus {
   pubId?: string;
@@ -212,6 +212,25 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
     });
   }, [doc, scale]);
 
+  useEffect(() => {
+    if (!doc || !scroller) return;
+    const refit = () => {
+      if (!isPhoneWidth()) return;
+      void doc.getPage(1).then((p) => {
+        const fit = phoneFitScale(p.getViewport({ scale: 1 }).width, scroller.clientWidth);
+        if (fit) setScale(fit);
+      });
+    };
+    refit();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(refit) : undefined;
+    ro?.observe(scroller);
+    window.addEventListener('orientationchange', refit);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('orientationchange', refit);
+    };
+  }, [doc, scroller]);
+
   const marksByPage = useMemo(() => {
     const m = new Map<number, Mark[]>();
     for (const g of filtered) {
@@ -236,10 +255,10 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
     if (!g) return;
     let frames = 0;
     let raf = 0;
-    document.getElementById(`docpage-${g.page}`)?.scrollIntoView({ block: 'start' });
+    document.getElementById(`docpage-${g.page}`)?.scrollIntoView({ block: 'start', inline: 'nearest' });
     const tick = () => {
       const el = scroller.querySelector(`[data-span="${selected}"]`);
-      if (el) el.scrollIntoView({ block: 'center' });
+      if (el) el.scrollIntoView({ block: 'center', inline: 'nearest' });
       else if (frames++ < 240) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);

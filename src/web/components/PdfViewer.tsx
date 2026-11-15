@@ -5,7 +5,7 @@ import { api } from '../api';
 import { locatePhraseBoxes, openPdf, renderPage, type BoxRect, type PdfDoc } from '../pdfRender';
 import type { OpenRequest } from './SidePanel';
 import { translateRuntime, useI18n } from '../i18n';
-import { phoneFitScale } from '../fit';
+import { isPhoneWidth, phoneFitScale } from '../fit';
 
 interface Props {
   projectId: string;
@@ -34,6 +34,12 @@ export function PdfViewer({ projectId, request: initial, backLabel, onClose }: P
   const layerRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const fitted = useRef(false);
+
+  const scrollToHighlight = () => {
+    const host = bodyRef.current;
+    const el = host?.querySelector('.hl');
+    el?.scrollIntoView({ block: 'center', inline: 'nearest' });
+  };
   const [phraseBoxes, setPhraseBoxes] = useState<{ boxes: BoxRect[]; exact: boolean } | undefined>();
   const [pageSize, setPageSize] = useState<{ w: number; h: number; base: { width: number; height: number } }>();
 
@@ -83,9 +89,9 @@ export function PdfViewer({ projectId, request: initial, backLabel, onClose }: P
       if (request.phrase && layerRef.current) {
         const hit = locatePhraseBoxes(layerRef.current, request.phrase);
         setPhraseBoxes(hit ? { boxes: hit.boxes, exact: hit.exact } : { boxes: [], exact: false });
-        requestAnimationFrame(() => document.querySelector('.viewer .hl')?.scrollIntoView({ block: 'center' }));
+        requestAnimationFrame(scrollToHighlight);
       } else {
-        requestAnimationFrame(() => document.querySelector('.viewer .hl')?.scrollIntoView({ block: 'center' }));
+        requestAnimationFrame(scrollToHighlight);
       }
     })();
     return () => {
@@ -103,6 +109,26 @@ export function PdfViewer({ projectId, request: initial, backLabel, onClose }: P
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [doc, onClose]);
+
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el || !doc) return;
+    const refit = () => {
+      if (!isPhoneWidth() || !target?.ok) return;
+      void doc.getPage(page).then((p) => {
+        const fit = phoneFitScale(p.getViewport({ scale: 1 }).width, el.clientWidth);
+        if (fit) setScale(fit);
+      });
+    };
+    refit();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(refit) : undefined;
+    ro?.observe(el);
+    window.addEventListener('orientationchange', refit);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('orientationchange', refit);
+    };
+  }, [doc, page, target?.ok]);
 
   const ok = target?.ok ? target : undefined;
   const showHighlights = ok && ok.exactHighlight && page === ok.page && pageSize;

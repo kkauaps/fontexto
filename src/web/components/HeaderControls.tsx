@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { LOCALES, LOCALE_NATIVE, parseLocale, useI18n } from '../i18n';
+import { LOCALES, LOCALE_NATIVE, parseLocale, useI18n, type Locale } from '../i18n';
 import { THEMES, useAppearance, type Theme } from '../appearance';
+import { Listbox, type ListboxOption } from './Listbox';
 
 const THEME_LABEL: Record<Theme, 'themeGlass' | 'themeDarkSolid' | 'themeLight'> = {
   glass: 'themeGlass',
@@ -35,43 +36,28 @@ const Icon = {
   ),
 };
 
-function ThemePill() {
+function ThemePill({ block }: { block?: boolean }) {
   const { t } = useI18n();
   const { appearance, setTheme } = useAppearance();
-  return (
-    <label className="hdr-pill hdr-select" title={t.appearance}>
-      {Icon.theme}
-      <select aria-label={t.appearance} value={appearance.theme} onChange={(e) => setTheme(e.target.value as Theme)}>
-        {THEMES.map((theme) => (
-          <option key={theme} value={theme}>
-            {t[THEME_LABEL[theme]]}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
+  const options: ListboxOption<Theme>[] = THEMES.map((theme) => ({ value: theme, label: t[THEME_LABEL[theme]] }));
+  return <Listbox value={appearance.theme} options={options} onChange={setTheme} ariaLabel={t.appearance} icon={Icon.theme} block={block} />;
 }
 
-function LanguagePill() {
+function LanguagePill({ block }: { block?: boolean }) {
   const { t, locale, setLocale } = useI18n();
+  const options: ListboxOption<Locale>[] = LOCALES.map((code) => ({ value: code, label: LOCALE_NATIVE[code] }));
   return (
-    <label className="hdr-pill hdr-select" title={t.language}>
-      {Icon.globe}
-      <select
-        aria-label={t.language}
-        value={locale}
-        onChange={(e) => {
-          const next = parseLocale(e.target.value);
-          if (next) setLocale(next);
-        }}
-      >
-        {LOCALES.map((code) => (
-          <option key={code} value={code}>
-            {LOCALE_NATIVE[code]}
-          </option>
-        ))}
-      </select>
-    </label>
+    <Listbox
+      value={locale}
+      options={options}
+      onChange={(code) => {
+        const next = parseLocale(code);
+        if (next) setLocale(next);
+      }}
+      ariaLabel={t.language}
+      icon={Icon.globe}
+      block={block}
+    />
   );
 }
 
@@ -108,9 +94,9 @@ export function HeaderControls() {
         </summary>
         <div className="hdr-menu-panel" role="group" aria-label={t.displaySettings}>
           <span className="hdr-menu-label">{t.appearance}</span>
-          <ThemePill />
+          <ThemePill block />
           <span className="hdr-menu-label">{t.language}</span>
-          <LanguagePill />
+          <LanguagePill block />
         </div>
       </details>
     </div>
