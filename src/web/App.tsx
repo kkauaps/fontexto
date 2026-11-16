@@ -77,6 +77,8 @@ export function App() {
     if (isPhoneWidth()) {
       setSourceRequest(r);
       setPhoneTab('source');
+      // phones show the source as a full tab: leave the graph so the tab bar and viewer are visible
+      setTab((cur) => (cur === 'graph' ? 'doc' : cur));
     } else setViewer(r);
   }, []);
 
@@ -273,7 +275,7 @@ export function App() {
             {stats.pending > 0 && <span className="badge warn"> {t.pending(stats.pending)}</span>}
           </span>
         )}
-        {tab === 'graph' && <button onClick={() => setLayoutNonce((n) => n + 1)}>{t.relayout}</button>}
+        {tab === 'graph' && !phone && <button onClick={() => setLayoutNonce((n) => n + 1)}>{t.relayout}</button>}
         <button className="primary topbar-files" onClick={() => setPanelOpen(true)}>
           {t.filesAndReview}
         </button>
@@ -289,7 +291,7 @@ export function App() {
           <span className="spinner" /> {t.loadingProject}
         </div>
       )}
-      {((phone && phoneTab === 'doc') || (!phone && docMode)) && graph && (
+      {((phone && tab !== 'graph' && phoneTab === 'doc') || (!phone && docMode)) && graph && (
         <div className="main">
           <DocumentView
             projectId={projectId}
@@ -301,13 +303,16 @@ export function App() {
               setDocMode(false);
               setSelection({ type: 'node', id: pubId });
             }}
-            onOpenFiles={() => setTab('refs')}
+            onOpenFiles={() => {
+              setTab('refs');
+              setPhoneTab('refs');
+            }}
             onEvidence={setEvidence}
             onGraph={setGraph}
           />
         </div>
       )}
-      {((phone && phoneTab === 'refs') || (!phone && tab === 'refs')) && graph && (
+      {((phone && tab !== 'graph' && phoneTab === 'refs') || (!phone && tab === 'refs')) && graph && (
         <div className="main">
           <ReferencesView
             projectId={projectId}
@@ -325,7 +330,7 @@ export function App() {
           />
         </div>
       )}
-      {phone && phoneTab === 'source' && graph && (
+      {phone && tab !== 'graph' && phoneTab === 'source' && graph && (
         <div className="main main-source">
           {sourceRequest ? (
             <PdfViewer projectId={projectId} request={sourceRequest} embedded onClose={() => setPhoneTab('doc')} />
@@ -408,7 +413,7 @@ export function App() {
               rules={rules}
               onClose={() => setSelection(undefined)}
               onSelect={setSelection}
-              onOpen={setViewer}
+              onOpen={openReference}
               docCitations={docCitations}
               onShowInDocument={showInDocument}
               onReview={onReview}
@@ -437,16 +442,13 @@ export function App() {
           }}
         />
       )}
-      {phone && tab !== 'graph' ? (
+      {phone ? (
         <MobileBottomNav
-          tab={phoneTab}
+          tab={tab === 'graph' ? undefined : phoneTab}
           onTab={(next) => {
             setPhoneTab(next);
-            if (next === 'doc') {
-              setDocMode(true);
-              setTab('doc');
-            }
-            if (next === 'refs') setTab('refs');
+            // any tab leaves the graph; "source" keeps the document as the underlying desktop tab
+            setTab(next === 'refs' ? 'refs' : 'doc');
           }}
         />
       ) : !phone ? (

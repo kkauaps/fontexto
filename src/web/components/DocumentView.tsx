@@ -410,6 +410,7 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
             </button>
           </span>
         </div>
+        <div className="doc-notices">
         {!hasBib && !hideNotices.bib && (
           <div className="notice notice-dismiss">
             <button type="button" className="notice-x" aria-label={t.close} onClick={() => setHideNotices((h) => ({ ...h, bib: true }))}>
@@ -433,16 +434,15 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
           </div>
         )}
         {hasBib && evidence.summary.occurrences > 0 && !hideNotices.semantic && (
-          <div className="semantic-wrap">
-            <SemanticNotice projectId={projectId} method={evidence.method} onGraph={onGraph} />
-            {phone && (
-              <button type="button" className="notice-x notice-x-float" aria-label={t.close} onClick={() => setHideNotices((h) => ({ ...h, semantic: true }))}>
-                ×
-              </button>
-            )}
-          </div>
+          <SemanticNotice
+            projectId={projectId}
+            method={evidence.method}
+            onGraph={onGraph}
+            onDismiss={phone ? () => setHideNotices((h) => ({ ...h, semantic: true })) : undefined}
+          />
         )}
         {docError && <div className="notice error">{translateRuntime(t, docError)}</div>}
+        </div>
         <div className="doc-pages" ref={scrollerRef}>
           {doc ? (
             Array.from({ length: doc.numPages }, (_, i) => i + 1).map((n) => (

@@ -8,12 +8,14 @@ interface Props {
   /** Evidence method text: tells whether the semantic re-rank is already in use. */
   method: string;
   onGraph: (g: CitationGraph) => void;
+  /** When set (phone), the notice gets its own close button. */
+  onDismiss?: () => void;
 }
 
 type State = { kind: 'idle' } | { kind: 'running'; label: string; fraction: number } | { kind: 'error'; message: string };
 
 /** Browser edition only: opt-in language-model re-ranking of the citation matches, run locally. */
-export function SemanticNotice({ projectId, method, onGraph }: Props) {
+export function SemanticNotice({ projectId, method, onGraph, onDismiss }: Props) {
   const { t } = useI18n();
   const [available, setAvailable] = useState(false);
   const [state, setState] = useState<State>({ kind: 'idle' });
@@ -41,7 +43,12 @@ export function SemanticNotice({ projectId, method, onGraph }: Props) {
   };
 
   return (
-    <div className="notice">
+    <div className={onDismiss ? 'notice notice-dismiss' : 'notice'}>
+      {onDismiss && state.kind !== 'running' && (
+        <button type="button" className="notice-x" aria-label={t.close} onClick={onDismiss}>
+          ×
+        </button>
+      )}
       {state.kind === 'running' ? (
         <>
           <span className="spinner" /> {state.label}

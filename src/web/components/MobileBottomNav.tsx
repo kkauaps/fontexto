@@ -24,7 +24,8 @@ const Icon = {
 };
 
 interface Props {
-  tab: MobileAppTab;
+  /** Undefined while the graph is open: no tab is selected, any tap leaves the graph. */
+  tab: MobileAppTab | undefined;
   onTab: (tab: MobileAppTab) => void;
 }
 

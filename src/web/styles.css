@@ -417,6 +417,8 @@ h4 {
   }
   .sidepanel {
     width: 100%;
+    /* full-width on phones: must sit above the floating graph controls (.net-top, z 6) */
+    z-index: 8;
   }
 }
 
@@ -2770,27 +2772,28 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   .docview-phone .doc-main { flex: 1; min-height: 0; display: flex; flex-direction: column; max-height: none; height: auto; }
   .docview-phone .doc-toolbar { display: none; }
   .docview-phone .doc-side { display: none; }
-  .docview-phone .doc-pages { flex: 1; min-height: 0; padding-bottom: 8px; }
-  .docview-phone .notice:not(.notice-dismiss) { display: none; }
-  .docview-phone .notice-dismiss { position: absolute; left: 8px; right: 8px; top: calc(52px + env(safe-area-inset-top)); z-index: 4; max-height: 30vh; overflow: auto; }
-  .docview-phone .semantic-wrap { position: absolute; left: 8px; right: 8px; top: calc(52px + env(safe-area-inset-top)); z-index: 4; }
-  .docview-phone .semantic-wrap .notice { margin: 0; max-height: 28vh; overflow: auto; }
-  .notice-dismiss { position: relative; padding-right: 36px; }
-  .notice-x, .notice-x-float {
-    position: absolute; top: 6px; right: 8px; width: 44px; height: 44px;
+  /* bottom padding keeps the last lines of the page clear of the floating control bar */
+  .docview-phone .doc-pages { flex: 1; min-height: 0; padding-bottom: 76px; }
+  /* notices sit in the column above the page instead of covering it */
+  .docview-phone .doc-notices:not(:empty) { flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; padding: 8px 8px 0; max-height: 34vh; overflow-y: auto; }
+  .docview-phone .doc-notices .notice { margin: 0; }
+  .notice-dismiss { position: relative; padding-right: 48px; }
+  .notice .notice-x {
+    position: absolute; top: 2px; right: 2px; width: 44px; height: 44px; min-height: 44px; margin: 0; padding: 0;
+    display: flex; align-items: center; justify-content: center;
     border: 0; background: transparent; color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer;
   }
-  .notice-x-float { top: 0; right: 0; }
   .doc-float-bar {
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-    width: min(100% - 16px, 420px);
-    bottom: calc(60px + env(safe-area-inset-bottom));
+    width: max-content;
+    max-width: calc(100% - 16px);
+    bottom: 10px;
     z-index: 5;
     display: flex;
     flex-wrap: nowrap;
-    gap: 4px;
+    gap: 2px;
     align-items: center;
     justify-content: center;
     padding: 4px 6px;
@@ -2834,17 +2837,18 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
     color: var(--on-accent);
     pointer-events: none;
   }
-  .doc-nav-float { flex: 0 1 auto; justify-content: center; margin: 0; gap: 2px; }
+  .doc-float-bar .doc-nav-float { flex: 0 0 auto; width: auto; justify-content: center; margin: 0; gap: 2px; }
   .doc-nav-float button { min-width: 44px; min-height: 44px; border-radius: 999px; border: 0; background: transparent; font-size: 20px; line-height: 1; }
   .doc-main { position: relative; flex: 1; min-height: 0; }
   .main-source { display: flex; flex-direction: column; min-height: 0; }
   .viewer-embedded { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-  .viewer-embedded .viewer-body { flex: 1; min-height: 0; overflow: auto; }
+  /* bottom padding keeps the end of the PDF reachable above the floating controls card */
+  .viewer-embedded .viewer-body { flex: 1; min-height: 0; overflow: auto; padding-bottom: 120px; }
   .viewer-float {
     position: absolute;
     left: 8px;
     right: 8px;
-    bottom: calc(64px + env(safe-area-inset-bottom));
+    bottom: 8px;
     z-index: 5;
     display: flex;
     flex-direction: column;
@@ -3016,7 +3020,15 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   .drawer, .sidepanel { background: var(--bg); backdrop-filter: none; -webkit-backdrop-filter: none; }
   .drawer button, .drawer select, .drawer input:not([type=checkbox]):not([type=radio]) { min-height: 44px; }
   .drawer .close, .sidepanel .close { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
-  .drawer table.files { display: block; overflow-x: auto; max-width: 100%; }
+  /* phones: each file becomes a card (name / type · status / link select / actions) instead of a side-scrolling table */
+  .drawer table.files, .drawer table.files tbody { display: block; max-width: 100%; }
+  .drawer table.files thead { display: none; }
+  .drawer table.files tr { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .drawer table.files td { display: block; padding: 0; border: 0; min-width: 0; overflow-wrap: anywhere; }
+  .drawer table.files td:first-child { grid-column: 1 / -1; font-weight: 600; }
+  .drawer table.files td:nth-child(n + 4) { grid-column: 1 / -1; }
+  .drawer table.files td:nth-child(n + 4):empty { display: none; }
+  .drawer table.files td select { width: 100%; max-width: 100%; }
   label.check { min-height: 44px; }
   label.check input { width: 20px; height: 20px; flex: none; }
   .sidepanel select, .sidepanel input:not([type=checkbox]):not([type=radio]) { min-height: 44px; font-size: 16px; }
@@ -3124,7 +3136,7 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   .lp-steps li, .lp-steps ol > li { align-items: center; }
   html, body { overflow-x: clip; }
   .uf-chip { text-align: left; }
-  .notice button { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 44px; margin-top: 8px; padding: 0 16px; }
+  .notice button:not(.notice-x) { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 44px; margin-top: 8px; padding: 0 16px; }
 }
 
 /* ---- Open-access copies, library access, "ask the author" (glass, all three themes) ---- */

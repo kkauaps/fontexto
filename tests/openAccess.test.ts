@@ -170,6 +170,41 @@ describe('lookupOpenAccess cascade', () => {
     expect(r.pdfUrls[0]).toMatchObject({ url: 'https://core.ac.uk/download/1234.pdf', source: 'CORE', host: 'repository', via: ['CORE'] });
   });
 
+  it('CORE finds a repository copy by title when there is no DOI, and rejects a different work', async () => {
+    const coreHit: Route = (u) =>
+      u.startsWith('https://api.core.ac.uk/')
+        ? json({
+            results: [
+              { title: 'Lumen Index: Moss Growth Without Benchmarks', authors: [{ name: 'Someone Else' }], yearPublished: 2010, downloadUrl: 'https://repo.example.edu/other.pdf' },
+              { title: TITLE, authors: [{ name: 'Quillfeather, Ada' }], yearPublished: 2021, downloadUrl: 'https://repo.example.edu/bitstream/lumen.pdf' },
+            ],
+          })
+        : undefined;
+    const nothing: Route = (u) =>
+      u.startsWith('https://api.openalex.org/works?') ? json({ results: [] }) : u.startsWith('https://api.crossref.org/works?') ? json({ message: { items: [] } }) : u.includes('europepmc') ? json({ resultList: { result: [] } }) : undefined;
+    const { f, calls } = mockFetch(nothing, s2none, coreHit);
+    const r = await lookupOpenAccess({ title: TITLE, author: 'Quillfeather', year: 2021 }, f, { env: { CORE_API_KEY: 'test-key' } });
+    const coreCall = calls.find((c) => c.url.includes('core.ac.uk'));
+    expect(decodeURIComponent(coreCall?.url ?? '')).toContain('title:(');
+    expect(r.pdfUrls.map((c) => c.url)).toEqual(['https://repo.example.edu/bitstream/lumen.pdf']);
+    expect(r.sources?.find((s) => s.name === 'CORE')?.status).toBe('found');
+  });
+
+  it('a work identified through Crossref also gets the copies OpenAlex lists for its DOI', async () => {
+    const crossrefItem = { DOI: DOI, title: [TITLE], issued: { 'date-parts': [[2021]] }, author: [{ given: 'Ada', family: 'Quillfeather' }] };
+    const { f, calls } = mockFetch(
+      (u) => (u.startsWith('https://api.crossref.org/works?') ? json({ message: { items: [crossrefItem] } }) : undefined),
+      openalex(WORK),
+      s2none,
+    );
+    // no OpenAlex key + title only: Crossref identifies the work first
+    const r = await lookupOpenAccess({ title: TITLE, author: 'Quillfeather', year: 2021 }, f);
+    expect(calls.some((c) => c.url.startsWith(`https://api.openalex.org/works/doi:${encodeURIComponent(DOI)}`))).toBe(true);
+    expect(r.pdfUrls.some((c) => c.url === 'https://journal.example.org/lumen.pdf')).toBe(true);
+    expect(r.openalexId).toBe('W1');
+    expect(r.contactEmail).toBe('ada.quill@example.edu');
+  });
+
   it('without a DOI, finds a Europe PMC preprint by title (and marks it as preprint)', async () => {
     const { f, calls } = mockFetch(
       (u) => (u.startsWith('https://api.openalex.org/works?') ? json({ results: [] }) : undefined),

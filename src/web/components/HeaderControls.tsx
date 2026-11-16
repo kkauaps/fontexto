@@ -82,6 +82,11 @@ export function HeaderControls({ onFiles, onGraph }: { onFiles?: () => void; onG
       document.removeEventListener('keydown', esc);
     };
   }, []);
+  /** Menu actions close the menu first, so it does not stay open over the next screen. */
+  const closeThen = (action: () => void) => {
+    if (menu.current) menu.current.open = false;
+    action();
+  };
   return (
     <div className="hdr-controls">
       <div className="hdr-inline">
@@ -98,12 +103,12 @@ export function HeaderControls({ onFiles, onGraph }: { onFiles?: () => void; onG
           <span className="hdr-menu-label">{t.language}</span>
           <LanguagePill block />
           {onFiles && (
-            <button type="button" className="hdr-pill hdr-menu-action" onClick={onFiles}>
+            <button type="button" className="hdr-pill hdr-menu-action" onClick={() => closeThen(onFiles)}>
               {t.filesAndReview}
             </button>
           )}
           {onGraph && (
-            <button type="button" className="hdr-pill hdr-menu-action" onClick={onGraph}>
+            <button type="button" className="hdr-pill hdr-menu-action" onClick={() => closeThen(onGraph)}>
               {t.tabGraph}
             </button>
           )}

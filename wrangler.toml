@@ -8,6 +8,14 @@ binding = "VISITS"
 id = "e972ee2ed9714d53b41b87f8cb224b05"
 preview_id = "2ce52636998d4f63bc771a533d639fbf"
 
+# Optional global cache for /api/oa lookups (shared by every data centre; the Cache API is per data centre).
+# With many users, popular references are then looked up upstream once instead of once per region.
+# Namespaces fontexto-oa-cache / fontexto-oa-cache-preview. scripts/ensure-kv.mjs recreates the binding if it is ever removed.
+[[kv_namespaces]]
+binding = "OA_CACHE"
+id = "3ef84eefa7ae4f45925ffdd15bbb02d2"
+preview_id = "b5b818961385480c82d0bebbd5dae22d"
+
 # Preview-only bindings (Pablo: create the same in production before enabling global rate limits).
 # Pages Functions do not yet expose the ratelimits binding on all accounts; prefer WAF (below) + in-isolate limiter.
 # [[unsafe.bindings]]

@@ -363,6 +363,46 @@ export function edgeCache(cache: EdgeCacheStore, l1: OaCache = memoryCache()): O
   };
 }
 
+/** The two KV methods used by the global cache tier (structural: Workers KV, or a fake in tests). */
+export interface KvStore {
+  get(key: string, type: 'json'): Promise<unknown>;
+  put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
+}
+/** KV allows TTLs from 60 s; short "upstream down" answers stay in the per-colo tiers only. */
+const KV_MIN_TTL = 3600;
+
+/**
+ * Global tier behind the per-colo edge cache. The Cache API is per data centre, so with many users the same popular
+ * reference would otherwise be looked up again upstream in every region; one KV read replaces those catalogue calls.
+ * Optional: without an `OA_CACHE` KV binding nothing changes.
+ */
+export function tieredCache(inner: OaCache, kv: KvStore | undefined, prefix = 'oa|'): OaCache {
+  if (!kv) return inner;
+  return {
+    async get(k) {
+      const hit = await inner.get(k);
+      if (hit) return hit;
+      try {
+        const v = (await kv.get(prefix + k, 'json')) as OaResult | null;
+        if (!v) return undefined;
+        await inner.put(k, v, 3600);
+        return v;
+      } catch {
+        return undefined;
+      }
+    },
+    async put(k, v, ttl) {
+      await inner.put(k, v, ttl);
+      if (ttl < KV_MIN_TTL) return;
+      try {
+        await kv.put(prefix + k, JSON.stringify(v), { expirationTtl: ttl });
+      } catch {
+        /* KV unavailable or over its write quota: the edge tiers still hold the answer */
+      }
+    },
+  };
+}
+
 let defaultCache = memoryCache();
 const inflightLookups = new Map<string, Promise<OaResult>>();
 /** Shared catalogue context (timeouts, keys, clock) for other /api/oa/* handlers. */
@@ -816,17 +856,35 @@ async function fromEuropePmc(ctx: Ctx, doi: string | undefined, q: OaQuery, pdfs
   return { found: pdfs.hitsOf('Europe PMC') + reads.hitsOf('Europe PMC') > before };
 }
 
-async function fromCore(ctx: Ctx, doi: string, pdfs: CandidateSet): Promise<OaSourceStatus> {
+interface CoreWork {
+  title?: string | null;
+  authors?: { name?: string | null }[] | null;
+  yearPublished?: number | null;
+  downloadUrl?: string | null;
+  sourceFulltextUrls?: string[] | null;
+  doi?: string | null;
+}
+/**
+ * CORE aggregates institutional repositories. By DOI when there is one; otherwise by title (theses and repository
+ * items often have no DOI), keeping only a record whose title/author/year pass the same bibliographic match.
+ */
+async function fromCore(ctx: Ctx, doi: string | undefined, q: OaQuery, pdfs: CandidateSet): Promise<OaSourceStatus> {
   if (!ctx.env.CORE_API_KEY) return 'skipped';
-  const res = await callJson<{ results?: { downloadUrl?: string | null; sourceFulltextUrls?: string[] | null; doi?: string | null }[] }>(
+  const words = q.title ? normalizeBibliographicTitle(q.title).split(' ').filter((w) => w.length > 2) : [];
+  if (!doi && words.length < 3) return 'skipped';
+  const query = doi ? `doi:"${doi}"` : `title:(${words.slice(0, 12).join(' ')})`;
+  const res = await callJson<{ results?: CoreWork[] }>(
     ctx,
     'CORE',
-    `https://api.core.ac.uk/v3/search/works?q=${encodeURIComponent(`doi:"${doi}"`)}&limit=3`,
+    `https://api.core.ac.uk/v3/search/works?q=${encodeURIComponent(query)}&limit=${doi ? 3 : 10}`,
     { Authorization: `Bearer ${ctx.env.CORE_API_KEY}` },
   );
+  const results = res?.results ?? [];
+  const accepted = doi
+    ? results.filter((r) => !r.doi || r.doi.toLowerCase() === doi)
+    : [bestMatch(results, q, (r) => r.title ?? '', (r) => (r.authors ?? []).map((a) => a.name ?? ''), (r) => r.yearPublished, 0.85)].filter((r): r is CoreWork => Boolean(r));
   const before = pdfs.hitsOf('CORE');
-  for (const r of res?.results ?? []) {
-    if (r.doi && r.doi.toLowerCase() !== doi) continue;
+  for (const r of accepted) {
     if (r.downloadUrl) pdfs.add({ url: r.downloadUrl, source: 'CORE', host: hostFromUrl(r.downloadUrl), version: 'unknown', via: 'CORE' });
   }
   return pdfs.hitsOf('CORE') > before ? 'found' : 'none';
@@ -930,6 +988,20 @@ async function lookupOpenAccessWork(q: OaQuery, f: Fetch, opts: OaOptions, cache
   const doi = (work?.doi ?? '').replace(/^https?:\/\/doi\.org\//i, '').toLowerCase() || q.doi;
   const title = work?.title ?? work?.display_name ?? q.title ?? undefined;
 
+  // Identified through Crossref (title search, or OpenAlex missed the title): OpenAlex's own record of that DOI lists
+  // repository and preprint copies Crossref does not. A DOI read is a cheap singleton call with its own cool-down.
+  let alex: OpenAlexWork | undefined;
+  if (work && via === 'Crossref' && doi && !q.doi && statuses.get('OpenAlex') !== 'rate_limited') {
+    await step(statuses, 'OpenAlex', async () => Boolean((alex = await findWorkOpenAlex(ctx, { doi }))));
+    if (alex) {
+      openAlexCandidates(alex, pdfs, 'OpenAlex');
+      openAlexReadLinks(alex, reads, 'OpenAlex');
+    }
+  }
+  /** Richer record for ids and author contacts (OpenAlex keeps affiliation strings; Crossref does not). */
+  const meta: OpenAlexWork | undefined = alex ?? work;
+  const firstAuthor = q.author ?? meta?.authorships?.[0]?.author?.display_name;
+
   // Known arXiv id: add the legal preprint PDF without a catalogue call (helps when a book-chapter DOI is closed).
   if (q.arxiv && fromArxivById(q.arxiv, pdfs)) statuses.set('arXiv', 'found');
 
@@ -943,10 +1015,9 @@ async function lookupOpenAccessWork(q: OaQuery, f: Fetch, opts: OaOptions, cache
       epmcEmail = r;
       return r.found;
     }),
-    doi ? step(statuses, 'CORE', () => fromCore(ctx, doi, pdfs)) : (statuses.set('CORE', 'skipped'), undefined),
+    step(statuses, 'CORE', () => fromCore(ctx, doi, { ...q, title, author: firstAuthor }, pdfs)),
   ]);
   // 3) arXiv by title, last (strict rate limit), only when nothing else gave a PDF
-  const firstAuthor = q.author ?? work?.authorships?.[0]?.author?.display_name;
   if (!statuses.has('arXiv')) {
     if (!pdfs.size && title) await step(statuses, 'arXiv', () => fromArxiv(ctx, title, pdfs, firstAuthor));
     else statuses.set('arXiv', pdfs.list().some((c) => c.host === 'preprint' && /arxiv/.test(c.url)) ? 'found' : 'skipped');
@@ -956,11 +1027,11 @@ async function lookupOpenAccessWork(q: OaQuery, f: Fetch, opts: OaOptions, cache
   const pdfList = pdfs.list();
   const pdfKeys = new Set(pdfList.map((c) => candidateKey(c.url)));
   const readList = reads.list().filter((c) => !pdfKeys.has(candidateKey(c.url)) && !(doi && /doi\.org\//i.test(c.url) && c.host !== 'publisher'));
-  const corresponding = work?.authorships?.find((a) => a.is_corresponding && emailIn(a.raw_affiliation_strings ?? []));
-  const anyWithEmail = corresponding ?? work?.authorships?.find((a) => emailIn(a.raw_affiliation_strings ?? []));
+  const corresponding = meta?.authorships?.find((a) => a.is_corresponding && emailIn(a.raw_affiliation_strings ?? []));
+  const anyWithEmail = corresponding ?? meta?.authorships?.find((a) => emailIn(a.raw_affiliation_strings ?? []));
   const contactEmail = anyWithEmail ? emailIn(anyWithEmail.raw_affiliation_strings ?? []) : epmcEmail.email;
   const contactName = anyWithEmail ? anyWithEmail.author?.display_name : epmcEmail.email ? epmcEmail.name : undefined;
-  const authors = (work?.authorships ?? []).map((a) => a.author?.display_name).filter((n): n is string => Boolean(n)).slice(0, 3);
+  const authors = (meta?.authorships ?? []).map((a) => a.author?.display_name).filter((n): n is string => Boolean(n)).slice(0, 3);
 
   let result: OaResult;
   if (!work && !pdfList.length && !readList.length) result = { status: 'not_found', doi: q.doi, title: q.title, year: q.year, pdfUrls: [], sources };
@@ -970,7 +1041,7 @@ async function lookupOpenAccessWork(q: OaQuery, f: Fetch, opts: OaOptions, cache
       title,
       doi: doi || undefined,
       year: work?.publication_year ?? q.year ?? undefined,
-      openalexId: work?.id ? work.id.replace('https://openalex.org/', '') || undefined : undefined,
+      openalexId: meta?.id ? meta.id.replace('https://openalex.org/', '') || undefined : undefined,
       landingUrl: doi ? `https://doi.org/${doi}` : httpUrlOrUndefined(work?.primary_location?.landing_page_url),
       pdfUrls: pdfList.slice(0, 8),
       readUrls: readList.slice(0, 4),
