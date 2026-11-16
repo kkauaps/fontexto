@@ -748,6 +748,7 @@ blockquote {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   max-width: 100%;
   touch-action: pan-x pan-y pinch-zoom;
+  isolation: isolate;
 }
 .page-wrap canvas {
   display: block;
@@ -756,10 +757,11 @@ blockquote {
   position: absolute;
   pointer-events: none;
   z-index: 2;
-  background: color-mix(in srgb, var(--accent) 48%, #ffe566);
-  outline: 2px solid var(--accent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 70%, #1a1200), inset 0 0 0 1px rgba(255, 255, 255, 0.35);
-  mix-blend-mode: normal;
+  /* Translucent accent over the canvas so the cited glyphs stay legible in every theme. */
+  background: color-mix(in srgb, var(--accent) 34%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  border-radius: 1px;
+  mix-blend-mode: multiply;
 }
 .notice {
   background: #fffcf3;

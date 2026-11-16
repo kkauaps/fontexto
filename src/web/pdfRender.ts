@@ -81,9 +81,11 @@ export interface BoxRect {
 }
 
 /**
- * Screen boxes (relative to `layer`) of `phrase` as laid out in the text layer.
- * Returns undefined when the phrase is not found; `exact` is false when only a
- * leading part of the phrase could be located.
+ * CSS-pixel boxes (relative to `layer`, not multiplied by devicePixelRatio) of
+ * `phrase` as laid out in the text layer. The canvas backing store may be
+ * larger on a retina or phone screen, but the overlay is positioned in the
+ * same CSS space as the layer. Returns undefined when the phrase is not found;
+ * `exact` is false when only a leading part of the phrase could be located.
  */
 export function locatePhraseBoxes(layer: HTMLElement, phrase: string, nth = 0): { boxes: BoxRect[]; exact: boolean } | undefined {
   const walker = document.createTreeWalker(layer, NodeFilter.SHOW_TEXT);
