@@ -9,10 +9,19 @@ export function resetOaRateLimits() {
   buckets.clear();
 }
 
-export function clientIpFromHeaders(headers: { get?(name: string): string | null; [key: string]: unknown }): string {
-  const cf = typeof headers.get === 'function' ? headers.get('CF-Connecting-IP') : (headers['cf-connecting-ip'] as string | undefined);
+export function clientIpFromHeaders(headers: Headers | { get?(name: string): string | null | undefined; [key: string]: unknown }): string {
+  const read = (name: string): string | undefined => {
+    if (typeof headers.get === 'function') {
+      const v = headers.get(name);
+      if (v) return v;
+    }
+    if (headers instanceof Headers) return undefined;
+    const v = headers[name] ?? headers[name.toLowerCase()];
+    return typeof v === 'string' && v ? v : undefined;
+  };
+  const cf = read('CF-Connecting-IP') ?? read('cf-connecting-ip');
   if (cf) return cf;
-  const xff = typeof headers.get === 'function' ? headers.get('X-Forwarded-For') : (headers['x-forwarded-for'] as string | undefined);
+  const xff = read('X-Forwarded-For') ?? read('x-forwarded-for');
   if (xff) return String(xff).split(',')[0]?.trim() || 'unknown';
   return 'unknown';
 }
