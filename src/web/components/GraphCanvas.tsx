@@ -10,6 +10,7 @@ import {
   getNodesBounds,
   getViewportForBounds,
   useReactFlow,
+  useStoreApi,
   type Edge,
   type Node,
   type NodeChange,
@@ -23,7 +24,7 @@ import { REF_STATUS_COLOR, REF_STATUS_ORDER, type RefStatus } from '../../core/r
 import { categoryColor } from '../labels';
 import { categoryLabel, refStatusText, useI18n } from '../i18n';
 import { layoutGraph, nodeSize, statusGridLayout, type Positioned } from '../layout';
-import { isPhoneWidth } from '../fit';
+import { isPhoneWidth, phoneViewport } from '../fit';
 
 export type Selection = { type: 'node'; id: string } | { type: 'edge'; id: string } | undefined;
 
@@ -118,6 +119,14 @@ interface Props {
 export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, layoutNonce, search, exportName, colorBy = 'category' }: Props) {
   const { t } = useI18n();
   const rf = useReactFlow();
+  const store = useStoreApi();
+  const frame = useCallback(() => {
+    if (!isPhoneWidth()) return void rf.fitView({ padding: 0.12, duration: 300 });
+    const nodes = rf.getNodes();
+    const { width, height } = store.getState();
+    if (!nodes.length || !width || !height) return void rf.fitView({ padding: 0.2, duration: 300 });
+    void rf.setViewport(phoneViewport(getNodesBounds(nodes), width, height), { duration: 300 });
+  }, [rf, store]);
   const [positions, setPositions] = useState<Map<string, Positioned>>(new Map());
   const [layingOut, setLayingOut] = useState(false);
   const [vertical, setVertical] = useState(false);
@@ -139,7 +148,7 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
         if (cancelled) return;
         setVertical(narrow);
         setPositions(pos);
-        requestAnimationFrame(() => rf.fitView({ padding: isPhoneWidth() ? 0.2 : 0.12, duration: 300 }));
+        requestAnimationFrame(frame);
       })
       .finally(() => !cancelled && setLayingOut(false));
     return () => {
@@ -282,7 +291,7 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
       )}
       <Panel position="top-right" className="canvas-actions">
         {layingOut && <span className="muted small">{t.layingOut}</span>}
-        <button onClick={() => rf.fitView({ padding: isPhoneWidth() ? 0.2 : 0.12, duration: 300 })}>{t.centerGraph}</button>
+        <button onClick={frame}>{t.centerGraph}</button>
         <button onClick={() => doExport('svg')}>SVG</button>
         <button onClick={() => doExport('png')}>PNG</button>
       </Panel>

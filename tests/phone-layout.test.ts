@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isPhoneWidth, phoneFitScale } from '../src/web/fit';
+import { isPhoneWidth, phoneFitScale, phoneViewport } from '../src/web/fit';
 import { statusGridLayout } from '../src/web/layout';
 import type { ViewGraph, ViewNode } from '../src/core/view';
 
@@ -45,5 +45,23 @@ describe('narrow star layout', () => {
   it('keeps the wide layout by default', () => {
     const pos = statusGridLayout(view);
     expect(pos.get('a')!.x).toBeGreaterThan(pos.get('doc')!.x + pos.get('doc')!.width);
+  });
+});
+
+describe('phone diagram framing', () => {
+  it('a small diagram fits between the controls and the legend', () => {
+    const v = phoneViewport({ x: 0, y: 0, width: 300, height: 400 }, 393, 700);
+    expect(v.y).toBeGreaterThanOrEqual(116);
+    expect(v.y + 400 * v.zoom).toBeLessThanOrEqual(700 - 84);
+    expect(v.x).toBeGreaterThanOrEqual(12);
+  });
+  it('a tall diagram (dozens of references) keeps readable labels, top-aligned under the controls', () => {
+    const v = phoneViewport({ x: 0, y: 0, width: 600, height: 2600 }, 393, 700);
+    expect(v.zoom).toBeCloseTo(0.6, 2);
+    expect(v.y).toBe(116);
+  });
+  it('never wider than the screen', () => {
+    const v = phoneViewport({ x: 0, y: 0, width: 1800, height: 3000 }, 393, 700);
+    expect(1800 * v.zoom).toBeLessThanOrEqual(393 - 24 + 0.01);
   });
 });

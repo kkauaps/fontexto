@@ -2775,8 +2775,10 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   /* bottom padding keeps the last lines of the page clear of the floating control bar */
   .docview-phone .doc-pages { flex: 1; min-height: 0; padding-bottom: 76px; }
   /* notices sit in the column above the page instead of covering it */
-  .docview-phone .doc-notices:not(:empty) { flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; padding: 8px 8px 0; max-height: 34vh; overflow-y: auto; }
-  .docview-phone .doc-notices .notice { margin: 0; }
+  .docview-phone .doc-notices:not(:empty) { flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; padding: 6px 8px 0; max-height: 28vh; overflow-y: auto; }
+  .docview-phone .doc-notices .notice { margin: 0; padding: 8px 44px 8px 12px; font-size: 13px; line-height: 1.35; }
+  .docview-phone .doc-notices .notice button:not(.notice-x) { min-height: 38px; margin-top: 6px; font-size: 13.5px; }
+  .docview-phone .doc-notices .notice .notice-x { top: 0; right: 0; }
   .notice-dismiss { position: relative; padding-right: 48px; }
   .notice .notice-x {
     position: absolute; top: 2px; right: 2px; width: 44px; height: 44px; min-height: 44px; margin: 0; padding: 0;
@@ -2995,7 +2997,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   /* graph */
   .canvas { min-height: 0; }
   .react-flow__minimap, .react-flow__controls { display: none; }
-  .react-flow__panel.canvas-actions { left: 0; right: 0; margin: 10px; justify-content: center; gap: 8px; }
+  /* below the Network | Diagram switch (.view-switch-float, top 6px), never on top of it; keep in sync with PHONE_TOP */
+  .react-flow__panel.canvas-actions { left: 0; right: 0; top: 52px; margin: 0 10px; justify-content: center; gap: 8px; }
   .canvas-actions button { min-height: 44px; padding: 0 16px; border-radius: 999px; }
   .react-flow__panel.graph-legend {
     top: auto;
@@ -3247,7 +3250,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 [data-theme="light"] .library-panel { background: #fff; }
 [data-theme="light"] .library-panel input { background: #fff; }
 @media (max-width: 760px) {
-  .refs-toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
+  /* nowrap: a wrapping column takes the width of its widest item (the whole chip row), so the page scrolled sideways */
+  .refs-toolbar { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 10px; }
   .refs-toolbar .chip-row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -12px; padding: 0 12px 2px; }
   .refs-oa { position: relative; width: 100%; flex-wrap: wrap; }
   .refs-oa-btn { order: -1; flex: 1 1 100%; min-height: 48px; padding: 0 16px; }
