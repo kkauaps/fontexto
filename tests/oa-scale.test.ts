@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { parseOaBatchBody, OA_BATCH_MAX } from '../src/core/oaBatch';
 import { makePacer, withRetry } from '../src/core/oaClient';
 import { checkClientRateLimit, clientIpFromRequest, resetOaRateLimits } from '../src/core/oaRateLimit';
-import { isFetchableUrl, lookupOpenAccess, memoryCache, oaCacheKey, pmcIdOf, pmcPdfCandidates, resetOaState, sourcesIndicateUpstreamError } from '../src/core/openAccess';
+import { isFetchableUrl, lookupOpenAccess, memoryCache, oaCacheKey, openAlexApiKey, pmcIdOf, pmcPdfCandidates, resetOaState, sourcesIndicateUpstreamError } from '../src/core/openAccess';
 
 describe('OA cache keys v5', () => {
   it('versions DOI and title keys', () => {
@@ -157,5 +157,34 @@ describe('upstream error classification', () => {
         { name: 'Unpaywall', status: 'skipped' },
       ]),
     ).toBe(true);
+  });
+});
+
+describe('OpenAlex API key', () => {
+  it('trims BOM, spaces and newlines', () => {
+    expect(openAlexApiKey({ OPENALEX_API_KEY: 'test-key-abc\n' })).toBe('test-key-abc');
+    expect(openAlexApiKey({ OPENALEX_API_KEY: '\r\n test-key-abc \t' })).toBe('test-key-abc');
+    expect(openAlexApiKey({ OPENALEX_API_KEY: '\ufefftest-key-abc' })).toBe('test-key-abc');
+    expect(openAlexApiKey({ OPENALEX_API_KEY: '   \n' })).toBeUndefined();
+    expect(openAlexApiKey({ })).toBeUndefined();
+  });
+
+  it('sends the trimmed key on OpenAlex requests, never a trailing newline', async () => {
+    resetOaState();
+    const urls: string[] = [];
+    const work = { id: 'https://openalex.org/W1', doi: 'https://doi.org/10.5555/trim-key', title: 'Trim key', open_access: { is_oa: false }, locations: [] };
+    const f = (async (url: string) => {
+      urls.push(url);
+      if (url.startsWith('https://api.openalex.org/works/doi:'))
+        return new Response(JSON.stringify(work), { headers: { 'content-type': 'application/json' } });
+      return new Response('{}', { headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch;
+    await lookupOpenAccess({ doi: '10.5555/trim-key' }, f, { env: { OPENALEX_API_KEY: 'test-key-abc\n' }, cache: memoryCache() });
+    const openAlex = urls.filter((u) => u.startsWith('https://api.openalex.org/'));
+    expect(openAlex.length).toBeGreaterThan(0);
+    for (const u of openAlex) {
+      expect(new URL(u).searchParams.get('api_key')).toBe('test-key-abc');
+      expect(u).not.toMatch(/api_key=test-key-abc(?:%0[AaDd]|[\r\n])/);
+    }
   });
 });

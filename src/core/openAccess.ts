@@ -97,9 +97,16 @@ type Fetch = typeof fetch;
 export const OA_CONTACT = 'contact@xoryn.com.br';
 const UA = `Fontexto/1.0 (+https://fontexto.com; mailto:${OA_CONTACT})`;
 const withMail = (url: string) => `${url}${url.includes('?') ? '&' : '?'}mailto=${encodeURIComponent(OA_CONTACT)}`;
+/** OpenAlex rejects keys with trailing newlines or spaces (HTTP 401). Wrangler secret put often keeps a stdin newline. */
+export const openAlexApiKey = (env: { OPENALEX_API_KEY?: string } | undefined) => {
+  const raw = env?.OPENALEX_API_KEY?.replace(/^\uFEFF/, '').trim();
+  return raw || undefined;
+};
+
 export const withOpenAlexKey = (ctx: { env: OaEnv }, url: string) => {
   const u = withMail(url);
-  return ctx.env.OPENALEX_API_KEY ? `${u}&api_key=${encodeURIComponent(ctx.env.OPENALEX_API_KEY)}` : u;
+  const key = openAlexApiKey(ctx.env);
+  return key ? `${u}&api_key=${encodeURIComponent(key)}` : u;
 };
 export const MAX_PDF_BYTES = 40 * 1024 * 1024;
 export const MAX_PDF_REDIRECTS = 5;
@@ -901,7 +908,7 @@ async function lookupOpenAccessWork(q: OaQuery, f: Fetch, opts: OaOptions, cache
   // 1) identify the work: without an OpenAlex key, prefer Crossref for title searches (shared keyless budget).
   let w: OpenAlexWork | undefined;
   let via: OaSourceName = 'OpenAlex';
-  const noAlexKey = !ctx.env.OPENALEX_API_KEY;
+  const noAlexKey = !openAlexApiKey(ctx.env);
   if (noAlexKey && q.title && !q.doi) {
     via = 'Crossref';
     await step(statuses, 'Crossref', async () => Boolean((w = await findWorkCrossref(ctx, q))));
