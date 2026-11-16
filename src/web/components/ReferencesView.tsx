@@ -8,7 +8,7 @@ import { refStatusText, translateRuntime, useI18n, type Messages } from '../i18n
 import { OA_CATALOGS_BUSY } from '../i18n/runtime';
 import { libraryLink, saveLibraryPrefix, useLibraryPrefix } from '../library';
 import { askAuthorMailto } from '../askAuthor';
-import { makePacer, OA_DEFAULT_CONCURRENCY, OA_MIN_GAP_MS, oaBatchLookup, oaEligible, oaQueryFromPub, withRetry } from '../../core/oaClient';
+import { makePacer, OA_DEFAULT_CONCURRENCY, OA_MIN_GAP_MS, OA_REQUEST_TIMEOUT_MS, OaDeadline, oaBatchLookup, oaEligible, oaQueryFromPub, runOaQueue, timeoutSignal, withRetry } from '../../core/oaClient';
 
 /** Outcome of the free-PDF search for one reference (kept for the session only). */
 export type OaState =
@@ -38,32 +38,34 @@ export async function fetchOpenAccess(
   for (const p of pubs) if (!queue.includes(p)) onState(p.id, { kind: 'not_found' });
   const files: { file: File; publicationId: string }[] = [];
   try {
-    await withRetry(() => oaBatchLookup(queue.map(oaQueryFromPub)));
+    // metadata batch is an optimisation with its own short budget and no retries; /api/oa/pdf still resolves each ref
+    await oaBatchLookup(queue.map(oaQueryFromPub));
   } catch {
-    /* metadata batch is an optimisation; /api/oa/pdf still resolves each ref */
+    /* ignore */
   }
-  let i = 0;
   const pace = makePacer(OA_MIN_GAP_MS);
-  const worker = async () => {
-    while (i < queue.length) {
-      const pub = queue[i++];
-      onState(pub.id, { kind: 'busy' });
-      try {
-        const r = await withRetry(async () => (await pace(), api.oaFetchPdf(oaQueryFromPub(pub), safeName(pub))));
-        if (r.file) {
-          files.push({ file: r.file, publicationId: pub.id });
-          onState(pub.id, { kind: 'got', source: r.source, host: r.host, version: r.version });
-        } else if (r.result.status === 'oa') onState(pub.id, { kind: 'blocked', result: r.result });
-        else if (r.result.status === 'closed') onState(pub.id, { kind: 'closed', result: r.result });
-        // "not found" while catalogues were throttled or down is not an answer: say so instead of "not identified"
-        else if (r.result.sources?.some((x) => x.status === 'rate_limited' || x.status === 'timeout' || x.status === 'error')) onState(pub.id, { kind: 'error', message: OA_CATALOGS_BUSY });
-        else onState(pub.id, { kind: 'not_found', result: r.result });
-      } catch (e) {
-        onState(pub.id, { kind: 'error', message: (e as Error).message });
-      }
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(OA_DEFAULT_CONCURRENCY, queue.length) }, worker));
+  await runOaQueue(queue, {
+    concurrency: OA_DEFAULT_CONCURRENCY,
+    onStart: (pub) => onState(pub.id, { kind: 'busy' }),
+    run: (pub, signal) =>
+      withRetry(async () => {
+        await pace();
+        if (signal.aborted) throw new OaDeadline();
+        return api.oaFetchPdf(oaQueryFromPub(pub), safeName(pub), timeoutSignal(OA_REQUEST_TIMEOUT_MS, signal));
+      }),
+    onDone: (pub, r) => {
+      if (r.file) {
+        files.push({ file: r.file, publicationId: pub.id });
+        onState(pub.id, { kind: 'got', source: r.source, host: r.host, version: r.version });
+      } else if (r.result.status === 'oa') onState(pub.id, { kind: 'blocked', result: r.result });
+      else if (r.result.status === 'closed') onState(pub.id, { kind: 'closed', result: r.result });
+      // "not found" while catalogues were throttled or down is not an answer: say so instead of "not identified"
+      else if (r.result.sources?.some((x) => x.status === 'rate_limited' || x.status === 'timeout' || x.status === 'error')) onState(pub.id, { kind: 'error', message: OA_CATALOGS_BUSY });
+      else onState(pub.id, { kind: 'not_found', result: r.result });
+    },
+    // a reference that ran out of time is "catalogues busy, try again", not a raw error string
+    onError: (pub, e) => onState(pub.id, { kind: 'error', message: e instanceof OaDeadline || e.name === 'TimeoutError' || e.name === 'AbortError' ? OA_CATALOGS_BUSY : e.message }),
+  });
   if (!files.length) return { got: 0 };
   const graph = await api.addLinkedFiles(projectId, files);
   onGraph?.(graph);
