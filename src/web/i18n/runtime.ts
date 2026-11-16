@@ -180,6 +180,18 @@ export function translateRuntime(t: Messages, text: string | undefined | null): 
   m = text.match(/^Número\(s\) da frase ausente\(s\) da passagem: (.+)\.$/);
   if (m) return t.localeMissingNumbersInPassage(m[1]);
 
+  m = text.match(/^A citação diz “(.+)”, mas a lista de referências traz “(.+)”; confira o ano\.$/);
+  if (m) return t.localeApproxYear(m[1], m[2]);
+
+  m = text.match(/^A citação diz “(.+)”, mas a lista de referências traz “(.+)”; confira a grafia do nome\.$/);
+  if (m) return t.localeApproxName(m[1], m[2]);
+
+  m = text.match(/^“(.+)” foi ligada pela sigla a “(.+)”; confira\.$/);
+  if (m) return t.localeApproxAcronym(m[1], m[2]);
+
+  m = text.match(/^“(.+)” foi ligada pela primeira palavra do título à referência sem autor “(.+)”\.$/);
+  if (m) return t.localeApproxTitle(m[1], m[2]);
+
   m = text.match(/^Há um trecho parecido na página citada \((.+)\)\.$/);
   if (m) return t.localeSimilarOnCitedPage(m[1]);
 

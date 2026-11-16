@@ -156,8 +156,22 @@ export function extractCitationMarkers(pdf: PdfText): CitationMarker[] {
   return out;
 }
 
+/**
+ * How a marker was resolved when the text and the bibliography disagree slightly (a common slip in theses):
+ * - `year`: the authors match one entry whose year has a one-digit typo ("Dias (1999)" for DIAS 1989), differs
+ *   by one or two years ("Araújo e Sartori (2004)" for 2003), or is missing from the list;
+ * - `name`: same year, the surname is spelled one letter off ("Picchini" for PICCHIONI);
+ * - `acronym`: an organisation cited by its initials ("MDIC (2008)" for "Ministério do Desenvolvimento, Indústria e Comércio");
+ * - `title`: an entry without author, cited by the first word of its title ("(ESTUDO..., 2007)").
+ */
+export interface Approximation {
+  kind: 'year' | 'name' | 'acronym' | 'title';
+  cited: string;
+  listed: string;
+}
+
 export type MarkerResolution =
-  | { status: 'resolved'; publicationId: string }
+  | { status: 'resolved'; publicationId: string; approx?: Approximation }
   | { status: 'ambiguous'; candidates: string[] }
   | { status: 'unresolved'; candidates: [] };
 
@@ -179,7 +193,94 @@ export function resolveMarker(marker: MarkerReference, pubs: PublicationNode[]):
     const res = resolveVariant(v, pubs);
     if (res.status !== 'unresolved') return res;
   }
+  // nothing matches exactly: try the near misses, again from the full form to the shortest variant
+  for (const v of variants) {
+    const res = resolveApproximate(v, pubs);
+    if (res) return res;
+  }
   return { status: 'unresolved', candidates: [] };
+}
+
+/** Years that differ by one digit (1989/1999, 2000/2005) or by one or two (2003/2004). */
+function nearYear(a: number, b: number): boolean {
+  if (Math.abs(a - b) <= 2) return true;
+  const x = String(a);
+  const y = String(b);
+  let diff = 0;
+  for (let i = 0; i < 4; i++) if (x[i] !== y[i]) diff++;
+  return diff === 1;
+}
+
+/** Damerau–Levenshtein distance is at most 1 (one letter added, dropped, changed or swapped). */
+function oneEditApart(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  if (a.length === b.length) {
+    if (a.slice(i + 1) === b.slice(i + 1)) return true;
+    return a[i] === b[i + 1] && a[i + 1] === b[i] && a.slice(i + 2) === b.slice(i + 2);
+  }
+  const [lo, hi] = a.length < b.length ? [a, b] : [b, a];
+  return lo.slice(i) === hi.slice(i + 1);
+}
+
+const foldName = (s: string) => normalizeName(s).replace(/[^\p{L}]/gu, '');
+
+/** Initials of the capitalised words of an organisation name: "Ministério do Desenvolvimento, Indústria e Comércio" -> "MDIC". */
+const initialsOf = (name: string) =>
+  name
+    .split(/[\s,\-–]+/)
+    .filter((w) => /^\p{Lu}/u.test(w))
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+
+const firstTitleWord = (title: string | undefined) => foldName(/^[\p{L}'’\-]+/u.exec(title ?? '')?.[0] ?? '');
+
+function resolveApproximate(marker: MarkerReference, pubs: PublicationNode[]): MarkerResolution | undefined {
+  const first = marker.authors[0];
+  if (!first) return undefined;
+  const pick = (cands: PublicationNode[], kind: Approximation['kind'], listed: (p: PublicationNode) => string): MarkerResolution | undefined =>
+    cands.length === 1 ? { status: 'resolved', publicationId: cands[0].id, approx: { kind, cited: `${marker.authors.map((a) => a.replace(/^(?:\p{Ll}+\s+)+/u, '')).join(', ')}${marker.etAl ? ' et al.' : ''} (${marker.yearLabel})`, listed: listed(cands[0]) } } : undefined;
+  const label = (p: PublicationNode) => `${p.authors.map((a) => a.family).slice(0, 2).join(', ')}${p.authors.length > 2 ? ' et al.' : ''}${p.year ? ` (${p.year})` : ''}`;
+
+  // every named author matches (in order); the year is a near miss or missing
+  const authorsMatch = (p: PublicationNode) =>
+    marker.authors.every((a, k) => p.authors[k] && sameFamilyName(p.authors[k].family, a)) && (marker.etAl || marker.authors.length > 1 || p.authors.length <= 2);
+  const byAuthors = pubs.filter(authorsMatch);
+  if (byAuthors.length > 0 && !byAuthors.some((p) => p.year === marker.year)) {
+    const near = byAuthors.filter((p) => p.year === undefined || nearYear(p.year, marker.year));
+    const res = pick(near, 'year', label);
+    if (res) return res;
+  }
+
+  // surname one letter off, same year (names of 5+ letters only)
+  const f = foldName(first);
+  if (f.length >= 5) {
+    const near = pubs.filter((p) => p.year === marker.year && p.authors[0] && foldName(p.authors[0].family).length >= 5 && oneEditApart(foldName(p.authors[0].family), f));
+    const res = pick(near, 'name', label);
+    if (res) return res;
+  }
+
+  // organisation cited by its initials
+  if (/^\p{Lu}{2,8}$/u.test(first) && marker.authors.length === 1) {
+    const near = pubs.filter((p) => {
+      const fam = p.authors[0]?.family ?? '';
+      const ini = initialsOf(fam);
+      return fam.split(/\s+/).length >= 2 && ini.length >= first.length && ini.startsWith(first) && (p.year === undefined || p.year === marker.year);
+    });
+    const res = pick(near, 'acronym', (p) => p.authors[0].family);
+    if (res) return res;
+  }
+
+  // entry without an author, cited by the first word of its title
+  if (marker.authors.length === 1) {
+    const near = pubs.filter((p) => p.authors.length === 0 && p.year === marker.year && firstTitleWord(p.title) === f);
+    const res = pick(near, 'title', (p) => p.title ?? '');
+    if (res) return res;
+  }
+  return undefined;
 }
 
 function resolveVariant(marker: MarkerReference, pubs: PublicationNode[]): MarkerResolution {

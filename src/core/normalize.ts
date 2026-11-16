@@ -344,7 +344,8 @@ export function sameFamilyName(a: string | undefined, b: string | undefined): bo
   const han = (s: string) => /^\p{Script=Han}+$/u.test(s);
   if (han(na) && han(nb)) {
     const [shorter, longer] = na.length <= nb.length ? [na, nb] : [nb, na];
-    if (shorter.length >= 1 && shorter.length <= 2 && longer.length <= 4 && longer.startsWith(shorter)) return true;
+    // Japanese full names run to 5 characters (山田 / 山田太一郎)
+    if (shorter.length >= 1 && shorter.length <= 2 && longer.length <= (shorter.length === 2 ? 5 : 4) && longer.startsWith(shorter)) return true;
   }
   return false;
 }

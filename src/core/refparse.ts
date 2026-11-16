@@ -104,6 +104,19 @@ function abntAuthors(text: string): { authors: ParsedReference['authors']; etAl:
         const nxt = (/^(\S+)/u.exec(rest())?.[1] ?? '').replace(/;$/, '');
         // "BOLGER, A. M.; LOHSE, M." (the next initial carries the ";"), "SOUZA, A. C. d."; a capitalised word after
         // the initials ("La", "De") starts the title, it is not a particle.
+        // "SILVA, César R. Leite da." / "SOUZA, J. R. Costa de;": a compound surname written after the initials,
+        // closed by a particle
+        const tail = /^((?:\p{Lu}\p{Ll}+\s+){1,2}(?:de|da|do|dos|das|e|van|von|del))(?=[.;])/u.exec(rest());
+        if (tail) {
+          given.push(tail[1]);
+          pos += tail[1].length;
+          if (text[pos] === '.') {
+            pos += /^\.\s*/.exec(rest())![0].length;
+            done = true;
+            break;
+          }
+          continue;
+        }
         if (!(INITIAL.test(nxt) || LOWER_PARTICLE.test(nxt) || /^et$/i.test(nxt))) {
           done = true;
         }
@@ -128,7 +141,8 @@ function abntAuthors(text: string): { authors: ParsedReference['authors']; etAl:
     // Trailing lower-case particles belong to the family name ("DALEN, Mirte J. van").
     const particles: string[] = [];
     while (given.length && PARTICLE.test(given[given.length - 1])) particles.unshift(given.pop()!);
-    authors.push({ family: [...particles, family].join(' '), given: given.join(' ').trim() || undefined });
+    const givenText = given.join(' ').replace(/\s*\((?:orgs?|eds?|coords?|comps?|dir|trad)\.?\)\s*$/i, '').trim();
+    authors.push({ family: [...particles, family].join(' '), given: givenText || undefined });
     if (done || etAl) break;
     if (/^;/.test(text.slice(pos - 1, pos)) || text[pos - 1] === ' ' && /;/.test(text.slice(pos - 3, pos))) continue;
     // ';' was consumed with the last given-name token above; otherwise the author block ended.
@@ -298,7 +312,34 @@ function usableTitle(t: string | undefined): string | undefined {
   return s;
 }
 
+/** Word Bibliographies glue a stray space before the period ("Mariz .Economia") and drop the comma after a surname in capitals ("; CLOSS David J."). */
+function abntNormalize(text: string): string {
+  if (!/^\p{Lu}{2,}/u.test(text)) return text;
+  return text
+    .replace(/(\p{L})\s+\.(?=\s*\p{Lu})/gu, '$1. ')
+    .replace(/\.(?=\p{Lu}\p{Ll}{2,})/gu, '. ')
+    .replace(/(;\s*)(\p{Lu}{2,}[\p{Lu}'’\-]*(?:\s\p{Lu}{2,}[\p{Lu}'’\-]*)?)\s+(?=\p{Lu}\p{Ll})/gu, '$1$2, ')
+    .replace(/\s{2,}/g, ' ');
+}
+
+const CAPS_WORD = String.raw`\p{Lu}{2,}[\p{Lu}'’\-]*`;
+const JP_AUTHOR_YEAR_RE = /^((?:[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー]{1,8}(?:\s[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー]{1,6})?)(?:\s*[・･、，,]\s*[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー]{1,8}(?:\s[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー]{1,6})?)*(?:\s*(?:他|ほか|等))?)\s*[（(]\s*((?:1[5-9]|20)\d{2})[a-z]?\s*[）)]\s*[.。．、,]?\s*/u;
+/** ABNT authors in capitals joined by "&"/"e" without given names: "WEINDENFELD & NICOLSON. Título." */
+const CAPS_PAIR_RE = new RegExp(String.raw`^(${CAPS_WORD})\s*(?:&|\be\b|\band\b)\s*(${CAPS_WORD})\.\s+(?=\S)`, 'u');
+/** ABNT corporate author of several words in capitals: "UNIVERSIDADE FEDERAL DO NORTE. Manual ...". */
+const CAPS_ORG_RE = new RegExp(String.raw`^(${CAPS_WORD}(?:[\s\-]+(?:${CAPS_WORD}|D[AEO]S?|E|OF|THE|AND|DEL?|LA|LOS|DU|DES|ET)){1,10})\.\s+(?=\S)`, 'u');
+/** ABNT entry by title (no author; cited by its first word): "ESTUDO temático sobre ...". */
+const TITLE_FIRST_RE = /^(\p{Lu}{3,}[\p{Lu}'’\-]*)\s+\p{Ll}/u;
+/** Mixed-case corporate author ending in a period: "Ministério do Desenvolvimento, Indústria e Comércio Exterior. Título". */
+const ORG_WORDS_RE = /^((?:\p{Lu}[\p{L}'’\-]*|d[aeo]s?|e|of|the|and|for|de[l]?|la|los|las|du|des|et|für|und|y|i)(?:,?\s+(?:\p{Lu}[\p{L}'’\-]*|d[aeo]s?|e|of|the|and|for|de[l]?|la|los|las|du|des|et|für|und|y|i)){1,11})\.\s+(?=\p{Lu}|\d)/u;
+
 export function parseReferenceText(text: string, index = 0, label?: string): Omit<ParsedReference, 'key'> {
+  const original = text;
+  const r = parseReferenceCore(abntNormalize(text), index, label);
+  return { ...r, text: original };
+}
+
+function parseReferenceCore(text: string, index: number, label?: string): Omit<ParsedReference, 'key'> {
   const doi = findDois(text)[0];
   const arxiv = findArxivIds(text)[0];
   const gostThesis = GOST_THESIS_RE.exec(text);
@@ -336,6 +377,36 @@ export function parseReferenceText(text: string, index = 0, label?: string): Omi
         return m ? { family: titleCaseName(m[1]), given: m[2].trim() } : { family: titleCaseName(a) };
       });
     return { index, text, style: 'apa', authors, etAl: /et\s+al\./.test(fr[1]), year: Number(fr[2]), title: usableTitle(titleAfter(text, fr[0].length)), doi, arxiv, label };
+  }
+  // Japanese author-year: "山田太郎（2010）『書名』出版社。", "佐藤花子・鈴木一郎 (2019). 論文名. 雑誌名, 3(2), 1-10."
+  const jp = JP_AUTHOR_YEAR_RE.exec(text);
+  if (jp) {
+    const authors = jp[1]
+      .split(/\s*[・･、，,]\s*/)
+      .map((a) => a.trim())
+      .filter(Boolean)
+      .map((a) => {
+        const sp = /^(\S+)\s+(\S+)$/u.exec(a);
+        return sp && /\p{Script=Han}/u.test(sp[1]) ? { family: sp[1], given: sp[2] } : { family: a.replace(/\s+/g, '') };
+      });
+    const rest = text.slice(jp[0].length);
+    const q = /^[『「“"]([^』」”"]{2,})[』」”"]/u.exec(rest);
+    const title = q ? q[1] : /^(.+?)[。.．](?:\s|$)/u.exec(rest)?.[1];
+    return { index, text, style: 'apa', authors, etAl: /等|他|ほか/.test(jp[1]), year: Number(jp[2]), title: usableTitle(title?.trim()), doi, arxiv, label };
+  }
+  const pair = CAPS_PAIR_RE.exec(text);
+  if (pair) {
+    const title = titleAfter(text, pair[0].length);
+    return { index, text, style: 'abnt', authors: [{ family: titleCaseName(pair[1]) }, { family: titleCaseName(pair[2]) }], etAl: false, year: pickYear(text, pair[0].length + (title?.length ?? 0)) ?? pickYear(text), title: usableTitle(title), doi, arxiv, label };
+  }
+  const capsOrg = CAPS_ORG_RE.exec(text);
+  if (capsOrg && !label) {
+    const title = titleAfter(text, capsOrg[0].length);
+    return { index, text, style: 'abnt', authors: [{ family: capsOrg[1], organization: true }], etAl: false, year: pickYear(text, capsOrg[0].length + (title?.length ?? 0)) ?? pickYear(text), title: usableTitle(title), doi, arxiv, label };
+  }
+  if (TITLE_FIRST_RE.test(text) && !label) {
+    const title = titleAfter(text, 0);
+    return { index, text, style: 'abnt', authors: [], etAl: false, year: pickYear(text, title?.length ?? 0) ?? pickYear(text), title: usableTitle(title), doi, arxiv, label };
   }
   let style = detectStyle(text, label);
   let authors: ParsedReference['authors'] = [];
@@ -430,6 +501,15 @@ export function parseReferenceText(text: string, index = 0, label?: string): Omi
       style = 'ieee';
     }
   }
+  if (!authors.length && style === 'unknown' && !label) {
+    // a corporate author written in mixed case, or an entry that starts with its title
+    const org = ORG_WORDS_RE.exec(text);
+    if (org && org[1].split(/\s+/).length >= 2) {
+      authors = [{ family: org[1], organization: true }];
+      title = titleAfter(text, org[0].length);
+      style = 'abnt';
+    } else if (!title) title = titleAfter(text, 0);
+  }
   if (year === undefined) year = pickYear(text);
   return { index, text, style, authors, etAl, year, title: usableTitle(title), doi, arxiv, label };
 }
@@ -437,13 +517,22 @@ export function parseReferenceText(text: string, index = 0, label?: string): Omi
 /** Parses every entry and assigns unique keys (`family` + `year` + optional letter). */
 export function parseReferences(entries: Pick<ReferenceEntry, 'index' | 'text' | 'label'>[]): ParsedReference[] {
   const used = new Map<string, number>();
+  let prev: ParsedReference | undefined;
   return entries.map((e) => {
-    const p = parseReferenceText(e.text, e.index, e.label);
+    let p = parseReferenceText(e.text, e.index, e.label);
+    // ABNT repeated author: "______. Outro título. 2010." takes the authors of the entry above
+    const rep = /^_{2,}\s*\.?\s*/.exec(e.text);
+    if (rep && prev?.authors.length) {
+      const rest = e.text.slice(rep[0].length);
+      const title = titleAfter(rest, 0);
+      p = { ...p, style: prev.style, authors: prev.authors, etAl: prev.etAl, title: usableTitle(title), year: pickYear(rest, title?.length ?? 0) ?? pickYear(rest) };
+    }
     if (isThesisText(e.text)) p.thesis = true;
     const base = `${fold(p.authors[0]?.family ?? 'ref') || 'ref'}${p.year ?? ''}`;
     const n = used.get(base) ?? 0;
     used.set(base, n + 1);
-    return { ...p, key: n === 0 ? base : `${base}${String.fromCharCode(96 + n + 1)}` };
+    prev = { ...p, key: n === 0 ? base : `${base}${String.fromCharCode(96 + n + 1)}` };
+    return prev;
   });
 }
 

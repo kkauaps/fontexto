@@ -23,10 +23,10 @@ import { DEFAULT_GLOSSARY } from './glossary.js';
 import { buildQuery, indexV2, lexicalCandidates, MATCH_PARAMS, windowText, type Candidate, type ClaimParts, type MatchParams } from './matching.js';
 import { claimSpanFor, isLeadingNarrative, numbersAttributedTo } from './attribution.js';
 import { authorsFromMarker, bestPassageFocus } from './passageFocus.js';
-import { extractMarkersFromText, isSelfCitation, resolveMarker, type MarkerReference } from './citations.js';
+import { extractMarkersFromText, isSelfCitation, resolveMarker, type Approximation, type MarkerReference } from './citations.js';
 import type { CitationGraph, FileRecord, PublicationNode, Rect } from './model.js';
 import { foldCjk, stripDiacritics } from './normalize.js';
-import { extractReferenceEntries, isPageNumber, matchReference, referenceSectionBounds, repeatedLines } from './references.js';
+import { extractReferenceEntries, isPageNumber, matchReference, referenceRanges, repeatedLines } from './references.js';
 import type { PdfText } from './text.js';
 
 export const EVIDENCE_SCHEMA_VERSION = 1 as const;
@@ -160,6 +160,16 @@ export interface CitationOccurrence {
   override?: { status: EvidenceStatus; at: string; auto?: EvidenceStatus; autoReason?: EvidenceReason; autoWhy?: string };
   passages: Passage[];
   curated?: CuratedMark;
+  /** Set when the marker only matched its reference approximately (year typo, spelling, acronym, title word). */
+  approx?: Approximation;
+}
+
+/** Plain-language note for an approximate marker resolution (translated in the web UI by translateRuntime). */
+export function approximationNote(a: Approximation): string {
+  if (a.kind === 'year') return `A citação diz “${a.cited}”, mas a lista de referências traz “${a.listed}”; confira o ano.`;
+  if (a.kind === 'name') return `A citação diz “${a.cited}”, mas a lista de referências traz “${a.listed}”; confira a grafia do nome.`;
+  if (a.kind === 'acronym') return `“${a.cited}” foi ligada pela sigla a “${a.listed}”; confira.`;
+  return `“${a.cited}” foi ligada pela primeira palavra do título à referência sem autor “${a.listed}”.`;
 }
 
 export interface EvidenceSummary {
@@ -428,13 +438,8 @@ const INTRO_RE = /^(?:(?:1|I)\.?\s*)?(?:introduction|introdu[cç][aã]o|introduc
 
 /** Sentence index of a (reference) PDF. The bibliography section is excluded. */
 export function buildReferenceIndex(pdf: PdfText): ReferenceIndex {
-  const bounds = referenceSectionBounds(pdf);
-  const flow = buildFlow(pdf, (page, line) => {
-    if (!bounds) return false;
-    const after = page > bounds.start.page || (page === bounds.start.page && line >= bounds.start.line);
-    const before = bounds.end ? page < bounds.end.page || (page === bounds.end.page && line < bounds.end.line) : true;
-    return after && before;
-  });
+  const { inside } = referenceRanges(pdf);
+  const flow = buildFlow(pdf, inside);
   const introLine = flow.lines.find((l) => l.page <= 2 && INTRO_RE.test(flow.text.slice(l.start, l.end).trim()));
   const introOffset = introLine?.start ?? 0;
   const sentences: IndexedSentence[] = [];
@@ -611,13 +616,8 @@ export function computeEvidence(input: ComputeEvidenceInput): EvidenceReport {
 
   if (mainFile && mainText) {
     const bibPubs = Object.values(graph.nodes).filter((n): n is PublicationNode => n.kind === 'publication' && n.inMainBibliography);
-    const bounds = referenceSectionBounds(mainText, { fallback: true });
-    const flow = buildFlow(mainText, (page, line) => {
-      if (!bounds) return false;
-      const after = page > bounds.start.page || (page === bounds.start.page && line >= bounds.start.line);
-      const before = bounds.end ? page < bounds.end.page || (page === bounds.end.page && line < bounds.end.line) : true;
-      return after && before;
-    });
+    const { inside } = referenceRanges(mainText, { fallback: true });
+    const flow = buildFlow(mainText, inside);
     const sentences = segmentSentences(flow.text);
     // self markers ("Fonte: Autor (2026)") stay in the list so they are cut out of claims, but never become occurrences
     const markers: (ReturnType<typeof extractMarkersFromText>[number] & { numericPub?: string | null })[] = extractMarkersFromText(flow.text, { includeSelf: true });
@@ -719,6 +719,10 @@ export function computeEvidence(input: ComputeEvidenceInput): EvidenceReport {
           const pub = graph.nodes[res.publicationId] as PublicationNode;
           scoreOccurrence(occ, pub, graph, texts, indexFor, claimTermsCache, params, input.onPending);
           occ.why ??= occ.notes[0];
+          if ('approx' in res && res.approx) {
+            occ.approx = res.approx;
+            occ.notes.unshift(approximationNote(res.approx));
+          }
         } else occ.why = res.status === 'ambiguous' ? 'Mais de uma referência da lista combina com esta citação; escolha a certa.' : 'Nenhuma referência da lista tem este autor e ano.';
         occurrences.push(occ);
       }

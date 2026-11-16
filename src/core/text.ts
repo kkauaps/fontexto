@@ -44,7 +44,15 @@ export function joinLines(lines: string[]): string {
     const doiBreak = /10\.\d{4,9}\/\S*[./_-]$/.test(tail) || /^(?:https?:\/\/)?(?:dx\.)?doi\.org\/$/i.test(tail);
     // a DOI that ends the line with "." is usually finished: keep the space unless the next line goes on in
     // lower case or digits ("…819861. Revista", "…2717. S. SILVA")
-    if (doiBreak && !(/\.$/.test(tail) && !/^[\p{Ll}\d]/u.test(line))) out += line;
+    // a URL broken across lines ("…/empresa_exp" + "ortadora_03.html", "…/setor-" + "farmaceutico.jhtml"): glue it
+    // back, keeping its hyphen
+    const firstTok = line.split(/\s/, 1)[0];
+    const urlBreak =
+      /^(?:<?https?:\/\/|<?www\.)\S*[^\s.,;>)]$/i.test(tail) &&
+      /^[\p{Ll}\d_~%/.\-]/u.test(line) &&
+      (/[/_\-=?&#%.]$/.test(tail) || /[/_=?&#%.\d]/.test(firstTok));
+    if (urlBreak) out += line;
+    else if (doiBreak && !(/\.$/.test(tail) && !/^[\p{Ll}\d]/u.test(line))) out += line;
     else if (/\p{Ll}-$/u.test(out) && /^\p{Ll}/u.test(line)) out = out.slice(0, -1) + line;
     else if (/\p{L}-$/u.test(out) && /^\p{Lu}/u.test(line)) out += line; // "Maier-" + "Hein"
     else out += ' ' + line;
