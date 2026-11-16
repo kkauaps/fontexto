@@ -10,12 +10,14 @@ interface Props {
   onGraph: (g: CitationGraph) => void;
   /** When set (phone), the notice gets its own close button. */
   onDismiss?: () => void;
+  /** Reports whether the notice is on screen (the phone notice strip counts it). */
+  onVisible?: (visible: boolean) => void;
 }
 
 type State = { kind: 'idle' } | { kind: 'running'; label: string; fraction: number } | { kind: 'error'; message: string };
 
 /** Browser edition only: opt-in language-model re-ranking of the citation matches, run locally. */
-export function SemanticNotice({ projectId, method, onGraph, onDismiss }: Props) {
+export function SemanticNotice({ projectId, method, onGraph, onDismiss, onVisible }: Props) {
   const { t } = useI18n();
   const [available, setAvailable] = useState(false);
   const [state, setState] = useState<State>({ kind: 'idle' });
@@ -28,7 +30,13 @@ export function SemanticNotice({ projectId, method, onGraph, onDismiss }: Props)
     void import('../local/semanticClient').then((m) => m.modelAvailable()).then(setAvailable);
   }, []);
 
-  if (edition !== 'web' || !available || active) return null;
+  const visible = edition === 'web' && available && !active;
+  useEffect(() => {
+    onVisible?.(visible);
+    return () => onVisible?.(false);
+  }, [visible, onVisible]);
+
+  if (!visible) return null;
 
   const run = async () => {
     setState({ kind: 'running', label: t.phaseDownload, fraction: 0 });

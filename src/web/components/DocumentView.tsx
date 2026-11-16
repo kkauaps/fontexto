@@ -165,6 +165,9 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
   const [filterSheet, setFilterSheet] = useState(false);
   const [citSheet, setCitSheet] = useState(false);
   const [hideNotices, setHideNotices] = useState<Record<string, boolean>>({});
+  /** Phone: notices live in a bottom sheet behind a one-line strip, so the page keeps the screen. */
+  const [noticesOpen, setNoticesOpen] = useState(false);
+  const [semanticVisible, setSemanticVisible] = useState(false);
   useEffect(() => {
     const onResize = () => setPhone(isPhoneWidth());
     window.addEventListener('resize', onResize);
@@ -323,6 +326,14 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
   }
   const hasBib = Object.values(graph.files).some((f) => f.role === 'bibtex');
   const refsWithoutPdf = evidence.summary.semPdf;
+  /** Plain text of each open notice, in on-screen order (phone strip). */
+  const noticeTexts = [
+    ...(!hasBib && !hideNotices.bib ? [t.noBibNotice] : []),
+    ...(hasBib && refsWithoutPdf > 0 && !hideNotices.missingPdf ? [t.citationsWithoutPdf(refsWithoutPdf)] : []),
+    ...(hasBib && evidence.summary.occurrences > 0 && !hideNotices.semantic && semanticVisible ? [t.semanticPitch] : []),
+  ];
+  /** Closes by itself once the last notice is dismissed. */
+  const noticeSheet = phone && noticesOpen && noticeTexts.length > 0;
 
   const chipRows = ([
     ['all', t.all],
@@ -410,7 +421,24 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
             </button>
           </span>
         </div>
-        <div className="doc-notices">
+        {phone && noticeTexts.length > 0 && (
+          <button type="button" className="doc-notice-strip" onClick={() => setNoticesOpen(true)} aria-haspopup="dialog" aria-label={t.warnings(noticeTexts.length)}>
+            <span className="doc-notice-strip-icon" aria-hidden="true">!</span>
+            <span className="doc-notice-strip-text">{noticeTexts[0]}</span>
+            {noticeTexts.length > 1 && <span className="doc-notice-strip-more">+{noticeTexts.length - 1}</span>}
+            <span className="doc-notice-strip-chevron" aria-hidden="true">›</span>
+          </button>
+        )}
+        {noticeSheet && <button type="button" className="sheet-scrim" aria-label={t.close} onClick={() => setNoticesOpen(false)} />}
+        <div className={`doc-notices${noticeSheet ? ' open' : ''}`} role={phone ? 'dialog' : undefined} aria-label={phone ? t.warnings(noticeTexts.length) : undefined}>
+        {phone && (
+          <header className="bottom-sheet-head">
+            <h3>{t.warnings(noticeTexts.length)}</h3>
+            <button type="button" className="sheet-close" onClick={() => setNoticesOpen(false)} aria-label={t.close}>
+              ×
+            </button>
+          </header>
+        )}
         {!hasBib && !hideNotices.bib && (
           <div className="notice notice-dismiss">
             <button type="button" className="notice-x" aria-label={t.close} onClick={() => setHideNotices((h) => ({ ...h, bib: true }))}>
@@ -439,10 +467,11 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
             method={evidence.method}
             onGraph={onGraph}
             onDismiss={phone ? () => setHideNotices((h) => ({ ...h, semantic: true })) : undefined}
+            onVisible={setSemanticVisible}
           />
         )}
-        {docError && <div className="notice error">{translateRuntime(t, docError)}</div>}
         </div>
+        {docError && <div className="notice error">{translateRuntime(t, docError)}</div>}
         <div className="doc-pages" ref={scrollerRef}>
           {doc ? (
             Array.from({ length: doc.numPages }, (_, i) => i + 1).map((n) => (
