@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { parseOaBatchBody, OA_BATCH_MAX } from '../src/core/oaBatch';
 import { makePacer, withRetry } from '../src/core/oaClient';
 import { checkClientRateLimit, clientIpFromRequest, resetOaRateLimits } from '../src/core/oaRateLimit';
-import { isFetchableUrl, lookupOpenAccess, memoryCache, oaCacheKey, resetOaState } from '../src/core/openAccess';
+import { isFetchableUrl, lookupOpenAccess, memoryCache, oaCacheKey, pmcIdOf, pmcPdfCandidates, resetOaState, sourcesIndicateUpstreamError } from '../src/core/openAccess';
 
 describe('OA cache keys v5', () => {
   it('versions DOI and title keys', () => {
@@ -111,5 +111,51 @@ describe('degraded cache TTL', () => {
     const r = await lookupOpenAccess({ doi: '10.5555/nocache' }, f, { cache, now: () => t });
     expect(r.sources?.some((s) => s.status === 'rate_limited')).toBe(true);
     expect(await cache.get(oaCacheKey({ doi: '10.5555/nocache' }))).toBeUndefined();
+  });
+});
+
+describe('PMC pdf fallback', () => {
+  it('extracts PMC ids from NCBI, Europe PMC, accid, and bare ids', () => {
+    expect(pmcIdOf('https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1234567/pdf/foo.pdf')).toBe('1234567');
+    expect(pmcIdOf('https://europepmc.org/articles/PMC1234567?pdf=render')).toBe('1234567');
+    expect(pmcIdOf('https://europepmc.org/article/PMC/1234567')).toBe('1234567');
+    expect(pmcIdOf('https://europepmc.org/backend/ptpmcrender.fcgi?accid=PMC1234567&blobtype=pdf')).toBe('1234567');
+    expect(pmcIdOf('PMC1234567')).toBe('1234567');
+  });
+
+  it('lists NCBI and Europe PMC PDF endpoints', () => {
+    expect(pmcPdfCandidates('PMC42')).toEqual([
+      'https://www.ncbi.nlm.nih.gov/pmc/articles/PMC42/pdf/',
+      'https://europepmc.org/articles/PMC42?pdf=render',
+      'https://europepmc.org/backend/ptpmcrender.fcgi?accid=PMC42&blobtype=pdf',
+    ]);
+  });
+});
+
+describe('upstream error classification', () => {
+  it('does not count a Semantic Scholar 429 as a failure when another catalogue answered', () => {
+    expect(
+      sourcesIndicateUpstreamError([
+        { name: 'OpenAlex', status: 'found' },
+        { name: 'Semantic Scholar', status: 'rate_limited' },
+        { name: 'Europe PMC', status: 'none' },
+      ]),
+    ).toBe(false);
+    expect(
+      sourcesIndicateUpstreamError([
+        { name: 'OpenAlex', status: 'none' },
+        { name: 'Semantic Scholar', status: 'rate_limited' },
+      ]),
+    ).toBe(false);
+  });
+
+  it('still flags a miss when no catalogue answered', () => {
+    expect(
+      sourcesIndicateUpstreamError([
+        { name: 'OpenAlex', status: 'error' },
+        { name: 'Semantic Scholar', status: 'rate_limited' },
+        { name: 'Unpaywall', status: 'skipped' },
+      ]),
+    ).toBe(true);
   });
 });

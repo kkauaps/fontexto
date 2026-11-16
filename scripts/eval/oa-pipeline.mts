@@ -13,7 +13,7 @@ import path from 'node:path';
 import { CoreStore, MemoryDriver } from '../../src/core/coreStore.ts';
 import type { PublicationNode } from '../../src/core/model.ts';
 import { extractPdfText } from '../../src/server/pdfText.ts';
-import { handleOaRequest, lookupOpenAccess, parseOaQuery, type OaResult } from '../../src/core/openAccess.ts';
+import { handleOaRequest, lookupOpenAccess, parseOaQuery, sourcesIndicateUpstreamError, type OaResult } from '../../src/core/openAccess.ts';
 import {
   arxivFromPub,
   makePacer,
@@ -107,8 +107,7 @@ function classify(r: OaResult, pdfOk: boolean, eligible: boolean, clientError?: 
   if (r.status === 'oa') return 'found_record_no_oa_fetch';
   if (r.status === 'closed') return 'found_record_no_oa';
   if (r.status === 'not_found') {
-    const deg = r.sources?.some((s) => s.status === 'rate_limited' || s.status === 'timeout' || s.status === 'error');
-    return deg ? 'upstream_error' : 'not_found';
+    return sourcesIndicateUpstreamError(r.sources) ? 'upstream_error' : 'not_found';
   }
   return 'unknown';
 }

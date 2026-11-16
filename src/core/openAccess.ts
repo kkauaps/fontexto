@@ -422,14 +422,52 @@ const arxivPdf = (u: string | null | undefined) => {
   const id = arxivId(u);
   return id ? `https://arxiv.org/pdf/${id}` : undefined;
 };
-const pmcOf = (u: string | null | undefined) => (u ? /(?:ncbi\.nlm\.nih\.gov\/(?:pmc\/)?articles\/|europepmc\.org\/(?:articles?|abstract\/PMC)\/?)(?:PMC)?(\d+)/i.exec(u)?.[1] : undefined);
-const europePmcPdf = (pmc: string) => `https://europepmc.org/articles/PMC${pmc.replace(/^PMC/i, '')}?pdf=render`;
+/** PMC numeric id from a PMC/Europe PMC URL, accid query, or a bare PMC123. */
+export function pmcIdOf(raw: string | null | undefined): string | undefined {
+  if (!raw) return undefined;
+  const s = raw.trim();
+  const bare = /^PMC(\d+)$/i.exec(s);
+  if (bare) return bare[1];
+  const patterns = [
+    /ncbi\.nlm\.nih\.gov\/(?:pmc\/)?articles\/(?:PMC)?(\d+)/i,
+    /europepmc\.org\/(?:articles?|article|abstract)\/(?:PMC\/)?(?:PMC)?(\d+)/i,
+    /(?:[?&](?:accid|id)=)(?:PMC)?(\d+)/i,
+  ];
+  for (const re of patterns) {
+    const m = re.exec(s);
+    if (m) return m[1];
+  }
+  return undefined;
+}
+
+/** Legal PMC PDF endpoints to try when a publisher copy is walled. NCBI first, then Europe PMC. */
+export function pmcPdfCandidates(pmc: string): string[] {
+  const id = pmc.replace(/^PMC/i, '');
+  if (!/^\d+$/.test(id)) return [];
+  return [
+    `https://www.ncbi.nlm.nih.gov/pmc/articles/PMC${id}/pdf/`,
+    `https://europepmc.org/articles/PMC${id}?pdf=render`,
+    `https://europepmc.org/backend/ptpmcrender.fcgi?accid=PMC${id}&blobtype=pdf`,
+  ];
+}
+
+const europePmcPdf = (pmc: string) => pmcPdfCandidates(pmc)[1] ?? `https://europepmc.org/articles/PMC${pmc.replace(/^PMC/i, '')}?pdf=render`;
+
+/** A catalogue 429/5xx is only an overall miss when no other catalogue gave a definitive found/none. Semantic Scholar 429s are ignored when another catalogue already answered. */
+export function sourcesIndicateUpstreamError(sources: { name: string; status: OaSourceStatus }[] | undefined): boolean {
+  if (!sources?.length) return false;
+  const answered = sources.some((s) => s.name !== 'Semantic Scholar' && (s.status === 'found' || s.status === 'none'));
+  return sources.some((s) => {
+    if (answered && s.name === 'Semantic Scholar' && s.status === 'rate_limited') return false;
+    return s.status === 'rate_limited' || s.status === 'timeout' || s.status === 'error';
+  });
+}
 
 /** Dedupe key: the same copy reached through different URLs counts once (arXiv id, PMC id, host + path). */
 export function candidateKey(url: string): string {
   const ax = arxivId(url);
   if (ax) return `arxiv:${ax.toLowerCase()}`;
-  const pmc = pmcOf(url);
+  const pmc = pmcIdOf(url);
   if (pmc) return `pmc:${pmc}`;
   try {
     const u = new URL(url);
@@ -648,13 +686,13 @@ function openAlexCandidates(w: OpenAlexWork, set: CandidateSet, via: OaSourceNam
     if (!l || l.is_oa === false) continue;
     const declared: OaHost | undefined = l.source?.type === 'journal' || l.source?.type === 'conference' || l.source?.type === 'book series' ? 'publisher' : l.source?.type === 'repository' ? undefined : undefined;
     const label = l.source?.display_name ?? undefined;
-    const pmc = pmcOf(l.pdf_url) ?? pmcOf(l.landing_page_url);
+    const pmc = pmcIdOf(l.pdf_url) ?? pmcIdOf(l.landing_page_url);
     if (pmc) set.add({ url: europePmcPdf(pmc), source: 'Europe PMC', host: 'repository', version: versionOf(l.version), license: l.license, via });
     const ax = arxivPdf(l.landing_page_url) ?? arxivPdf(l.pdf_url);
     if (ax) set.add({ url: ax, source: 'arXiv', host: 'preprint', version: 'preprint', license: l.license, via });
     if (l.pdf_url && !pmc && !ax) set.add({ url: l.pdf_url, source: label ?? hostLabel(l.pdf_url), host: declared, version: versionOf(l.version), license: l.license, via });
   }
-  const pmc = w.ids?.pmcid ? pmcOf(w.ids.pmcid) ?? /PMC(\d+)/i.exec(w.ids.pmcid)?.[1] : undefined;
+  const pmc = w.ids?.pmcid ? pmcIdOf(w.ids.pmcid) ?? /PMC(\d+)/i.exec(w.ids.pmcid)?.[1] : undefined;
   if (pmc) set.add({ url: europePmcPdf(pmc), source: 'Europe PMC', host: 'repository', version: 'unknown', via });
 }
 
@@ -694,7 +732,7 @@ async function fromUnpaywall(ctx: Ctx, doi: string, pdfs: CandidateSet, reads: C
       pdfs.add({ ...base, url: ax, source: 'arXiv', host: 'preprint', version: 'preprint' });
       continue;
     }
-    const pmc = pmcOf(l.url_for_pdf) ?? pmcOf(l.url);
+    const pmc = pmcIdOf(l.url_for_pdf) ?? pmcIdOf(l.url) ?? pmcIdOf(l.url_for_landing_page);
     if (pmc) {
       pdfs.add({ ...base, url: europePmcPdf(pmc), source: 'Europe PMC', host: 'repository' });
       continue;
@@ -1043,7 +1081,23 @@ export async function pdfUrlFromLanding(landing: string, f: Fetch = fetch): Prom
  * (same site only, never the user's), and validates the "%PDF-" magic before accepting the body.
  */
 export async function openPdfResponse<C extends { url: string; source: string }>(candidates: C[], f: Fetch = fetch): Promise<{ stream: ReadableStream<Uint8Array>; source: string; url: string; candidate: C } | undefined> {
-  const tryList = [...candidates.slice(0, 8)];
+  const expanded: C[] = [];
+  const seen = new Set<string>();
+  const push = (c: C) => {
+    if (seen.has(c.url)) return;
+    seen.add(c.url);
+    expanded.push(c);
+  };
+  for (const c of candidates) {
+    const pmc = pmcIdOf(c.url);
+    if (!pmc) continue;
+    for (const url of pmcPdfCandidates(pmc)) {
+      const source = /ncbi\.nlm\.nih\.gov/.test(url) ? 'PubMed Central' : 'Europe PMC';
+      push({ ...c, url, source } as C);
+    }
+  }
+  for (const c of candidates) if (!pmcIdOf(c.url)) push(c);
+  const tryList = expanded.slice(0, 10);
   for (const c of tryList) {
     let url = c.url;
     const jar = new Map<string, Map<string, string>>();
