@@ -368,9 +368,9 @@ const inflightLookups = new Map<string, Promise<OaResult>>();
 /** Shared catalogue context (timeouts, keys, clock) for other /api/oa/* handlers. */
 export const oaContext = (f: Fetch, opts: OaOptions = {}): Ctx => ({ f, env: opts.env ?? {}, timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, now: opts.now ?? Date.now });
 export const foldText = (s: string) => fold(s);
-// v5: longer edge TTLs, coalescing, contact@xoryn.com.br polite pool
+// v6: drop entries poisoned by an untrimmed OpenAlex key (401 was cached as a miss for TTL_MISS)
 export const oaCacheKey = (q: OaQuery) =>
-  q.doi ? `v5|doi|${q.doi}` : q.arxiv ? `v5|arxiv|${q.arxiv}` : `v5|t|${fold(q.title ?? '')}|${q.year ?? ''}|${fold(q.author ?? '')}${q.kind ? `|${q.kind}` : ''}`;
+  q.doi ? `v6|doi|${q.doi}` : q.arxiv ? `v6|arxiv|${q.arxiv}` : `v6|t|${fold(q.title ?? '')}|${q.year ?? ''}|${fold(q.author ?? '')}${q.kind ? `|${q.kind}` : ''}`;
 
 /** OpenAlex `filter=` for a title search: ±1 year, or for theses type:dissertation with ±2 years. */
 export function openAlexTitleFilter(q: OaQuery, extra: string[] = []): string {
@@ -980,7 +980,14 @@ async function lookupOpenAccessWork(q: OaQuery, f: Fetch, opts: OaOptions, cache
       sources,
     };
   // don't cache answers spoiled by a catalogue being down or throttled, unless something was found anyway
-  const degraded = sources.some((s) => s.status === 'error' || s.status === 'timeout' || s.status === 'rate_limited');
+  const degraded = sources.some(
+    (s) =>
+      s.status === 'error' ||
+      s.status === 'timeout' ||
+      s.status === 'rate_limited' ||
+      s.detail === 'http_401' ||
+      s.detail === 'http_403',
+  );
   if (!degraded || result.pdfUrls.length) {
     const ttl = degraded ? TTL_ERROR : result.status === 'not_found' || result.status === 'closed' ? TTL_MISS : TTL_FOUND;
     await cache.put(key, result, ttl);

@@ -4,10 +4,10 @@ import { makePacer, withRetry } from '../src/core/oaClient';
 import { checkClientRateLimit, clientIpFromRequest, resetOaRateLimits } from '../src/core/oaRateLimit';
 import { isFetchableUrl, lookupOpenAccess, memoryCache, oaCacheKey, openAlexApiKey, pmcIdOf, pmcPdfCandidates, resetOaState, sourcesIndicateUpstreamError } from '../src/core/openAccess';
 
-describe('OA cache keys v5', () => {
+describe('OA cache keys v6', () => {
   it('versions DOI and title keys', () => {
-    expect(oaCacheKey({ doi: '10.5555/x' })).toBe('v5|doi|10.5555/x');
-    expect(oaCacheKey({ title: 'Sample lattice study', year: 2020 })).toMatch(/^v5\|t\|/);
+    expect(oaCacheKey({ doi: '10.5555/x' })).toBe('v6|doi|10.5555/x');
+    expect(oaCacheKey({ title: 'Sample lattice study', year: 2020 })).toMatch(/^v6\|t\|/);
   });
 });
 
@@ -111,6 +111,19 @@ describe('degraded cache TTL', () => {
     const r = await lookupOpenAccess({ doi: '10.5555/nocache' }, f, { cache, now: () => t });
     expect(r.sources?.some((s) => s.status === 'rate_limited')).toBe(true);
     expect(await cache.get(oaCacheKey({ doi: '10.5555/nocache' }))).toBeUndefined();
+  });
+
+  it('does not cache a miss after an OpenAlex HTTP 401', async () => {
+    resetOaState();
+    const cache = memoryCache();
+    const f = vi.fn(async (url: string) => {
+      if (url.startsWith('https://api.openalex.org/'))
+        return new Response('{"error":"Invalid or missing API key"}', { status: 401, headers: { 'content-type': 'application/json' } });
+      return new Response('{}', { headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch;
+    const r = await lookupOpenAccess({ doi: '10.5555/oa-401' }, f, { cache, env: { OPENALEX_API_KEY: 'test-key-abc' } });
+    expect(r.sources?.some((s) => s.name === 'OpenAlex' && s.detail === 'http_401')).toBe(true);
+    expect(await cache.get(oaCacheKey({ doi: '10.5555/oa-401' }))).toBeUndefined();
   });
 });
 

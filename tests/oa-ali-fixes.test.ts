@@ -77,8 +77,8 @@ describe('OA query, cache and DOI fidelity', () => {
   it('accepts an arXiv id as a lookup query and versions the cache key', () => {
     const q = parseOaQuery(new URLSearchParams('arxiv=1809.10486'));
     expect(q).toEqual({ arxiv: '1809.10486' });
-    expect(oaCacheKey({ arxiv: '1809.10486' })).toBe('v5|arxiv|1809.10486');
-    expect(oaCacheKey({ doi: '10.5555/fx.0001' }).startsWith('v5|doi|')).toBe(true);
+    expect(oaCacheKey({ arxiv: '1809.10486' })).toBe('v6|arxiv|1809.10486');
+    expect(oaCacheKey({ doi: '10.5555/fx.0001' }).startsWith('v6|doi|')).toBe(true);
     expect(parseOaQuery(new URLSearchParams('arxiv=nope'))).toBeUndefined();
   });
 
