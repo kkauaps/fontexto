@@ -166,7 +166,7 @@ export const ja: SiteContent = {
           h2: '作成者',
           p: [
             'Fontexto は情報システムを学ぶ学生、**Pablo Kauã Pereira Silva**（@kkauaps）が作成・開発しています。論文の引用を一つずつ、PDF を次々に開いて該当箇所を探しながら確認する大変さを自身でよく知っており、その確認をより速く確実にするために Fontexto を作りました。',
-            '[X/Twitter @kkauaps](https://x.com/kkauaps) · [Threads @kkauaps](https://www.threads.com/@kkauaps) · [GitHub @kkauaps](https://github.com/kkauaps)',
+            '[X/Twitter @kkauaps](https://x.com/kkauaps) · [Threads @kkauaps](https://www.threads.com/@kkauaps) · [GitHub @kkauaps](https://github.com/kkauaps) · [LinkedIn](https://www.linkedin.com/in/pablo-kaua-pereira-silva/)',
           ],
         },
         {
