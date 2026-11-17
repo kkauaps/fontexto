@@ -77,3 +77,10 @@ describe('entries glued together after a DOI', () => {
       expect(splitGluedEntries(t)).toHaveLength(1);
   });
 });
+
+describe('publication year of an entry without author', () => {
+  it('is the last year of the entry, not one inside its title, and never the access date', () => {
+    expect(parseReferenceText('Estudo temático 2005/2006 do Fórum de Líderes/ SOBEET – Sociedade Brasileira de estudos de empresas Transnacionais e da Globalização Econômica – Clio Editora, São Paulo, 2007.').year).toBe(2007);
+    expect(parseReferenceText('ESTUDO de caso sobre exportação 2010. Revista X, 2015. Disponível em: http://x.org. Acesso em: 3 mar. 2021.').year).toBe(2015);
+  });
+});
