@@ -407,3 +407,14 @@ describe('OJS galley links', () => {
     expect(ojsDownloadUrl('https://journal.example.org/lumen.pdf')).toBeUndefined();
   });
 });
+
+describe('CORE quota', () => {
+  it('is not asked when another catalogue already gave a PDF, even with a key', async () => {
+    resetOaState();
+    const { f, calls } = mockFetch(openalex(WORK), s2none);
+    const r = await lookupOpenAccess({ doi: DOI }, f, { env: { CORE_API_KEY: 'test-key' } });
+    expect(r.pdfUrls.length).toBeGreaterThan(0);
+    expect(calls.some((c) => c.url.includes('core.ac.uk'))).toBe(false);
+    expect(r.sources?.find((s) => s.name === 'CORE')?.status).toBe('skipped');
+  });
+});
