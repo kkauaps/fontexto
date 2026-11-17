@@ -2136,8 +2136,15 @@ table.files select {
 
 /* ------------------------------------------------------------------ Theme chrome (glass / dark-solid / light) */
 
-html, body, #root {
+html, body {
   background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+}
+/* transparent: the theme's background glow (body::before) shows through. An opaque #root hid it and, past the
+   first screen of a scrolled page, the glow appeared below it with a straight edge (glass theme). */
+#root {
+  background: transparent;
   color: var(--text);
   font-family: var(--font);
 }
@@ -2171,6 +2178,13 @@ button.primary:hover, .primary:hover { background: var(--accent-hover); }
   font-weight: 650;
 }
 [data-theme="light"] .lp-btn-soft, [data-theme="light"] button.soft { color: var(--accent); }
+/* dark themes: the light-mint hover (#bff5da) under light text made "Document + reference PDFs" unreadable */
+[data-theme="dark-solid"] .lp-btn-soft:hover:not(:disabled), [data-theme="glass"] .lp-btn-soft:hover:not(:disabled),
+[data-theme="dark-solid"] button.soft:hover:not(:disabled), [data-theme="glass"] button.soft:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 34%, transparent);
+  border-color: var(--accent);
+  color: var(--text);
+}
 .linklike { color: var(--accent); font-weight: 650; }
 
 .fx-mark-tile {
