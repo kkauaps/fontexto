@@ -162,11 +162,18 @@ export const es: SiteContent = {
           ],
         },
         {
+          h2: 'Quién lo creó',
+          p: [
+            'Fontexto fue creado y es desarrollado por **Pablo Kauã Pereira Silva** (@kkauaps), estudiante de Sistemas de Información. Como estudiante, conoce de cerca lo tedioso que es revisar una tesis cita por cita, abriendo un PDF tras otro para encontrar el pasaje correcto, y creó Fontexto para que esa revisión sea más rápida y confiable.',
+            '[X/Twitter @kkauaps](https://x.com/kkauaps) · [Threads @kkauaps](https://www.threads.com/@kkauaps) · [GitHub @kkauaps](https://github.com/kkauaps)',
+          ],
+        },
+        {
           h2: 'Contacto',
           p: ['Preguntas sobre copias de acceso abierto: oa@fontexto.com. Avisos de seguridad: contact@xoryn.com.br.'],
         },
       ],
-      credit: 'Creado por Pablo Kauã ([@kkauaps](https://github.com/kkauaps))',
+      credit: 'Creado por Pablo Kauã Pereira Silva ([@kkauaps](https://github.com/kkauaps))',
     },
     privacy: {
       nav: 'Privacidad',

@@ -163,11 +163,18 @@ export const zhCN: SiteContent = {
           ],
         },
         {
+          h2: '创建者',
+          p: [
+            'Fontexto 由信息系统专业的学生 **Pablo Kauã Pereira Silva**（@kkauaps）创建并开发。作为学生，他深知逐条核对论文引用、一个接一个打开 PDF 寻找对应段落的辛苦，因此开发了 Fontexto，让这项核对更快、更可靠。',
+            '[X/Twitter @kkauaps](https://x.com/kkauaps) · [Threads @kkauaps](https://www.threads.com/@kkauaps) · [GitHub @kkauaps](https://github.com/kkauaps)',
+          ],
+        },
+        {
           h2: '联系',
           p: ['开放获取副本相关问题：oa@fontexto.com。安全问题：contact@xoryn.com.br。'],
         },
       ],
-      credit: '由 Pablo Kauã（[@kkauaps](https://github.com/kkauaps)）创建',
+      credit: '由 Pablo Kauã Pereira Silva（[@kkauaps](https://github.com/kkauaps)）创建',
     },
     privacy: {
       nav: '隐私',

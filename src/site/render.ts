@@ -8,7 +8,7 @@ import { contentSecurityPolicy } from '../server/securityHeaders';
 import { SITE_LANGS, SITE_SLUGS, type SiteContent, type SiteLang, type SitePage, type SiteSlug } from './types';
 
 export const SITE_ORIGIN = 'https://fontexto.com';
-export const CONTENT_UPDATED = '2026-11-14';
+export const CONTENT_UPDATED = '2026-11-17';
 export const OG_IMAGE = { path: '/og-image.png', width: 1200, height: 630 } as const;
 export const LICENSE_URL = 'https://www.gnu.org/licenses/agpl-3.0.html';
 
@@ -88,6 +88,10 @@ export function headTags(h: HeadInput): string {
     `<meta name="twitter:description" content="${escapeHtml(h.description)}" />`,
     `<meta name="twitter:image" content="${SITE_ORIGIN}${OG_IMAGE.path}" />`,
     `<meta name="twitter:image:alt" content="${escapeHtml(h.ogImageAlt)}" />`,
+    `<meta name="twitter:site" content="${CREATOR.handle}" />`,
+    `<meta name="twitter:creator" content="${CREATOR.handle}" />`,
+    `<meta name="author" content="${CREATOR.name}" />`,
+    ...[CREATOR.github, CREATOR.x, CREATOR.threads].map((href) => `<link rel="me" href="${href}" />`),
   ];
   return tags.map((t) => `    ${t}`).join('\n');
 }
@@ -97,13 +101,26 @@ const WEBSITE_ID = `${SITE_ORIGIN}/#website`;
 const APP_ID = `${SITE_ORIGIN}/#app`;
 const PERSON_ID = `${SITE_ORIGIN}/#author`;
 
+/** The creator of Fontexto, one identity across the site and the public profiles (@kkauaps everywhere). */
+export const CREATOR = {
+  name: 'Pablo Kauã Pereira Silva',
+  handle: '@kkauaps',
+  github: 'https://github.com/kkauaps',
+  x: 'https://x.com/kkauaps',
+  twitter: 'https://twitter.com/kkauaps',
+  threads: 'https://www.threads.com/@kkauaps',
+} as const;
+
 const AUTHOR = {
   '@type': 'Person',
   '@id': PERSON_ID,
-  name: 'Pablo Kauã',
-  alternateName: 'kkauaps',
-  url: 'https://github.com/kkauaps',
-  sameAs: ['https://github.com/kkauaps', 'https://x.com/kkauaps', 'https://www.threads.net/@kkauaps'],
+  name: CREATOR.name,
+  givenName: 'Pablo Kauã',
+  familyName: 'Pereira Silva',
+  alternateName: ['Pablo Kauã', 'kkauaps', CREATOR.handle],
+  description: 'Information Systems student; creator and developer of Fontexto.',
+  url: CREATOR.github,
+  sameAs: [CREATOR.github, CREATOR.x, CREATOR.twitter, CREATOR.threads, 'https://www.threads.net/@kkauaps'],
 } as const;
 
 type Json = Record<string, unknown>;
@@ -117,6 +134,7 @@ function organization(): Json {
     url: `${SITE_ORIGIN}/`,
     logo: { '@type': 'ImageObject', url: `${SITE_ORIGIN}/icon-512.png` },
     email: 'oa@fontexto.com',
+    founder: { '@id': PERSON_ID },
   };
 }
 
@@ -188,7 +206,10 @@ export function structuredData(lang: SiteLang, c: SiteContent, slug?: SiteSlug, 
     isPartOf: { '@type': 'WebSite', '@id': WEBSITE_ID, name: 'Fontexto', url: `${SITE_ORIGIN}/`, publisher: { '@id': ORG_ID }, author: { '@id': PERSON_ID }, creator: { '@id': PERSON_ID } },
     about: { '@type': 'WebApplication', '@id': APP_ID, name: 'Fontexto', author: { '@id': PERSON_ID }, creator: { '@id': PERSON_ID } },
     breadcrumb: { '@id': `${url}#breadcrumb` },
+    author: { '@id': PERSON_ID },
+    creator: { '@id': PERSON_ID },
   };
+  if (slug === 'about') webPage.mainEntity = { '@id': PERSON_ID };
   if (page.faq) {
     webPage.mainEntity = page.faq.map((f) => ({ '@type': 'Question', name: plain(f.q), acceptedAnswer: { '@type': 'Answer', text: plain(f.a) } }));
   }

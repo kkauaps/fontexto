@@ -59,10 +59,13 @@ describe('structured data', () => {
   const person = {
     '@type': 'Person',
     '@id': 'https://fontexto.com/#author',
-    name: 'Pablo Kauã',
-    alternateName: 'kkauaps',
+    name: 'Pablo Kauã Pereira Silva',
+    givenName: 'Pablo Kauã',
+    familyName: 'Pereira Silva',
+    alternateName: ['Pablo Kauã', 'kkauaps', '@kkauaps'],
+    description: 'Information Systems student; creator and developer of Fontexto.',
     url: 'https://github.com/kkauaps',
-    sameAs: ['https://github.com/kkauaps', 'https://x.com/kkauaps', 'https://www.threads.net/@kkauaps'],
+    sameAs: ['https://github.com/kkauaps', 'https://x.com/kkauaps', 'https://twitter.com/kkauaps', 'https://www.threads.com/@kkauaps', 'https://www.threads.net/@kkauaps'],
   };
   const authorRef = { author: { '@id': 'https://fontexto.com/#author' }, creator: { '@id': 'https://fontexto.com/#author' } };
 
@@ -72,7 +75,7 @@ describe('structured data', () => {
     const [org, who, site, app] = d['@graph'];
     expect(app).toMatchObject({ applicationCategory: 'EducationalApplication', operatingSystem: 'Web', offers: { '@type': 'Offer', price: '0' }, license: 'https://www.gnu.org/licenses/agpl-3.0.html' });
     expect(org).not.toHaveProperty('sameAs');
-    expect(org).toMatchObject({ '@type': 'Organization', name: 'Fontexto' });
+    expect(org).toMatchObject({ '@type': 'Organization', name: 'Fontexto', founder: { '@id': 'https://fontexto.com/#author' } });
     expect(who).toEqual(person);
     expect(site).toMatchObject({ '@type': 'WebSite', publisher: { '@id': 'https://fontexto.com/#organization' }, ...authorRef });
     expect(app).toMatchObject({ publisher: { '@id': 'https://fontexto.com/#organization' }, ...authorRef });
@@ -90,7 +93,24 @@ describe('structured data', () => {
         const page = data['@graph'].find((n) => n['@type'] === 'WebPage' || n['@type'] === 'AboutPage' || n['@type'] === 'FAQPage') as Record<string, Record<string, unknown>>;
         expect(page.isPartOf).toMatchObject(authorRef);
         expect(page.about).toMatchObject(authorRef);
+        expect(page).toMatchObject(authorRef);
       }
+    }
+  });
+
+  it('every page names the creator: meta author, @kkauaps on X/Twitter, rel=me profiles; About says it in the text', () => {
+    for (const lang of SITE_LANGS) {
+      for (const slug of SITE_SLUGS) {
+        const { html } = staticPage(lang, slug, siteContent, assets);
+        expect(html).toContain('<meta name="author" content="Pablo Kauã Pereira Silva" />');
+        expect(html).toContain('<meta name="twitter:creator" content="@kkauaps" />');
+        for (const href of ['https://github.com/kkauaps', 'https://x.com/kkauaps', 'https://www.threads.com/@kkauaps']) expect(html).toContain(`<link rel="me" href="${href}" />`);
+      }
+      const about = staticPage(lang, 'about', siteContent, assets).html;
+      expect(about).toContain('Pablo Kauã Pereira Silva');
+      for (const href of ['https://x.com/kkauaps', 'https://www.threads.com/@kkauaps', 'https://github.com/kkauaps']) expect(about).toContain(`href="${href}"`);
+      const page = (ldOf(about).data as { '@graph': Record<string, unknown>[] })['@graph'].find((n) => n['@type'] === 'AboutPage');
+      expect(page).toMatchObject({ mainEntity: { '@id': 'https://fontexto.com/#author' } });
     }
   });
   it('FAQPage only on the FAQ, with exactly the visible questions', () => {

@@ -162,11 +162,18 @@ export const ptBR: SiteContent = {
           ],
         },
         {
+          h2: 'Quem criou',
+          p: [
+            'O Fontexto foi criado e é desenvolvido por **Pablo Kauã Pereira Silva** (@kkauaps), estudante de Sistemas de Informação. Como estudante, ele conhece de perto a dor de conferir citação por citação no TCC, abrindo PDF atrás de PDF para achar o trecho certo, e criou o Fontexto para tornar essa revisão mais rápida e confiável.',
+            '[X/Twitter @kkauaps](https://x.com/kkauaps) · [Threads @kkauaps](https://www.threads.com/@kkauaps) · [GitHub @kkauaps](https://github.com/kkauaps)',
+          ],
+        },
+        {
           h2: 'Contato',
           p: ['Dúvidas sobre cópias em acesso aberto: oa@fontexto.com. Relatos de segurança: contact@xoryn.com.br.'],
         },
       ],
-      credit: 'Criado por Pablo Kauã ([@kkauaps](https://github.com/kkauaps))',
+      credit: 'Criado por Pablo Kauã Pereira Silva ([@kkauaps](https://github.com/kkauaps))',
     },
     privacy: {
       nav: 'Privacidade',
