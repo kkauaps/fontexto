@@ -257,24 +257,25 @@ function brand(lang: SiteLang, assets: Assets): string {
   return `<a class="lp-brand sp-brand" href="${pathOf(lang)}"><span class="fx-mark-tile" aria-hidden="true"><img src="${assets.mark}" alt="" width="20" height="18" /></span><span class="wordmark">fontexto</span></a>`;
 }
 
+/** Language menu in the header: the current language, the others as links to the same page (no script needed). */
 function langSwitch(lang: SiteLang, slug: SiteSlug | undefined, c: SiteContent): string {
   const items = SITE_LANGS.map((l) =>
     l === lang
       ? `<li><span aria-current="true">${LANG_NATIVE[l]}</span></li>`
       : `<li><a href="${pathOf(l, slug)}" hreflang="${l}" lang="${l}">${LANG_NATIVE[l]}</a></li>`,
   ).join('');
-  return `<nav class="sp-langs" aria-label="${escapeHtml(c.chrome.languageLabel)}"><ul>${items}</ul></nav>`;
+  return `<details class="sp-langs"><summary aria-label="${escapeHtml(c.chrome.languageLabel)}"><span aria-hidden="true">🌐</span> <span class="sp-lang-name">${LANG_NATIVE[lang]}</span><span class="sp-lang-code" aria-hidden="true">${lang.slice(0, 2).toUpperCase()}</span></summary><nav aria-label="${escapeHtml(c.chrome.languageLabel)}"><ul>${items}</ul></nav></details>`;
 }
 
+/** Same footer as the home page: mark + note, then the page links, centred. */
 function footer(lang: SiteLang, slug: SiteSlug | undefined, c: SiteContent, assets: Assets): string {
-  const links = SITE_SLUGS.map((s) => (s === slug ? `<li><span aria-current="page">${escapeHtml(c.pages[s].nav)}</span></li>` : `<li><a href="${pathOf(lang, s)}">${escapeHtml(c.pages[s].nav)}</a></li>`)).join('');
-  return `<footer class="sp-footer">
-      <div class="sp-footer-row">
-        ${brand(lang, assets)}
-        <nav aria-label="${escapeHtml(c.chrome.menuLabel)}"><ul class="sp-footer-links">${links}</ul></nav>
+  const links = SITE_SLUGS.map((s) => (s === slug ? `<span aria-current="page">${escapeHtml(c.pages[s].nav)}</span>` : `<a href="${pathOf(lang, s)}">${escapeHtml(c.pages[s].nav)}</a>`)).join('');
+  return `<footer class="lp-footer small sp-footer">
+      <div class="lp-footer-note">
+        <span class="lp-brand"><span class="fx-mark-tile" aria-hidden="true"><img src="${assets.mark}" alt="" width="14" height="12" /></span></span>
+        <span>Fontexto · ${escapeHtml(c.chrome.footerNote)} ${escapeHtml(c.chrome.license)}</span>
       </div>
-      ${langSwitch(lang, slug, c)}
-      <p class="sp-fine">${escapeHtml(c.chrome.footerNote)} ${escapeHtml(c.chrome.license)}</p>
+      <nav class="lp-footer-links" aria-label="${escapeHtml(c.chrome.menuLabel)}">${links}</nav>
     </footer>`;
 }
 
@@ -305,11 +306,12 @@ export function staticPage(lang: SiteLang, slug: SiteSlug, content: Record<SiteL
     .join('');
   const date = new Date(`${CONTENT_UPDATED}T12:00:00Z`).toLocaleDateString(lang, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
   const html = `<!doctype html>
-<html lang="${lang}" data-theme="light" data-accent="emerald">
+<html lang="${lang}" data-theme="light" data-accent="emerald" data-static>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="referrer" content="no-referrer" />
+    <script src="/boot.js"></script>
 ${headTags({ lang, slug, title, description: page.description, ogImageAlt: c.chrome.ogImageAlt, ogLocale: c.chrome.ogLocale, allLocales: allOgLocales(content) })}
 ${iconLinks}
 ${assets.css.map((href) => `    <link rel="stylesheet" href="${href}" />`).join('\n')}
@@ -321,6 +323,7 @@ ${assets.css.map((href) => `    <link rel="stylesheet" href="${href}" />`).join(
     <header class="sp-nav">
       ${brand(lang, assets)}
       <nav class="sp-menu" aria-label="${escapeHtml(c.chrome.menuLabel)}">${nav}</nav>
+      ${langSwitch(lang, slug, c)}
       <a class="lp-btn primary sp-cta" href="${pathOf(lang)}">${escapeHtml(c.chrome.openApp)}</a>
     </header>
     <main id="main" class="sp-main">
@@ -383,11 +386,12 @@ export function notFoundPage(content: Record<SiteLang, SiteContent>, assets: Ass
   const homes = SITE_LANGS.map((l) => `<li><a href="${pathOf(l)}" hreflang="${l}" lang="${l}">${LANG_NATIVE[l]}</a></li>`).join('');
   const pages = SITE_SLUGS.map((s) => `<li><a href="${pathOf('en', s)}">${escapeHtml(c.pages[s].nav)}</a></li>`).join('');
   return `<!doctype html>
-<html lang="en" data-theme="light" data-accent="emerald">
+<html lang="en" data-theme="light" data-accent="emerald" data-static>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="referrer" content="no-referrer" />
+    <script src="/boot.js"></script>
     <meta name="robots" content="noindex" />
     <title>Page not found · Fontexto</title>
 ${iconLinks}
