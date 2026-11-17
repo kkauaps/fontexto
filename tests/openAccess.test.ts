@@ -104,10 +104,22 @@ describe('lookupOpenAccess cascade', () => {
     expect(r.pdfUrls[0].via).toEqual(['OpenAlex', 'Unpaywall']);
     expect(r.pdfUrls[1].via).toEqual(expect.arrayContaining(['OpenAlex', 'Europe PMC']));
     expect(r.pdfUrls[2].source).toBe('Example University Repository');
-    expect(r.pdfUrls[3].via).toEqual(expect.arrayContaining(['OpenAlex', 'Semantic Scholar']));
-    expect(Object.fromEntries((r.sources ?? []).map((s) => [s.name, s.status]))).toMatchObject({ OpenAlex: 'found', Unpaywall: 'found', 'Semantic Scholar': 'found', 'Europe PMC': 'found', CORE: 'skipped' });
+    expect(r.pdfUrls[3].via).toEqual(expect.arrayContaining(['OpenAlex']));
+    // Semantic Scholar is only asked when nothing else gave a PDF (its key allows ~1 request/s across all users)
+    expect(Object.fromEntries((r.sources ?? []).map((s) => [s.name, s.status]))).toMatchObject({ OpenAlex: 'found', Unpaywall: 'found', 'Semantic Scholar': 'skipped', 'Europe PMC': 'found', CORE: 'skipped' });
     expect(r.contactEmail).toBe('ada.quill@example.edu');
     expect(r.contactName).toBe('Ada Quillfeather');
+  });
+
+  it('asks Semantic Scholar when the other catalogues found no PDF', async () => {
+    const { f, calls } = mockFetch(
+      openalex(BARE),
+      (u) => (u.startsWith('https://api.semanticscholar.org/') ? json({ openAccessPdf: { url: 'https://repo.example.org/only-s2.pdf', status: 'GREEN' }, externalIds: {} }) : undefined),
+    );
+    const r = await lookupOpenAccess({ doi: DOI }, f);
+    expect(calls.some((c) => c.url.startsWith('https://api.semanticscholar.org/'))).toBe(true);
+    expect(r.pdfUrls.map((c) => c.url)).toContain('https://repo.example.org/only-s2.pdf');
+    expect(r.sources?.find((s) => s.name === 'Semantic Scholar')?.status).toBe('found');
   });
 
   it('only talks to legal open catalogues', async () => {
@@ -383,5 +395,15 @@ describe('arXiv title guard', () => {
     );
     const r = await lookupOpenAccess({ title: 'Moss Growth Models', author: 'Quillfeather' }, f);
     expect(r.pdfUrls).toEqual([]);
+  });
+});
+
+describe('OJS galley links', () => {
+  it('the reader page of a galley maps to its download URL; other links are left alone', async () => {
+    const { ojsDownloadUrl } = await import('../src/core/openAccess');
+    expect(ojsDownloadUrl('https://www.educ-res.com/index.php/er/article/view/7158/6815')).toBe('https://www.educ-res.com/index.php/er/article/download/7158/6815');
+    expect(ojsDownloadUrl('https://revistas.example.br/index.php/rev/article/view/12/34/')).toBe('https://revistas.example.br/index.php/rev/article/download/12/34');
+    expect(ojsDownloadUrl('https://revistas.example.br/index.php/rev/article/view/12')).toBeUndefined();
+    expect(ojsDownloadUrl('https://journal.example.org/lumen.pdf')).toBeUndefined();
   });
 });

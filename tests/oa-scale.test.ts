@@ -97,10 +97,10 @@ describe('client queue backoff', () => {
 });
 
 describe('degraded cache TTL', () => {
-  it('does not cache a full rate-limited miss', async () => {
+  it('keeps a miss for a few hours when only a secondary catalogue was throttled (instead of re-querying every visit)', async () => {
     resetOaState();
-    const cache = memoryCache();
-    const t = 1_000_000;
+    let t = 1_000_000;
+    const cache = memoryCache(500, () => t);
     const bare = { id: 'https://openalex.org/W9', doi: 'https://doi.org/10.5555/nocache', title: 'No cache', open_access: { is_oa: false }, locations: [] };
     const f = vi.fn(async (url: string) => {
       if (url.startsWith('https://api.openalex.org/works/doi:'))
@@ -109,8 +109,21 @@ describe('degraded cache TTL', () => {
       return new Response('{}', { headers: { 'content-type': 'application/json' } });
     }) as typeof fetch;
     const r = await lookupOpenAccess({ doi: '10.5555/nocache' }, f, { cache, now: () => t });
-    expect(r.sources?.some((s) => s.status === 'rate_limited')).toBe(true);
+    expect(r.sources?.find((s) => s.name === 'Semantic Scholar')?.status).toBe('rate_limited');
+    expect(await cache.get(oaCacheKey({ doi: '10.5555/nocache' }))).toBeDefined();
+    t += 6 * 3600 * 1000 + 1;
     expect(await cache.get(oaCacheKey({ doi: '10.5555/nocache' }))).toBeUndefined();
+  });
+
+  it('does not keep a miss when the identification itself was throttled', async () => {
+    resetOaState();
+    const cache = memoryCache();
+    const f = vi.fn(async (url: string) => {
+      if (url.startsWith('https://api.openalex.org/') || url.startsWith('https://api.crossref.org/')) return new Response('', { status: 429, headers: { 'retry-after': '60' } });
+      return new Response('{}', { headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch;
+    await lookupOpenAccess({ doi: '10.5555/primary' }, f, { cache });
+    expect(await cache.get(oaCacheKey({ doi: '10.5555/primary' }))).toBeUndefined();
   });
 
   it('does not cache a miss after an OpenAlex HTTP 401', async () => {

@@ -117,6 +117,10 @@ const DOI_RE = /^10\.\d{4,9}\/(?!(?:.*\/)?\.\.(?:\/|$))[^\s?#%\\]{1,200}$/;
 const TTL_FOUND = 30 * 24 * 3600;
 const TTL_MISS = 5 * 24 * 3600;
 const TTL_ERROR = 60;
+/** A secondary catalogue (Semantic Scholar, Europe PMC, arXiv, CORE) throttled or slow: the answer is still good enough to keep a while. */
+const TTL_SECONDARY = 6 * 3600;
+/** Identification and the main OA index: when these fail the answer is not trusted beyond TTL_ERROR. */
+const PRIMARY_SOURCES = new Set<OaSourceName>(['OpenAlex', 'Crossref', 'Unpaywall']);
 
 // Unicode-aware: Cyrillic, Greek, CJK... must survive (a-z only turned every Russian or Chinese title into "").
 const fold = (s: string) =>
@@ -1009,7 +1013,6 @@ async function lookupOpenAccessWork(q: OaQuery, f: Fetch, opts: OaOptions, cache
   let epmcEmail: { email?: string; name?: string } = {};
   await Promise.all([
     doi ? step(statuses, 'Unpaywall', () => fromUnpaywall(ctx, doi, pdfs, reads)) : (statuses.set('Unpaywall', 'skipped'), undefined),
-    step(statuses, 'Semantic Scholar', () => fromSemanticScholar(ctx, doi, doi ? undefined : title, pdfs, q.arxiv)),
     step(statuses, 'Europe PMC', async () => {
       const r = await fromEuropePmc(ctx, doi, { ...q, title }, pdfs, reads);
       epmcEmail = r;
@@ -1017,7 +1020,11 @@ async function lookupOpenAccessWork(q: OaQuery, f: Fetch, opts: OaOptions, cache
     }),
     step(statuses, 'CORE', () => fromCore(ctx, doi, { ...q, title, author: firstAuthor }, pdfs)),
   ]);
-  // 3) arXiv by title, last (strict rate limit), only when nothing else gave a PDF
+  // 3) Semantic Scholar only when nothing gave a PDF yet: its key allows ~1 request/s across all users, and for works the
+  // other catalogues already cover it mostly repeats them; spent on every lookup it was throttled for most of them.
+  if (!pdfs.size) await step(statuses, 'Semantic Scholar', () => fromSemanticScholar(ctx, doi, doi ? undefined : title, pdfs, q.arxiv));
+  else statuses.set('Semantic Scholar', 'skipped');
+  // 4) arXiv by title, last (strict rate limit), only when nothing else gave a PDF
   if (!statuses.has('arXiv')) {
     if (!pdfs.size && title) await step(statuses, 'arXiv', () => fromArxiv(ctx, title, pdfs, firstAuthor));
     else statuses.set('arXiv', pdfs.list().some((c) => c.host === 'preprint' && /arxiv/.test(c.url)) ? 'found' : 'skipped');
@@ -1050,17 +1057,15 @@ async function lookupOpenAccessWork(q: OaQuery, f: Fetch, opts: OaOptions, cache
       contactName: contactEmail ? contactName : undefined,
       sources,
     };
-  // don't cache answers spoiled by a catalogue being down or throttled, unless something was found anyway
-  const degraded = sources.some(
-    (s) =>
-      s.status === 'error' ||
-      s.status === 'timeout' ||
-      s.status === 'rate_limited' ||
-      s.detail === 'http_401' ||
-      s.detail === 'http_403',
-  );
-  if (!degraded || result.pdfUrls.length) {
-    const ttl = degraded ? TTL_ERROR : result.status === 'not_found' || result.status === 'closed' ? TTL_MISS : TTL_FOUND;
+  // Don't keep answers spoiled by the identification or the main OA index being down or throttled, unless something was
+  // found anyway. A throttled or slow secondary catalogue only shortens the TTL: dropping those answers from the cache made
+  // every repeat visit query all catalogues again, which throttled them more.
+  const failed = (s: (typeof sources)[number]) => s.status === 'error' || s.status === 'timeout' || s.status === 'rate_limited' || s.detail === 'http_401' || s.detail === 'http_403';
+  const degradedPrimary = sources.some((s) => failed(s) && PRIMARY_SOURCES.has(s.name));
+  const degradedSecondary = sources.some((s) => failed(s) && !PRIMARY_SOURCES.has(s.name));
+  if (!degradedPrimary || result.pdfUrls.length) {
+    const base = result.status === 'not_found' || result.status === 'closed' ? TTL_MISS : TTL_FOUND;
+    const ttl = degradedPrimary ? TTL_ERROR : degradedSecondary ? Math.min(base, TTL_SECONDARY) : base;
     await cache.put(key, result, ttl);
   }
   return result;
@@ -1160,6 +1165,12 @@ export async function pdfUrlFromLanding(landing: string, f: Fetch = fetch): Prom
   return undefined;
 }
 
+/** OJS galley reader URL -> its direct download URL ("/article/view/123/456" -> "/article/download/123/456"). */
+export function ojsDownloadUrl(url: string): string | undefined {
+  const m = /^(https?:\/\/[^?#]+\/article\/)view(\/\d+\/\d+)\/?(?:[?#].*)?$/i.exec(url);
+  return m ? `${m[1]}download${m[2]}` : undefined;
+}
+
 /**
  * First candidate that really serves a PDF: follows redirects by hand (each hop re-checked against
  * isFetchableUrl), keeps the session cookies a publisher sets while bouncing through its own cookie check
@@ -1181,7 +1192,14 @@ export async function openPdfResponse<C extends { url: string; source: string }>
       push({ ...c, url, source } as C);
     }
   }
-  for (const c of candidates) if (!pmcIdOf(c.url)) push(c);
+  for (const c of candidates) {
+    if (pmcIdOf(c.url)) continue;
+    // OJS (most Latin American and many university journals): ".../article/view/123/456" is the HTML reader of a galley;
+    // ".../article/download/123/456" serves the file itself
+    const ojs = ojsDownloadUrl(c.url);
+    if (ojs) push({ ...c, url: ojs } as C);
+    push(c);
+  }
   const tryList = expanded.slice(0, 10);
   for (const c of tryList) {
     let url = c.url;
