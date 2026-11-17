@@ -206,6 +206,18 @@ export const en: SiteContent = {
           ],
         },
         {
+          h2: 'Assessments for calibration (optional)',
+          p: [
+            'Off by default. If you tick “Help calibrate Fontexto” in a citation panel, each assessment you make (OK, Caveat, Not located) sends only four values: the automatic label, your assessment, the passage score rounded, and whether semantic search was on. No text, title, DOI, file or project, and no identifier. The server only adds them up into totals, used to tune the thresholds of the automatic labels.',
+          ],
+        },
+        {
+          h2: '“Fontexto — my access” extension (optional)',
+          p: [
+            'If you install the extension, Fontexto can ask it for the PDF of a reference without a free copy. The extension looks it up by DOI, in your browser, with your own access (university network, library login). It only works on fontexto.com, only accepts DOIs and only hands back PDFs. Nothing goes through Fontexto’s servers.',
+          ],
+        },
+        {
           h2: 'What we do not do',
           ul: [
             'No accounts, no cookies, no third-party analytics, no advertising, no tracking pixels.',

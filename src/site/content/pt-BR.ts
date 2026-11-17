@@ -206,6 +206,18 @@ export const ptBR: SiteContent = {
           ],
         },
         {
+          h2: 'Avaliações para calibrar (opcional)',
+          p: [
+            'Desligado por padrão. Se você marcar “Ajudar a calibrar o Fontexto” no painel de uma citação, cada avaliação que fizer (OK, Ressalva, Não localizado) envia só quatro valores: o rótulo automático, a sua avaliação, a pontuação do trecho arredondada e se a busca semântica estava ligada. Nada do texto, título, DOI, arquivo ou projeto, e nenhum identificador. O servidor só soma esses valores em totais, usados para ajustar os limites dos rótulos automáticos.',
+          ],
+        },
+        {
+          h2: 'Extensão “Fontexto — meu acesso” (opcional)',
+          p: [
+            'Se você instalar a extensão, o Fontexto pode pedir a ela o PDF de uma referência sem cópia gratuita. A extensão busca pelo DOI, no seu navegador, usando o seu próprio acesso (rede da universidade, login da biblioteca). Ela só funciona no fontexto.com, só aceita DOIs e só devolve PDFs. Nada passa pelos servidores do Fontexto.',
+          ],
+        },
+        {
           h2: 'O que não fazemos',
           ul: [
             'Sem contas, sem cookies, sem analytics de terceiros, sem publicidade, sem pixels de rastreamento.',

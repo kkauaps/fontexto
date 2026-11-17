@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <img src="icons/32.png" alt="" width="24" height="24" />
+      <h1 data-i18n="name"></h1>
+    </header>
+    <p data-i18n="popupIntro"></p>
+    <form id="form">
+      <label for="prefix" data-i18n="prefixLabel"></label>
+      <input id="prefix" type="url" placeholder="https://ezproxy.example.edu/login?url=" autocomplete="off" spellcheck="false" />
+      <small data-i18n="prefixHint"></small>
+      <div class="row">
+        <button type="submit" data-i18n="save"></button>
+        <span id="status" role="status"></span>
+      </div>
+    </form>
+    <p class="muted" data-i18n="privacy"></p>
+    <script src="popup.js"></script>
+  </body>
+</html>

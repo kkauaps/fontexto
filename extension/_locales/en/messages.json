@@ -1,0 +1,11 @@
+{
+  "name": { "message": "Fontexto — my access" },
+  "description": { "message": "Lets Fontexto download a cited work's PDF with your own access (university network, library login). Only PDFs, only for the DOIs Fontexto asks for." },
+  "popupIntro": { "message": "When a reference has no free copy, Fontexto asks this extension to download the PDF with your own access: your university network, your library login or a publisher account. Nothing goes through Fontexto's servers." },
+  "prefixLabel": { "message": "Library link prefix (optional)" },
+  "prefixHint": { "message": "Your library's proxy prefix (EZproxy or similar). Use {url} or {doi} if it needs them in the middle of the link. Leave it empty if you are on the university network." },
+  "save": { "message": "Save" },
+  "saved": { "message": "Saved." },
+  "invalid": { "message": "This is not a valid link." },
+  "privacy": { "message": "The extension only works on fontexto.com, only resolves DOIs, and only hands back PDFs." }
+}

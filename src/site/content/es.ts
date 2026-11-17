@@ -206,6 +206,18 @@ export const es: SiteContent = {
           ],
         },
         {
+          h2: 'Evaluaciones para calibrar (opcional)',
+          p: [
+            'Desactivado por defecto. Si marcas “Ayudar a calibrar Fontexto” en el panel de una cita, cada evaluación que hagas (OK, Con reserva, No localizado) envía solo cuatro valores: la etiqueta automática, tu evaluación, la puntuación del pasaje redondeada y si la búsqueda semántica estaba activada. Nada del texto, título, DOI, archivo o proyecto, y ningún identificador. El servidor solo los suma en totales, usados para ajustar los umbrales de las etiquetas automáticas.',
+          ],
+        },
+        {
+          h2: 'Extensión “Fontexto — mi acceso” (opcional)',
+          p: [
+            'Si instalas la extensión, Fontexto puede pedirle el PDF de una referencia sin copia gratuita. La extensión lo busca por DOI, en tu navegador, con tu propio acceso (red de la universidad, inicio de sesión de la biblioteca). Solo funciona en fontexto.com, solo acepta DOI y solo devuelve PDF. Nada pasa por los servidores de Fontexto.',
+          ],
+        },
+        {
           h2: 'Lo que no hacemos',
           ul: [
             'Sin cuentas, sin cookies, sin analítica de terceros, sin publicidad, sin píxeles de seguimiento.',
