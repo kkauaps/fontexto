@@ -169,7 +169,8 @@ function titleAfter(text: string, from: number): string | undefined {
   return t.length >= 3 ? t : undefined;
 }
 
-function pickYear(text: string, from = 0): number | undefined {
+/** First plausible year after `from` (or the last one, `last`: ABNT puts the publication year at the end). */
+function pickYear(text: string, from = 0, last = false): number | undefined {
   const clean = text
     .slice(from)
     .replace(/(?:Acesso|Acessado|Accessed|Atualizado|Updated|Retrieved|Dispon[ií]vel|cited|consultado|дата\s+обращения)[^\]\)]{0,40}?\d{4}/giu, ' ')
@@ -180,11 +181,15 @@ function pickYear(text: string, from = 0): number | undefined {
     .replace(/\b10\.\d{4,9}\/\S+/g, ' ')
     .replace(/\b(?:arxiv:?\s*)?\d{4}\.\d{4,5}(?:v\d+)?\b/gi, ' ');
   const max = new Date().getFullYear() + 1;
+  let found: number | undefined;
   for (const m of clean.matchAll(/\b(1[5-9]\d{2}|20\d{2})[a-z]?\b/g)) {
     const y = Number(m[1]);
-    if (y <= max) return y;
+    if (y <= max) {
+      if (!last) return y;
+      found = y;
+    }
   }
-  return undefined;
+  return found;
 }
 
 /** Government bodies that follow the jurisdiction in an ABNT author ("BRASIL. Ministério da Saúde."). */
@@ -455,7 +460,8 @@ function parseReferenceCore(text: string, index: number, label?: string): Omit<P
   }
   if (TITLE_FIRST_RE.test(text) && !label) {
     const title = titleAfter(text, 0);
-    return { index, text, style: 'abnt', authors: [], etAl: false, year: pickYear(text, title?.length ?? 0) ?? pickYear(text), title: usableTitle(title), doi, arxiv, label };
+    // no author: a year inside the title ("Estudo temático 2005/2006 …, 2007") is not the publication year
+    return { index, text, style: 'abnt', authors: [], etAl: false, year: pickYear(text, title?.length ?? 0) ?? pickYear(text, 0, true), title: usableTitle(title), doi, arxiv, label };
   }
   let style = detectStyle(text, label);
   let authors: ParsedReference['authors'] = [];
@@ -559,7 +565,9 @@ function parseReferenceCore(text: string, index: number, label?: string): Omit<P
       style = 'abnt';
     } else if (!title) title = titleAfter(text, 0);
   }
-  if (year === undefined) year = pickYear(text);
+  // without an author the entry usually opens with its title, which may carry years of its own ("Estudo temático
+  // 2005/2006 …, São Paulo, 2007"); the publication year comes last
+  if (year === undefined) year = authors.length ? pickYear(text) : pickYear(text, 0, true);
   return { index, text, style, authors, etAl, year, title: usableTitle(title), doi, arxiv, label };
 }
 
