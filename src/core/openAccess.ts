@@ -1023,12 +1023,20 @@ async function lookupOpenAccessWork(q: OaQuery, f: Fetch, opts: OaOptions, cache
       epmcEmail = r;
       return r.found;
     }),
-    step(statuses, 'CORE', () => fromCore(ctx, doi, { ...q, title, author: firstAuthor }, pdfs)),
   ]);
   // 3) Semantic Scholar only when nothing gave a PDF yet: its key allows ~1 request/s across all users, and for works the
   // other catalogues already cover it mostly repeats them; spent on every lookup it was throttled for most of them.
-  if (!pdfs.size) await step(statuses, 'Semantic Scholar', () => fromSemanticScholar(ctx, doi, doi ? undefined : title, pdfs, q.arxiv));
-  else statuses.set('Semantic Scholar', 'skipped');
+  // CORE likewise: its key has a daily token quota, best spent where the other catalogues found nothing (theses,
+  // institutional repositories)
+  if (!pdfs.size) {
+    await Promise.all([
+      step(statuses, 'Semantic Scholar', () => fromSemanticScholar(ctx, doi, doi ? undefined : title, pdfs, q.arxiv)),
+      step(statuses, 'CORE', () => fromCore(ctx, doi, { ...q, title, author: firstAuthor }, pdfs)),
+    ]);
+  } else {
+    statuses.set('Semantic Scholar', 'skipped');
+    statuses.set('CORE', 'skipped');
+  }
   // 4) arXiv by title, last (strict rate limit), only when nothing else gave a PDF
   if (!statuses.has('arXiv')) {
     if (!pdfs.size && title) await step(statuses, 'arXiv', () => fromArxiv(ctx, title, pdfs, firstAuthor));
