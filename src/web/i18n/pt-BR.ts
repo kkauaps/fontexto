@@ -3,7 +3,7 @@ import type { Messages } from './en';
 const pl = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
 export const ptBR: Messages = {
-  metaTitle: 'Fontexto — cada citação ligada ao trecho da fonte',
+  metaTitle: 'Cada citação ligada ao trecho da fonte | Fontexto',
   metaDescription:
     'O Fontexto liga cada citação do seu documento ao trecho exato da fonte. Envie um PDF, confira as correspondências e mantenha os arquivos no navegador.',
   boot: 'Carregando o Fontexto…',
@@ -33,7 +33,7 @@ export const ptBR: Messages = {
   themeDarkSolid: 'Escuro sólido',
   themeLight: 'Claro',
   tagline: 'Cada citação ligada ao trecho exato da fonte',
-  pageTitle: (section?: string) => (section ? `${section} · Fontexto` : 'Fontexto — cada citação ligada ao trecho exato da fonte'),
+  pageTitle: (section?: string) => (section ? `${section} · Fontexto` : 'Cada citação ligada ao trecho exato da fonte | Fontexto'),
   privacyNote: 'Os arquivos enviados são lidos e guardados apenas neste computador.',
   privacyNoteWeb: 'Os arquivos enviados são lidos e guardados apenas neste navegador.',
 

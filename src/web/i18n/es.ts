@@ -3,7 +3,7 @@ import type { Messages } from './en';
 const pl = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
 export const es: Messages = {
-  metaTitle: 'Fontexto — cada cita ligada al pasaje de la fuente',
+  metaTitle: 'Cada cita ligada al pasaje de la fuente | Fontexto',
   metaDescription:
     'Fontexto relaciona cada cita de tu documento con el pasaje exacto de la fuente. Sube un PDF, revisa las coincidencias y deja los archivos en el navegador.',
   boot: 'Cargando Fontexto…',
@@ -33,7 +33,7 @@ export const es: Messages = {
   themeDarkSolid: 'Oscuro sólido',
   themeLight: 'Claro',
   tagline: 'Cada cita ligada al pasaje exacto de la fuente',
-  pageTitle: (section?: string) => (section ? `${section} · Fontexto` : 'Fontexto — cada cita ligada al pasaje exacto de la fuente'),
+  pageTitle: (section?: string) => (section ? `${section} · Fontexto` : 'Cada cita ligada al pasaje exacto de la fuente | Fontexto'),
   privacyNote: 'Los archivos que envías se leen y se guardan solo en este equipo.',
   privacyNoteWeb: 'Los archivos que envías se leen y se guardan solo en este navegador.',
 

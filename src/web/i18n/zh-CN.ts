@@ -3,7 +3,7 @@ import type { Messages } from './en';
 const pl = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
 export const zhCN: Messages = {
-  metaTitle: 'Fontexto — 每个引用都链接到源摘录',
+  metaTitle: '每个引用都链接到源摘录｜Fontexto',
   metaDescription:
     'Fontexto 将文档中的每个引文链接到来源的确切摘录。发送 PDF，检查匹配项并将文件保留在浏览器中。',
   boot: '正在加载 Fontexto…',
@@ -33,7 +33,7 @@ export const zhCN: Messages = {
   themeDarkSolid: '深色',
   themeLight: '浅色',
   tagline: '每个引用都链接到来源的确切摘录',
-  pageTitle: (section?: string) => (section ? `${section}·Fontexto` : 'Fontexto — 每个引用都链接到来源的确切摘录'),
+  pageTitle: (section?: string) => (section ? `${section}·Fontexto` : '每个引用都链接到来源的确切摘录｜Fontexto'),
   privacyNote: '发送的文件仅在此计算机上读取和保存。',
   privacyNoteWeb: '上传的文件只能在此浏览器中读取和保存。',
 

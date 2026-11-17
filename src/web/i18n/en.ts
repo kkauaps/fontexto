@@ -2,7 +2,7 @@ const pl = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
 /** English is the source of truth for the message shape. Other locales must match this type. */
 export const en = {
-  metaTitle: 'Fontexto — each citation linked to the passage in the source',
+  metaTitle: 'Each citation linked to the passage in the source | Fontexto',
   metaDescription:
     'Fontexto links each citation in your document to the exact passage in the source. Upload a PDF, review the matches, and keep your files in the browser.',
   boot: 'Loading Fontexto…',
@@ -32,7 +32,7 @@ export const en = {
   themeDarkSolid: 'Dark solid',
   themeLight: 'Light',
   tagline: 'Each citation linked to the exact passage in the source',
-  pageTitle: (section?: string) => (section ? `${section} · Fontexto` : 'Fontexto — each citation linked to the exact passage in the source'),
+  pageTitle: (section?: string) => (section ? `${section} · Fontexto` : 'Each citation linked to the exact passage in the source | Fontexto'),
   privacyNote: 'Files you add are read and stored only on this device.',
   privacyNoteWeb: 'Files you add are read and stored only in this browser.',
 
