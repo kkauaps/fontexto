@@ -65,7 +65,7 @@ describe('structured data', () => {
     alternateName: ['Pablo Kauã', 'kkauaps', '@kkauaps'],
     description: 'Information Systems student; creator and developer of Fontexto.',
     url: 'https://github.com/kkauaps',
-    sameAs: ['https://github.com/kkauaps', 'https://x.com/kkauaps', 'https://twitter.com/kkauaps', 'https://www.threads.com/@kkauaps', 'https://www.threads.net/@kkauaps'],
+    sameAs: ['https://github.com/kkauaps', 'https://www.linkedin.com/in/pablo-kaua-pereira-silva/', 'https://x.com/kkauaps', 'https://twitter.com/kkauaps', 'https://www.threads.com/@kkauaps', 'https://www.threads.net/@kkauaps'],
   };
   const authorRef = { author: { '@id': 'https://fontexto.com/#author' }, creator: { '@id': 'https://fontexto.com/#author' } };
 
@@ -104,11 +104,11 @@ describe('structured data', () => {
         const { html } = staticPage(lang, slug, siteContent, assets);
         expect(html).toContain('<meta name="author" content="Pablo Kauã Pereira Silva" />');
         expect(html).toContain('<meta name="twitter:creator" content="@kkauaps" />');
-        for (const href of ['https://github.com/kkauaps', 'https://x.com/kkauaps', 'https://www.threads.com/@kkauaps']) expect(html).toContain(`<link rel="me" href="${href}" />`);
+        for (const href of ['https://github.com/kkauaps', 'https://www.linkedin.com/in/pablo-kaua-pereira-silva/', 'https://x.com/kkauaps', 'https://www.threads.com/@kkauaps']) expect(html).toContain(`<link rel="me" href="${href}" />`);
       }
       const about = staticPage(lang, 'about', siteContent, assets).html;
       expect(about).toContain('Pablo Kauã Pereira Silva');
-      for (const href of ['https://x.com/kkauaps', 'https://www.threads.com/@kkauaps', 'https://github.com/kkauaps']) expect(about).toContain(`href="${href}"`);
+      for (const href of ['https://x.com/kkauaps', 'https://www.threads.com/@kkauaps', 'https://github.com/kkauaps', 'https://www.linkedin.com/in/pablo-kaua-pereira-silva/']) expect(about).toContain(`href="${href}"`);
       const page = (ldOf(about).data as { '@graph': Record<string, unknown>[] })['@graph'].find((n) => n['@type'] === 'AboutPage');
       expect(page).toMatchObject({ mainEntity: { '@id': 'https://fontexto.com/#author' } });
     }

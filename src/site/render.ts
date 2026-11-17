@@ -91,7 +91,7 @@ export function headTags(h: HeadInput): string {
     `<meta name="twitter:site" content="${CREATOR.handle}" />`,
     `<meta name="twitter:creator" content="${CREATOR.handle}" />`,
     `<meta name="author" content="${CREATOR.name}" />`,
-    ...[CREATOR.github, CREATOR.x, CREATOR.threads].map((href) => `<link rel="me" href="${href}" />`),
+    ...[CREATOR.github, CREATOR.linkedin, CREATOR.x, CREATOR.threads].map((href) => `<link rel="me" href="${href}" />`),
   ];
   return tags.map((t) => `    ${t}`).join('\n');
 }
@@ -109,6 +109,7 @@ export const CREATOR = {
   x: 'https://x.com/kkauaps',
   twitter: 'https://twitter.com/kkauaps',
   threads: 'https://www.threads.com/@kkauaps',
+  linkedin: 'https://www.linkedin.com/in/pablo-kaua-pereira-silva/',
 } as const;
 
 const AUTHOR = {
@@ -120,7 +121,7 @@ const AUTHOR = {
   alternateName: ['Pablo Kauã', 'kkauaps', CREATOR.handle],
   description: 'Information Systems student; creator and developer of Fontexto.',
   url: CREATOR.github,
-  sameAs: [CREATOR.github, CREATOR.x, CREATOR.twitter, CREATOR.threads, 'https://www.threads.net/@kkauaps'],
+  sameAs: [CREATOR.github, CREATOR.linkedin, CREATOR.x, CREATOR.twitter, CREATOR.threads, 'https://www.threads.net/@kkauaps'],
 } as const;
 
 type Json = Record<string, unknown>;

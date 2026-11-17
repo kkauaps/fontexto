@@ -165,7 +165,7 @@ export const ru: SiteContent = {
           h2: 'Кто создал',
           p: [
             'Fontexto создал и развивает **Pablo Kauã Pereira Silva** (@kkauaps), студент направления «Информационные системы». Он сам знает, как утомительно проверять диплом ссылка за ссылкой, открывая PDF за PDF в поисках нужного фрагмента, и сделал Fontexto, чтобы такая проверка стала быстрее и надёжнее.',
-            '[X/Twitter @kkauaps](https://x.com/kkauaps) · [Threads @kkauaps](https://www.threads.com/@kkauaps) · [GitHub @kkauaps](https://github.com/kkauaps)',
+            '[X/Twitter @kkauaps](https://x.com/kkauaps) · [Threads @kkauaps](https://www.threads.com/@kkauaps) · [GitHub @kkauaps](https://github.com/kkauaps) · [LinkedIn](https://www.linkedin.com/in/pablo-kaua-pereira-silva/)',
           ],
         },
         {
