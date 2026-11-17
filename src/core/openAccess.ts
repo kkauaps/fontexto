@@ -669,11 +669,34 @@ export function scoreBibliographicMatch(
   }
   // Catalogues often store only a translation. If the first author and year agree and enough
   // Latinate title tokens line up, treat it as the same work (still below a raw 1.0 exact title).
-  if (authorMatch && yearClose) {
+  // Only across languages: in the same language, a common surname, the same year and three generic words
+  // ("segmentação", "imagens", "digitais") matched a different paper.
+  if (authorMatch && yearClose && titleLanguage(qt) !== titleLanguage(nt)) {
     const { inter, x } = tokenOverlap(qt, nt, 4);
     if (x.size >= 4 && inter >= 3 && inter / x.size >= 0.4) s = Math.max(s, 0.82);
   }
   return s;
+}
+
+/** Rough language of a title, enough to tell a translation from a different work in the same language. */
+export function titleLanguage(title: string): 'pt' | 'es' | 'en' | 'fr' | 'de' | 'other' {
+  const t = ` ${title.toLowerCase()} `;
+  const score = (re: RegExp) => (t.match(re) ?? []).length;
+  const s = {
+    pt: score(/ção|ções|ões|ão |ã|õ| de | do | da | dos | das | em | para | no | na | uma? | com /g),
+    es: score(/ción|ciones|ñ| del | los | las | el | en | para | una? | con | y /g),
+    en: score(/ the | of | and | for | with | in | on | a | an | to | from | by /g),
+    fr: score(/ le | la | les | des | du | et | pour | dans | une? | à |é /g),
+    de: score(/ der | die | das | und | für | mit | von | zur | zum | ein | eine |ä|ö|ü|ß/g),
+  };
+  const best = (Object.entries(s) as [keyof typeof s, number][]).sort((a, b) => b[1] - a[1])[0];
+  return best[1] > 0 ? best[0] : 'other';
+}
+
+/** Share of the larger title's words found in the other (no containment bonus): "same title", both ways. */
+function strictTitleSimilarity(a: string, b: string): number {
+  const { inter, x, y } = tokenOverlap(normalizeBibliographicTitle(a), normalizeBibliographicTitle(b));
+  return x.size && y.size ? inter / Math.max(x.size, y.size) : 0;
 }
 
 function bestMatch<T>(items: T[], q: OaQuery, titleOf: (w: T) => string, authorsOf: (w: T) => string[], yearOf: (w: T) => number | null | undefined, min = 0.8, prefer?: (w: T) => number): T | undefined {
@@ -682,7 +705,12 @@ function bestMatch<T>(items: T[], q: OaQuery, titleOf: (w: T) => string, authors
   const good: { w: T; s: number }[] = [];
   for (const w of items) {
     const s = scoreBibliographicMatch(q, titleOf(w), authorsOf(w), yearOf(w));
-    if (author && s < 0.88 && !authorsOf(w).some((a) => fold(a).split(' ').includes(author))) continue;
+    const names = authorsOf(w).filter(Boolean);
+    const authorOk = names.some((a) => fold(a).split(' ').includes(author));
+    if (author && !authorOk && s < 0.88) continue;
+    // a different first author is only accepted for the same title both ways: a longer title that merely contains
+    // the cited one is a review or commentary of it ("…有名論文ナナメ読み：Vaswani et al.: Attention Is All You Need")
+    if (author && names.length && !authorOk && strictTitleSimilarity(q.title, titleOf(w)) < 0.85) continue;
     if (s >= min) good.push({ w, s });
   }
   good.sort((a, b) => b.s - a.s || (prefer?.(b.w) ?? 0) - (prefer?.(a.w) ?? 0));
