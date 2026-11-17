@@ -3,7 +3,7 @@ import type { Messages } from './en';
 const pl = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
 export const ja: Messages = {
-  metaTitle: 'Fontexto — 出典の該当箇所にリンクされた各引用',
+  metaTitle: '出典の該当箇所にリンクされた各引用｜Fontexto',
   metaDescription:
     'Fontextoは、文書内の各引用を出典の該当箇所に正確にリンクします。PDFを送信し、一致を確認し、ファイルをブラウザに保存します。',
   boot: 'Fontextoを読み込み中…',
@@ -33,7 +33,7 @@ export const ja: Messages = {
   themeDarkSolid: '濃い単色',
   themeLight: 'ライト',
   tagline: '出典の正確な箇所にリンクされた各引用',
-  pageTitle: (section?: string) => (section ? `${section}｜Fontexto` : 'Fontexto — 各引用を出典の該当箇所につなぐ'),
+  pageTitle: (section?: string) => (section ? `${section}｜Fontexto` : '各引用を出典の該当箇所につなぐ｜Fontexto'),
   privacyNote: '送信されたファイルは、このコンピュータでのみ読み取りおよび保存されます。',
   privacyNoteWeb: '送信されたファイルは、このブラウザでのみ読み取りおよび保存されます。',
 

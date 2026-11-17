@@ -10,7 +10,7 @@ const ruNoun = (n: number, one: string, few: string, many: string) => {
 };
 
 export const ru: Messages = {
-  metaTitle: 'Fontexto — каждая ссылка связана с фрагментом источника',
+  metaTitle: 'Каждая ссылка связана с фрагментом источника | Fontexto',
   metaDescription:
     'Fontexto связывает каждую ссылку в вашем документе с точным фрагментом источника. Загрузите PDF, проверьте совпадения — файлы остаются в браузере.',
   boot: 'Загрузка Fontexto…',
@@ -40,7 +40,7 @@ export const ru: Messages = {
   themeDarkSolid: 'Плотный тёмный',
   themeLight: 'Светлая',
   tagline: 'Каждая ссылка связана с точным фрагментом источника',
-  pageTitle: (section?: string) => (section ? `${section} · Fontexto` : 'Fontexto — каждая ссылка связана с точным фрагментом источника'),
+  pageTitle: (section?: string) => (section ? `${section} · Fontexto` : 'Каждая ссылка связана с точным фрагментом источника | Fontexto'),
   privacyNote: 'Отправленные файлы читаются и хранятся только на этом компьютере.',
   privacyNoteWeb: 'Отправленные файлы читаются и хранятся только в этом браузере.',
 
