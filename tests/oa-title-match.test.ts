@@ -39,3 +39,39 @@ describe('bibliographic title lookup', () => {
     expect(scoreBibliographicMatch(q, other, ['Ada Quillfeather'], 2021)).toBeLessThan(0.8);
   });
 });
+
+describe('does not take a different work for the cited one (live cases)', () => {
+  const run = async (q: { title: string; year: number; author: string }, candidates: unknown[]) => {
+    const { resetOaState, lookupOpenAccess } = await import('../src/core/openAccess');
+    resetOaState();
+    const f = (async (input: RequestInfo | URL) => {
+      const u = String(input);
+      const body = u.startsWith('https://api.openalex.org/works?') ? { results: candidates } : u.startsWith('https://api.crossref.org/works?') ? { message: { items: [] } } : {};
+      return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch;
+    return lookupOpenAccess(q, f);
+  };
+  const work = (title: string, year: number, authors: string[]) => ({ id: 'https://openalex.org/W9', doi: null, title, display_name: title, publication_year: year, authorships: authors.map((a) => ({ author: { display_name: a } })), locations: [] });
+
+  it('a commentary whose title contains the cited title, by someone else', async () => {
+    const r = await run({ title: 'Attention is all you need', year: 2017, author: 'Vaswani' }, [
+      work('5分で分かる!? 有名論文ナナメ読み：Ashish Vaswani et al. : Attention Is All You Need', 2018, ['中沢 敏明']),
+    ]);
+    expect(r.status).toBe('not_found');
+  });
+
+  it('same language, common surname, same year and a few generic words', async () => {
+    const r = await run({ title: 'Segmentação de feridas crônicas em imagens digitais', year: 2019, author: 'Silva' }, [
+      work('Pré-Processamento de Imagens Digitais para Segmentação de Pimentas', 2019, ['Paulo Renato Baliza Silva', 'Arlindo Rodrigues Galvão Filho']),
+    ]);
+    expect(r.status).toBe('not_found');
+  });
+
+  it('still accepts the same work catalogued under its English translation', async () => {
+    const r = await run({ title: 'Segmentação semântica de imagens médicas com redes neurais convolucionais', year: 2020, author: 'Oliveira' }, [
+      work('Semantic segmentation of medical images with convolutional neural networks', 2020, ['Ana Oliveira', 'João Costa']),
+    ]);
+    expect(r.status).not.toBe('not_found');
+    expect(r.title).toMatch(/Semantic segmentation of medical images/);
+  });
+});
