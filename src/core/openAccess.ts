@@ -239,6 +239,11 @@ const lastCall = new Map<OaSourceName, number>();
 const lastHttp = new Map<string, number>();
 /** Catalogues that are often slower than the rest get a longer timeout (multiplier). */
 const SLOW: Partial<Record<OaSourceName, number>> = { 'Europe PMC': 1.5 };
+/**
+ * Pause after a 429 that gives no Retry-After. Semantic Scholar limits per second: a minute-long pause after one refusal
+ * turned the next ~30 lookups into "rate limited" without asking.
+ */
+const DEFAULT_COOLDOWN_MS: Partial<Record<OaSourceName, number>> = { 'Semantic Scholar': 5_000 };
 
 /** For tests: forget cool-downs, spacing and the default in-memory cache. */
 export function resetOaState() {
@@ -282,7 +287,7 @@ async function call(ctx: Ctx, name: OaSourceName, url: string, headers: Record<s
     const r = await f(url, { headers: { 'User-Agent': UA, Accept: 'application/json', ...headers }, signal: ac.signal });
     if (r.status === 429) {
       const ra = Number(r.headers.get('retry-after'));
-      cooldownUntil.set(bucket, ctx.now() + Math.min(Number.isFinite(ra) && ra > 0 ? ra * 1000 : 60_000, 10 * 60_000));
+      cooldownUntil.set(bucket, ctx.now() + Math.min(Number.isFinite(ra) && ra > 0 ? ra * 1000 : (DEFAULT_COOLDOWN_MS[name] ?? 60_000), 10 * 60_000));
       void r.body?.cancel();
       throw new RateLimited();
     }

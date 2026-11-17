@@ -214,3 +214,23 @@ describe('OpenAlex API key', () => {
     }
   });
 });
+
+describe('Semantic Scholar cool-down', () => {
+  it('a 429 without Retry-After pauses Semantic Scholar for seconds, not a minute', async () => {
+    resetOaState();
+    let t = 5_000_000;
+    let s2 = 0;
+    const bare = (doi: string) => ({ id: 'https://openalex.org/W1', doi: `https://doi.org/${doi}`, title: 'Bare', locations: [] });
+    const f = vi.fn(async (url: string) => {
+      const m = /works\/doi:(.+)$/.exec(url);
+      if (m) return new Response(JSON.stringify(bare(decodeURIComponent(m[1]))), { headers: { 'content-type': 'application/json' } });
+      if (url.includes('semanticscholar')) return ++s2 === 1 ? new Response('', { status: 429 }) : new Response(JSON.stringify({ openAccessPdf: null, externalIds: {} }), { headers: { 'content-type': 'application/json' } });
+      return new Response('{}', { headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch;
+    const first = await lookupOpenAccess({ doi: '10.5555/cool.1' }, f, { now: () => t });
+    expect(first.sources?.find((s) => s.name === 'Semantic Scholar')?.status).toBe('rate_limited');
+    t += 6_000;
+    const second = await lookupOpenAccess({ doi: '10.5555/cool.2' }, f, { now: () => t });
+    expect(second.sources?.find((s) => s.name === 'Semantic Scholar')?.status).toBe('none');
+  });
+});
