@@ -187,6 +187,9 @@ function pickYear(text: string, from = 0): number | undefined {
   return undefined;
 }
 
+/** Government bodies that follow the jurisdiction in an ABNT author ("BRASIL. Ministério da Saúde."). */
+const SUBORDINATE_BODY_RE = /^(?:Minist[ée]rio|Secretaria|Conselho|Ag[êe]ncia|Departamento|Presid[êe]ncia|Congresso|Senado|C[âa]mara|Coordena[çc][ãa]o|Diretoria|Superintend[êe]ncia|Tribunal|Supremo|Procuradoria|Comiss[ãa]o)\b/u;
+
 function parseAuthorsGeneric(block: string): { authors: ParsedReference['authors']; etAl: boolean } {
   const etAl = /\bet\s+al\.?/i.test(block);
   const s = block
@@ -209,6 +212,9 @@ function parseAuthorsGeneric(block: string): { authors: ParsedReference['authors
     apa.push({ family: parts[i], given: parts[i + 1] });
   }
   if (apa.length && parts.length % 2 === 0) return { authors: apa, etAl };
+  // APA with the given name in full: "Martínez Rodríguez, Luis" is one author (compound family name), not two
+  if (parts.length === 2 && /^\p{Lu}[\p{L}'’\-]+(?:\s(?:de|del|da|do|dos|y|e)?\s?\p{Lu}[\p{L}'’\-]+){1,2}$/u.test(parts[0]) && /^\p{Lu}\p{Ll}+\.?$/u.test(parts[1]))
+    return { authors: [{ family: parts[0], given: parts[1].replace(/\.$/, '') }], etAl };
   // IEEE: "A. B. Family, C. Family2"
   const authors: ParsedReference['authors'] = [];
   for (const part of parts) {
@@ -333,15 +339,46 @@ const TITLE_FIRST_RE = /^(\p{Lu}{3,}[\p{Lu}'’\-]*)\s+\p{Ll}/u;
 /** Mixed-case corporate author ending in a period: "Ministério do Desenvolvimento, Indústria e Comércio Exterior. Título". */
 const ORG_WORDS_RE = /^((?:\p{Lu}[\p{L}'’\-]*|d[aeo]s?|e|of|the|and|for|de[l]?|la|los|las|du|des|et|für|und|y|i)(?:,?\s+(?:\p{Lu}[\p{L}'’\-]*|d[aeo]s?|e|of|the|and|for|de[l]?|la|los|las|du|des|et|für|und|y|i)){1,11})\.\s+(?=\p{Lu}|\d)/u;
 
+/**
+ * A word broken at a line end inside one extracted line: "Shel- drick" -> "Sheldrick", "Subr- amanian" -> "Subramanian".
+ * Only a capitalised fragment followed by a lower-case one, so suspended hyphens ("pré- e pós-") and dashes stay.
+ */
+export function joinBrokenWords(text: string): string {
+  return text.replace(/(\p{Lu}\p{Ll}+)- (\p{Ll}{2,})/gu, (all, a: string, b: string) => (/^(?:and|und|et|ou|or|und|y|e|и|или)$/u.test(b) ? all : a + b));
+}
+
+/** "BRASIL. Ministério da Saúde. Título." -> the title is the part after the government bodies, which belong to the author. */
+function skipSubordinateBodies<T extends { title?: string; authors: ParsedReference['authors'] }>(r: T, text: string): T {
+  if (!r.title || !SUBORDINATE_BODY_RE.test(r.title) || r.authors.length !== 1 || !/^\p{Lu}[\p{Lu}\s]+$/u.test(r.authors[0].family)) return r;
+  let title: string | undefined = r.title;
+  let from = text.indexOf(title);
+  for (let i = 0; i < 3 && title && from >= 0 && SUBORDINATE_BODY_RE.test(title); i++) {
+    from = from + title.length + 1;
+    title = titleAfter(text, from);
+    if (title) from = text.indexOf(title, from);
+  }
+  return title && !SUBORDINATE_BODY_RE.test(title) ? { ...r, title: usableTitle(title) } : r;
+}
+
 export function parseReferenceText(text: string, index = 0, label?: string): Omit<ParsedReference, 'key'> {
   const original = text;
-  const r = parseReferenceCore(abntNormalize(text), index, label);
+  const norm = abntNormalize(joinBrokenWords(text));
+  const r = skipSubordinateBodies(parseReferenceCore(norm, index, label), norm);
   return { ...r, text: original };
 }
 
 function parseReferenceCore(text: string, index: number, label?: string): Omit<ParsedReference, 'key'> {
   const doi = findDois(text)[0];
   const arxiv = findArxivIds(text)[0];
+  // DIN 1505: "Müller, Hans; Schmidt, Anna: Titel. In: Zeitschrift 42 (2019), Nr. 3, S. 1–2." (authors end with ":")
+  const din = /^((?:\p{Lu}\p{Ll}[\p{L}'’\-]*(?:\s\p{Lu}\p{Ll}[\p{L}'’\-]*)?,\s(?:\p{Lu}(?:\p{Ll}+|\.)\s?){1,3})(?:;\s(?:\p{Lu}\p{Ll}[\p{L}'’\-]*(?:\s\p{Lu}\p{Ll}[\p{L}'’\-]*)?,\s(?:\p{Lu}(?:\p{Ll}+|\.)\s?){1,3}))*(?:u\.\s?a\.)?):\s+(.+?)(?:\.\s+In:|\s+In:|\.\s+\p{Lu}|\.$)/u.exec(stripLeadingRefLabel(text));
+  if (din) {
+    const authors = din[1].replace(/u\.\s?a\.$/, '').split(/\s*;\s*/).filter(Boolean).map((a) => {
+      const [family, given] = a.split(/,\s*/);
+      return { family: family.trim(), given: given?.trim() || undefined };
+    });
+    return { index, text, style: 'apa', authors, etAl: /u\.\s?a\./.test(din[1]), year: pickYear(text, din[0].length) ?? pickYear(text), title: usableTitle(din[2]), doi, arxiv, label };
+  }
   const gostThesis = GOST_THESIS_RE.exec(text);
   if (gostThesis) {
     return { index, text, style: 'vancouver', authors: [{ family: gostThesis[1], given: gostThesis[2].replace(/\s+/g, '') }], etAl: false, year: pickYear(text, gostThesis[0].length), title: usableTitle(gostThesis[3].trim()), doi, arxiv, label, thesis: true };
@@ -361,7 +398,8 @@ function parseReferenceCore(text: string, index: number, label?: string): Omit<P
         const m = /^(.+?)\s((?:\p{Lu}\.\s?){1,3})$/u.exec(a);
         return m ? { family: m[1], given: m[2].replace(/\s+/g, '') } : { family: a };
       });
-    const title = gost[3].trim().replace(/[\s.]+$/, '');
+    // GOST: "Title / A. S. Ivanova // Journal": the statement of responsibility after " / " is not part of the title
+    const title = gost[3].trim().replace(/\s+\/\s+.*$/su, '').replace(/[\s.]+$/, '');
     return { index, text, style: 'vancouver', authors, etAl: Boolean(gost[2]), year: pickYear(gost[4]) ?? pickYear(text), title: title.length >= 3 ? title : undefined, doi, arxiv, label };
   }
   // French/European author-year with capitals and no comma: "BARJOT D. (2012), « Titre », Revue..."
@@ -377,6 +415,17 @@ function parseReferenceCore(text: string, index: number, label?: string): Omit<P
         return m ? { family: titleCaseName(m[1]), given: m[2].trim() } : { family: titleCaseName(a) };
       });
     return { index, text, style: 'apa', authors, etAl: /et\s+al\./.test(fr[1]), year: Number(fr[2]), title: usableTitle(titleAfter(text, fr[0].length)), doi, arxiv, label };
+  }
+  // Organisation in capitals with the year in parentheses: "UNITED NATIONS CHILDREN'S FUND (2016), « Titre », …"
+  const capsOrgYear = /^(\p{Lu}[\p{Lu}'’&\-]+(?:\s+[\p{Lu}'’&\-]{2,}){1,8})\s*\(\s*((?:1[5-9]|20)\d{2})[a-z]?\s*\)[,.:]?\s*/u.exec(text);
+  if (capsOrgYear) {
+    return { index, text, style: 'apa', authors: [{ family: capsOrgYear[1].trim(), organization: true }], etAl: false, year: Number(capsOrgYear[2]), title: usableTitle(titleAfter(text, capsOrgYear[0].length)), doi, arxiv, label };
+  }
+  // Chinese names in ABNT/APA order without a GB/T type mark: "倪序南. 标题. 期刊, v. 7, 2025." / "夏巧刚,阮同江, 俞. 标题. …"
+  const hanAbnt = /^([\p{Script=Han}·]{2,4}(?:\s*[,，、]\s*[\p{Script=Han}·]{1,4}){0,9})\s*[.．。]\s*([^.．。]{2,200}?)\s*[.．。]/u.exec(stripLeadingRefLabel(text));
+  if (hanAbnt) {
+    const authors = hanAbnt[1].split(/\s*[,，、]\s*/).filter(Boolean).map((n) => ({ family: n }));
+    return { index, text, style: 'abnt', authors, etAl: false, year: pickYear(text, hanAbnt[0].length) ?? pickYear(text), title: usableTitle(hanAbnt[2]), doi, arxiv, label };
   }
   // Japanese author-year: "山田太郎（2010）『書名』出版社。", "佐藤花子・鈴木一郎 (2019). 論文名. 雑誌名, 3(2), 1-10."
   const jp = JP_AUTHOR_YEAR_RE.exec(text);

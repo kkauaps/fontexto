@@ -550,6 +550,41 @@ function segmentEntries(lines: SectionLine[]): { lines: SectionLine[]; label?: s
   return groups.map(({ lines, label }) => ({ lines, label }));
 }
 
+/** Where a DOI (bare, "doi:" or a doi.org link) ends, with the period that closes the entry. */
+const DOI_END_RE = /(?:https?:\/\/(?:dx\.)?doi\.org\/|\bdoi:?\s*)?10\.\d{4,9}\/[^\s"<>]+/giu;
+/**
+ * The start of another entry: "Surname, X." / "Surname-Name, X" (also OCR-damaged "Schinde1in", line-split "Subr- amanian"),
+ * "SURNAME, X." / "UNITED NATIONS CHILDREN'S FUND (2016)", "S. SILVEIRA, Z.", "倪序南." / "Муршед, М.".
+ */
+const ENTRY_START_RE =
+  /^(?:\p{Lu}[\p{L}\d'’]+(?:-\s?[\p{L}]+)*(?:\s+(?:de|da|do|dos|das|van|von|der|del|la|le)?\s*\p{Lu}[\p{L}'’]+)*,\s*\p{Lu}|\p{Lu}{2,}[\p{Lu}\s'’\-]*(?:,|\s\(\d{4})|\p{Lu}\.\s+\p{Lu}{2,}[\p{Lu}'’\-]*,|\p{Script=Han}{2,4}[.,，])/u;
+
+/**
+ * A DOI almost always closes an entry. When the PDF layout glued two entries together ("…DOI: 10.x/y. SILVA, J. Title…"),
+ * the text after the DOI is cut off as its own entry if it starts like one and has a year. Without this the second
+ * reference is never parsed, matched or looked up.
+ */
+export function splitGluedEntries(text: string): string[] {
+  const out: string[] = [];
+  let rest = text;
+  for (let guard = 0; guard < 50; guard++) {
+    let cut = -1;
+    for (const m of rest.matchAll(DOI_END_RE)) {
+      const end = (m.index ?? 0) + m[0].replace(/[.,;)\]]+$/u, '').length;
+      const after = rest.slice(end).replace(/^[.,;)\]]*\s+/u, '');
+      if (after.length >= 30 && ENTRY_START_RE.test(after) && HAS_YEAR_RE.test(after)) {
+        cut = rest.length - after.length;
+        break;
+      }
+    }
+    if (cut < 0) break;
+    out.push(rest.slice(0, cut).trim());
+    rest = rest.slice(cut).trim();
+  }
+  out.push(rest);
+  return out.filter((t) => t.length >= 15);
+}
+
 export function extractReferenceEntries(pdf: PdfText): ReferenceEntry[] {
   const sections = referenceSections(pdf, { fallback: true });
   const page = (n: number) => pdf.pages.find((p) => p.page === n)!;
@@ -566,16 +601,19 @@ export function extractReferenceEntries(pdf: PdfText): ReferenceEntry[] {
       // where repeatedLines cannot tell it from the body)
       const inMargin = p.height > 0 && (first.rect.y < p.height * MARGIN_BAND || first.rect.y + first.rect.h > p.height * (1 - MARGIN_BAND));
       if (g.lines.length === 1 && inMargin && !HAS_YEAR_RE.test(text) && !/\b10\.\d{4,9}\/|https?:\/\/|www\./i.test(text)) continue;
-      out.push({
-        index: out.length,
-        label: g.label,
-        text,
-        page: first.page,
-        rects: g.lines.filter((l) => l.page === first.page).map((l) => l.rect),
-        pageSize: { width: p.width, height: p.height },
-        dois: findDois(text),
-        years: parseYears(text),
-      });
+      const pieces = g.label ? [text] : splitGluedEntries(text);
+      for (const [k, piece] of pieces.entries()) {
+        out.push({
+          index: out.length,
+          label: k === 0 ? g.label : undefined,
+          text: piece,
+          page: first.page,
+          rects: g.lines.filter((l) => l.page === first.page).map((l) => l.rect),
+          pageSize: { width: p.width, height: p.height },
+          dois: findDois(piece),
+          years: parseYears(piece),
+        });
+      }
     }
   }
   return out;
