@@ -1,0 +1,11 @@
+{
+  "name": { "message": "Fontexto — meu acesso" },
+  "description": { "message": "Permite ao Fontexto baixar o PDF de uma obra citada com o seu próprio acesso (rede da universidade, login da biblioteca). Só PDFs, só dos DOIs que o Fontexto pedir." },
+  "popupIntro": { "message": "Quando uma referência não tem cópia gratuita, o Fontexto pede a esta extensão que baixe o PDF com o seu próprio acesso: a rede da universidade, o login da biblioteca ou uma conta na editora. Nada passa pelos servidores do Fontexto." },
+  "prefixLabel": { "message": "Prefixo de link da biblioteca (opcional)" },
+  "prefixHint": { "message": "O prefixo do proxy da sua biblioteca (EZproxy ou similar). Use {url} ou {doi} se ele precisar disso no meio do link. Deixe vazio se você estiver na rede da universidade." },
+  "save": { "message": "Salvar" },
+  "saved": { "message": "Salvo." },
+  "invalid": { "message": "Este não é um link válido." },
+  "privacy": { "message": "A extensão só funciona no fontexto.com, só resolve DOIs e só devolve PDFs." }
+}

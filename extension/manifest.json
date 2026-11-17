@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_name__",
+  "short_name": "Fontexto",
+  "description": "__MSG_description__",
+  "version": "0.1.0",
+  "default_locale": "en",
+  "homepage_url": "https://fontexto.com/",
+  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" },
+  "action": {
+    "default_title": "__MSG_name__",
+    "default_popup": "popup.html",
+    "default_icon": { "16": "icons/16.png", "32": "icons/32.png" }
+  },
+  "background": { "service_worker": "background.js" },
+  "permissions": ["storage"],
+  "host_permissions": ["<all_urls>"],
+  "content_scripts": [
+    {
+      "matches": ["https://fontexto.com/*", "https://www.fontexto.com/*", "https://fontexto.pages.dev/*", "https://*.fontexto.pages.dev/*", "http://localhost:5173/*", "http://127.0.0.1:5173/*", "http://localhost:8788/*", "http://127.0.0.1:8788/*"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'none'" }
+}

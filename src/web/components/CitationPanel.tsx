@@ -1,4 +1,6 @@
 import { BackPill } from './HeaderControls';
+import { edition } from '../api';
+import { sendFeedback, setFeedbackConsent, useFeedbackConsent } from '../feedback';
 import type { CitationOccurrence, EvidenceStatus } from '../../core/evidence';
 import type { CitationGraph, PublicationNode } from '../../core/model';
 import { passageParts, occurrenceStatus, type CitationGroup } from '../../core/evidenceView';
@@ -59,9 +61,16 @@ function labelButtons(t: Messages): { status: EvidenceStatus; text: string }[] {
 }
 
 /** The researcher's own verdict: overrides the automatic label, is saved in the project and can be undone. */
-function LabelControl({ o, onLabel }: { o: CitationOccurrence; onLabel: PanelProps['onLabel'] }) {
+function LabelControl({ o, onLabel, method }: { o: CitationOccurrence; onLabel: PanelProps['onLabel']; method: string }) {
   const { t } = useI18n();
+  const consent = useFeedbackConsent();
   if (o.resolution !== 'resolved') return null;
+  const choose = (status: EvidenceStatus) => {
+    const undo = o.override?.status === status;
+    onLabel(o.id, undo ? null : status);
+    const auto = o.override?.auto ?? o.status;
+    if (!undo && auto) sendFeedback({ auto, verdict: status, score: o.score, semantic: method.includes('modelo de linguagem multilíngue') });
+  };
   return (
     <div className="label-control" role="group" aria-label={t.yourAssessmentAria}>
       <span className="small muted">{t.yourAssessment}</span>
@@ -70,7 +79,7 @@ function LabelControl({ o, onLabel }: { o: CitationOccurrence; onLabel: PanelPro
           key={b.status}
           className={`small st-btn st-${b.status}${o.override?.status === b.status ? ' on' : ''}`}
           aria-pressed={o.override?.status === b.status}
-          onClick={() => onLabel(o.id, o.override?.status === b.status ? null : b.status)}
+          onClick={() => choose(b.status)}
         >
           {b.text}
         </button>
@@ -79,6 +88,11 @@ function LabelControl({ o, onLabel }: { o: CitationOccurrence; onLabel: PanelPro
         <button className="linklike small" onClick={() => onLabel(o.id, null)} title={t.undoAutoTitle}>
           {t.undoAuto(o.override.auto ? evidenceStatusText(t, o.override.auto) : '—')}
         </button>
+      )}
+      {edition === 'web' && (
+        <label className="feedback-consent small muted">
+          <input type="checkbox" checked={consent} onChange={(e) => setFeedbackConsent(e.target.checked)} /> {t.feedbackConsent}
+        </label>
       )}
     </div>
   );
@@ -133,7 +147,7 @@ function OccurrenceCard({ o, graph, props }: { o: CitationOccurrence; graph: Cit
         </p>
       )}
       {!o.why && o.reason && o.status !== 'localizado' && <p className="small reason">{reasonText(t, o.reason)}</p>}
-      <LabelControl o={o} onLabel={props.onLabel} />
+      <LabelControl o={o} onLabel={props.onLabel} method={props.method} />
       {o.notes.filter((n) => n !== o.why && n !== o.override?.autoWhy).map((n, i) => (
         <p key={i} className="small muted">
           {translateRuntime(t, n)}

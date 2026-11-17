@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { EvidenceReport } from '../../core/evidence';
 import type { CitationGraph, PublicationNode } from '../../core/model';
 import { REF_STATUS_ORDER, refRows, type RefRow, type RefStatus } from '../../core/refStatus';
@@ -7,6 +7,7 @@ import type { OpenRequest } from './SidePanel';
 import { refStatusText, translateRuntime, useI18n, type Messages } from '../i18n';
 import { OA_CATALOGS_BUSY } from '../i18n/runtime';
 import { libraryLink, saveLibraryPrefix, useLibraryPrefix } from '../library';
+import { extensionAvailable, fetchWithMyAccess, MY_ACCESS_SOURCE, useExtensionAvailable } from '../extension';
 import { askAuthorMailto } from '../askAuthor';
 import { makePacer, OA_DEFAULT_CONCURRENCY, OA_MIN_GAP_MS, OA_REQUEST_TIMEOUT_MS, OaDeadline, oaBatchLookup, oaEligible, oaQueryFromPub, runOaQueue, timeoutSignal, withRetry } from '../../core/oaClient';
 
@@ -35,6 +36,13 @@ export async function fetchOpenAccess(
   onGraph?: (g: CitationGraph) => void,
 ): Promise<{ got: number; graph?: CitationGraph }> {
   const queue = pubs.filter(oaEligible);
+  // last state of each reference, to retry the ones without a PDF through the reader's own access afterwards
+  const last = new Map<string, OaState>();
+  const report = onState;
+  onState = (pubId, s) => {
+    last.set(pubId, s);
+    report(pubId, s);
+  };
   for (const p of pubs) if (!queue.includes(p)) onState(p.id, { kind: 'not_found' });
   const files: { file: File; publicationId: string }[] = [];
   try {
@@ -66,6 +74,22 @@ export async function fetchOpenAccess(
     // a reference that ran out of time is "catalogues busy, try again", not a raw error string
     onError: (pub, e) => onState(pub.id, { kind: 'error', message: e instanceof OaDeadline || e.name === 'TimeoutError' || e.name === 'AbortError' ? OA_CATALOGS_BUSY : e.message }),
   });
+  // Extension installed: what the open catalogues could not give, try with the reader's own access (one at a time:
+  // it is their browser and their library's session)
+  if (extensionAvailable()) {
+    for (const pub of pubs) {
+      const prev = last.get(pub.id);
+      if (prev?.kind === 'got') continue;
+      const doi = (prev && 'result' in prev ? prev.result?.doi : undefined) ?? pub.doi;
+      if (!doi) continue;
+      onState(pub.id, { kind: 'busy' });
+      const file = await fetchWithMyAccess(doi, safeName(pub));
+      if (file) {
+        files.push({ file, publicationId: pub.id });
+        onState(pub.id, { kind: 'got', source: MY_ACCESS_SOURCE });
+      } else onState(pub.id, prev ?? { kind: 'not_found' });
+    }
+  }
   if (!files.length) return { got: 0 };
   const graph = await api.addLinkedFiles(projectId, files);
   onGraph?.(graph);
@@ -90,6 +114,41 @@ function CandidateLink({ c, children }: { c: OaCandidate; children?: React.React
   );
 }
 
+const OPEN_LIBRARY_EVENT = 'fontexto:open-library';
+
+/** Provided by the References view: downloads one reference's PDF through the extension and links it. */
+const MyAccessContext = createContext<((pub: PublicationNode, doi: string) => Promise<boolean>) | undefined>(undefined);
+
+/** "Download with my access" for one reference (only with the extension installed and inside the References view). */
+function ExtensionFetch({ pub, doi }: { pub: PublicationNode; doi?: string }) {
+  const { t } = useI18n();
+  const installed = useExtensionAvailable();
+  const run = useContext(MyAccessContext);
+  const [state, setState] = useState<'idle' | 'busy' | 'failed'>('idle');
+  if (!installed || !run || !doi) return null;
+  if (state === 'busy')
+    return (
+      <span className="oa-btn" aria-live="polite">
+        <span className="spinner" /> {t.extFetching}
+      </span>
+    );
+  return (
+    <>
+      <button
+        type="button"
+        className="oa-btn"
+        onClick={async () => {
+          setState('busy');
+          setState((await run(pub, doi)) ? 'idle' : 'failed');
+        }}
+      >
+        🔑 {t.extFetch}
+      </button>
+      {state === 'failed' && <span className="oa-bad small">{t.extFailed}</span>}
+    </>
+  );
+}
+
 /** Library link + "ask the author" for a work with no free copy (or none we could fetch). */
 function NoFreeCopyActions({ result, pub }: { result?: OaResult; pub: PublicationNode }) {
   const { t } = useI18n();
@@ -98,14 +157,19 @@ function NoFreeCopyActions({ result, pub }: { result?: OaResult; pub: Publicatio
   const lib = libraryLink(prefix, { url: result?.landingUrl ?? doiUrl(doi), doi });
   const author = result?.contactName ?? result?.authors?.[0] ?? [pub.authors[0]?.given, pub.authors[0]?.family].filter(Boolean).join(' ');
   const mail = askAuthorMailto(t, { title: result?.title ?? pub.title, year: result?.year ?? pub.year, doi, email: result?.contactEmail, name: result?.contactEmail ? author : undefined });
-  if (!lib && !mail) return null;
   return (
     <>
-      {lib && (
+      {lib ? (
         <a className="oa-btn" href={lib} target="_blank" rel="noreferrer noopener">
           🏛 {t.libraryLink}
         </a>
+      ) : (
+        // not set up yet: most paywalled works open through the university's subscription
+        <button type="button" className="oa-btn" onClick={() => window.dispatchEvent(new Event(OPEN_LIBRARY_EVENT))}>
+          🏛 {t.libraryPrompt}
+        </button>
       )}
+      <ExtensionFetch pub={pub} doi={doi} />
       {mail && (
         <a className="oa-btn" href={mail} title={result?.contactEmail ? t.askAuthorWithEmail : t.askAuthorNoEmail}>
           ✉ {t.askAuthor}
@@ -138,6 +202,7 @@ export function OaCell({ state, pub }: { state?: OaState; pub: PublicationNode }
         </>,
       );
     case 'got':
+      if (state.source === MY_ACCESS_SOURCE) return cell(<span className="oa-ok">✓ PDF · {t.extGot}</span>);
       return cell(<span className="oa-ok">{t.freePdfGot(state.version ? candidateLabel(t, { source: state.source, version: state.version }) : state.source)}</span>);
     case 'blocked': {
       const r = state.result;
@@ -201,6 +266,15 @@ export function LibraryAccess({ popover = false }: { popover?: boolean }) {
   const { t } = useI18n();
   const prefix = useLibraryPrefix();
   const [open, setOpen] = useState(false);
+  // "Access through your university?" on a reference without a free copy opens these settings
+  useEffect(() => {
+    const show = () => {
+      setOpen(true);
+      requestAnimationFrame(() => root.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+    };
+    window.addEventListener(OPEN_LIBRARY_EVENT, show);
+    return () => window.removeEventListener(OPEN_LIBRARY_EVENT, show);
+  }, []);
   const [value, setValue] = useState(prefix ?? '');
   const [note, setNote] = useState<{ ok: boolean; text: string } | undefined>();
   const root = useRef<HTMLDivElement>(null);
@@ -364,7 +438,19 @@ export function ReferencesView({ projectId, graph, evidence, oa, setOa, onGraph,
     );
   }
 
+  const myAccess = useCallback(
+    async (pub: PublicationNode, doi: string) => {
+      const file = await fetchWithMyAccess(doi, safeName(pub));
+      if (!file) return false;
+      onGraph(await api.addLinkedFiles(projectId, [{ file, publicationId: pub.id }]));
+      setOa((prev) => ({ ...prev, [pub.id]: { kind: 'got', source: MY_ACCESS_SOURCE } }));
+      return true;
+    },
+    [projectId, onGraph, setOa],
+  );
+
   return (
+    <MyAccessContext.Provider value={myAccess}>
     <div className="refs-view">
       <div className="refs-toolbar">
         <div className="chip-row" role="group" aria-label={t.filterBySituation}>
@@ -430,6 +516,7 @@ export function ReferencesView({ projectId, graph, evidence, oa, setOa, onGraph,
         </tbody>
       </table>
     </div>
+    </MyAccessContext.Provider>
   );
 }
 

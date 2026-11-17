@@ -16,6 +16,13 @@ binding = "OA_CACHE"
 id = "3ef84eefa7ae4f45925ffdd15bbb02d2"
 preview_id = "b5b818961385480c82d0bebbd5dae22d"
 
+# Opt-in calibration feedback: running totals of (automatic label, reader's label, score bucket, semantic on/off).
+# No text or identifiers (src/core/feedback.ts). Namespaces fontexto-feedback / fontexto-feedback-preview.
+[[kv_namespaces]]
+binding = "FEEDBACK"
+id = "6a2afc88ac044d62ab3c943dbc89da0c"
+preview_id = "074e1aceb256436ca32d11e60c819cf3"
+
 # Preview-only bindings (Pablo: create the same in production before enabling global rate limits).
 # Pages Functions do not yet expose the ratelimits binding on all accounts; prefer WAF (below) + in-isolate limiter.
 # [[unsafe.bindings]]
