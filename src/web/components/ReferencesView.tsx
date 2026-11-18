@@ -7,6 +7,7 @@ import type { OpenRequest } from './SidePanel';
 import { refStatusText, translateRuntime, useI18n, type Messages } from '../i18n';
 import { OA_CATALOGS_BUSY } from '../i18n/runtime';
 import { libraryLink, saveLibraryPrefix, useLibraryPrefix } from '../library';
+import { ProjectCheckup } from './ProjectCheckup';
 import { extensionAvailable, fetchWithMyAccess, MY_ACCESS_SOURCE, useExtensionAvailable } from '../extension';
 import { askAuthorMailto } from '../askAuthor';
 import { makePacer, OA_DEFAULT_CONCURRENCY, OA_MIN_GAP_MS, OA_REQUEST_TIMEOUT_MS, OaDeadline, oaBatchLookup, oaEligible, oaQueryFromPub, runOaQueue, timeoutSignal, withRetry } from '../../core/oaClient';
@@ -452,6 +453,7 @@ export function ReferencesView({ projectId, graph, evidence, oa, setOa, onGraph,
   return (
     <MyAccessContext.Provider value={myAccess}>
     <div className="refs-view">
+      {evidence && <ProjectCheckup graph={graph} evidence={evidence} onFindPdfs={withoutPdf.length && busy !== 'oa' ? runOa : undefined} />}
       <div className="refs-toolbar">
         <div className="chip-row" role="group" aria-label={t.filterBySituation}>
           <button className={`chip-filter${filter === 'all' ? ' on' : ''}`} onClick={() => setFilter('all')}>
@@ -548,9 +550,19 @@ function RefLine({ row, oa, busy, onUpload, onOpenPdf, onShowInDocument, onShowI
         {row.citations === 0 ? (
           <span className="muted small">—</span>
         ) : (
-          <button className="link-btn" onClick={onShowInDocument} title={t.seeTheseInDocument}>
-            <span className="cnt ok">{counts.localizado}</span> · <span className="cnt warn">{counts.ressalva}</span> · <span className="cnt nl">{counts.nao_localizado}</span>
-            {row.citations > counts.localizado + counts.ressalva + counts.nao_localizado && <span className="muted">{t.extraNoPdf(row.citations - counts.localizado - counts.ressalva - counts.nao_localizado)}</span>}
+          <button
+            className="link-btn ref-cites"
+            onClick={onShowInDocument}
+            title={`${t.seeTheseInDocument} — ${t.statusLocated} ${counts.localizado} · ${t.statusCaveat} ${counts.ressalva} · ${t.statusNotLocated} ${counts.nao_localizado}`}
+          >
+            {/* one segment per label; grey = not checked yet (no PDF) */}
+            <span className="ref-cites-bar" aria-hidden="true">
+              {counts.localizado > 0 && <i className="ok" style={{ flexGrow: counts.localizado }} />}
+              {counts.ressalva > 0 && <i className="warn" style={{ flexGrow: counts.ressalva }} />}
+              {counts.nao_localizado > 0 && <i className="nl" style={{ flexGrow: counts.nao_localizado }} />}
+              {row.citations > counts.localizado + counts.ressalva + counts.nao_localizado && <i className="none" style={{ flexGrow: row.citations - counts.localizado - counts.ressalva - counts.nao_localizado }} />}
+            </span>
+            <span className="ref-cites-n">{t.tabCitations(row.citations)}</span>
           </button>
         )}
         <button className="link-btn small" onClick={onShowInGraph}>

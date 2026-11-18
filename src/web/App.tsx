@@ -390,6 +390,7 @@ export function App() {
                   search={filters.search ?? ''}
                   exportName={projectId}
                   colorBy={filters.colorBy}
+                  docCitations={docCitations}
                 />
               </ReactFlowProvider>
             ) : (

@@ -228,7 +228,19 @@ export function CitationList({ groups, graph, onSelect, method }: { groups: Cita
               {g.occurrences.some((o) => o.override) && <span className="manual-mark" title={t.youLabeledThis}>✎</span>}
               <span className="cit-main">
                 <b>{g.occurrences.map((o) => (o.publicationId ? graph.nodes[o.publicationId]?.label : undefined) ?? g.marker).join(' · ')}</b>
-                {g.status !== 'localizado' && g.occurrences.find((o) => occurrenceStatus(o) === g.status)?.why && (
+                <span className="cit-chips">
+                  <span className={`cit-chip st-${g.status}`}>{evidenceStatusText(t, g.status)}</span>
+                  {g.occurrences
+                    .filter((o) => o.approx?.kind === 'year' || o.approx?.kind === 'name')
+                    .slice(0, 1)
+                    .map((o) => (
+                      <span key={o.id} className="cit-chip cit-chip-warn">
+                        {t.checkupTextVsList(o.approx!.cited, o.approx!.listed)}
+                      </span>
+                    ))}
+                </span>
+                {/* the long explanation only where it says something specific to this citation */}
+                {(g.status === 'ressalva' || g.status === 'nao_localizado') && g.occurrences.find((o) => occurrenceStatus(o) === g.status)?.why && (
                   <span className={`small why-inline st-${g.status}`}>{translateRuntime(t, g.occurrences.find((o) => occurrenceStatus(o) === g.status)!.why)}</span>
                 )}
                 <span className="small muted">

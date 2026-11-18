@@ -42,9 +42,19 @@ describe('narrow star layout', () => {
     expect(xs.size).toBe(1);
   });
 
-  it('keeps the wide layout by default', () => {
+  it('wide layout: the document above its status groups, the most cited first within a group', () => {
+    const pos = statusGridLayout(view, { weights: new Map([['c', 9]]) });
+    const doc = pos.get('doc')!;
+    for (const id of ['a', 'b', 'c', 'd']) expect(pos.get(id)!.y).toBeGreaterThan(doc.y + doc.height);
+    expect(pos.get('c')!.y).toBeLessThan(pos.get('a')!.y);
+  });
+
+  it('one header per status group, above its references', async () => {
+    const { statusGroupHeaders } = await import('../src/web/layout');
     const pos = statusGridLayout(view);
-    expect(pos.get('a')!.x).toBeGreaterThan(pos.get('doc')!.x + pos.get('doc')!.width);
+    const [h] = statusGroupHeaders(view, pos);
+    expect(h).toMatchObject({ status: 'ok', count: 4 });
+    expect(h.y).toBeLessThan(Math.min(...['a', 'b', 'c', 'd'].map((id) => pos.get(id)!.y)));
   });
 });
 
