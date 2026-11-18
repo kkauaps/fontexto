@@ -171,6 +171,8 @@ function application(lang: SiteLang, c: SiteContent): Json {
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
     license: LICENSE_URL,
     featureList: c.chrome.featureList,
+    keywords: [c.chrome.documentTypes, ...c.chrome.keywords].join(', '),
+    audience: { '@type': 'EducationalAudience', educationalRole: c.chrome.audience, audienceType: c.chrome.documentTypes },
     screenshot: `${SITE_ORIGIN}/preview-documento.png`,
     image: `${SITE_ORIGIN}${OG_IMAGE.path}`,
     publisher: { '@id': ORG_ID },

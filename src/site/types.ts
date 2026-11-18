@@ -53,6 +53,12 @@ export interface SiteChrome {
   appDescription: string;
   featureList: string[];
   ogImageAlt: string;
+  /** Local names of the documents people check, e.g. “TFG, TFM, tesis” (es) or “курсовая, ВКР” (ru). */
+  documentTypes: string;
+  /** Who uses it, in local academic terms (schema.org EducationalAudience roles). */
+  audience: string[];
+  /** Search terms people use in this language. */
+  keywords: string[];
 }
 
 export interface SiteContent {

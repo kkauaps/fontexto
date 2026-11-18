@@ -24,6 +24,9 @@ export const en: SiteContent = {
       'PDFs are processed in the browser and never uploaded',
     ],
     ogImageAlt: 'Fontexto: each citation linked to the exact passage in the source',
+    documentTypes: "thesis, dissertation, capstone project or paper",
+    audience: ["Undergraduate students", "Master's students", "PhD candidates", "Thesis supervisors and advisors", "Examiners and committee members", "Researchers", "Peer reviewers", "Journal editors"],
+    keywords: ["citation checker", "reference checker", "check citations in a thesis", "dissertation citation check", "source verification", "bibliography checker", "APA", "Harvard", "IEEE", "Vancouver", "open access PDF"],
   },
   pages: {
     'how-it-works': {
@@ -141,8 +144,8 @@ export const en: SiteContent = {
         {
           h2: 'Who it is for',
           ul: [
-            'Students writing a thesis or dissertation who want to review their citations before submission.',
-            'Supervisors and examiners who need to check sources quickly.',
+            'Students writing a thesis, dissertation, capstone project or paper (undergraduate, master’s or PhD) who want to review their citations before submission.',
+            'Supervisors, advisors, examiners and committee members who need to check sources quickly.',
             'Researchers, reviewers and editors reading a manuscript with a long bibliography.',
           ],
         },
