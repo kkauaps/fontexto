@@ -99,26 +99,36 @@ export function statusGridLayout(view: ViewGraph, opts: { narrow?: boolean; weig
  * `rest` arrives sorted by status, so each status still forms a run.
  */
 function narrowStarLayout(docs: ViewNode[], rest: ViewNode[]): Map<string, Positioned> {
+  // Phone: an outline, not a fan of links. The document on top, then one section per status: its header
+  // (drawn by the canvas from statusGroupHeaders) and its references in one or two columns below it.
   const out = new Map<string, Positioned>();
-  const cols = Math.max(1, Math.min(4, Math.round(Math.sqrt(rest.length * 0.13))));
-  const perCol = Math.max(1, Math.ceil(rest.length / cols));
-  const sizes = rest.map((n) => nodeSize(n));
-  const colW = Math.max(160, ...sizes.map((z) => z.width)) + 24;
-  const rowH = 50;
-  const totalW = cols * colW - 24;
+  const sizes = new Map(rest.map((n) => [n.id, nodeSize(n)]));
+  const cols = rest.length > 8 ? 2 : 1;
+  const colW = Math.max(160, ...[...sizes.values()].map((z) => z.width)) + 16;
+  const rowH = 48;
+  const totalW = cols * colW - 16;
   let y = 0;
   docs.forEach((n) => {
     const { width, height } = nodeSize(n);
     out.set(n.id, { id: n.id, x: Math.max(0, totalW / 2 - width / 2), y, width, height });
     y += height + 20;
   });
-  const top = y + 70;
-  rest.forEach((n, i) => {
-    const c = Math.floor(i / perCol);
-    const k = i % perCol;
-    const { width, height } = sizes[i];
-    out.set(n.id, { id: n.id, x: c * colW + (colW - 24 - width) / 2, y: top + k * rowH, width, height });
-  });
+  y += 36;
+  let i = 0;
+  while (i < rest.length) {
+    const status = rest[i].refStatus;
+    const group: ViewNode[] = [];
+    while (i < rest.length && rest[i].refStatus === status) group.push(rest[i++]);
+    y += STATUS_HEADER_HEIGHT + 26; // room for the section header
+    const rows = Math.ceil(group.length / cols);
+    group.forEach((n, k) => {
+      const c = k % cols;
+      const r = Math.floor(k / cols);
+      const { width, height } = sizes.get(n.id)!;
+      out.set(n.id, { id: n.id, x: c * colW + (colW - 16 - width) / 2, y: y + r * rowH, width, height });
+    });
+    y += rows * rowH + 28;
+  }
   return out;
 }
 

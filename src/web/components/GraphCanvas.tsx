@@ -183,7 +183,7 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
       .then((pos) => {
         if (cancelled) return;
         setVertical(narrow);
-        setStar(starOnly && !narrow);
+        setStar(starOnly);
         setPositions(pos);
         requestAnimationFrame(frame);
       })
@@ -274,6 +274,8 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
     // keep the selected/focused reference's own edge so a selection still shows its link to the document
     const kept = edges.filter((e) => !docIds.has(e.source) || (focus && focus.edges.has(e.id)));
     const doc = [...docIds][0];
+    // phone outline: sections stacked under the document; links would cross them, so none are drawn
+    if (vertical) return edges.filter((e) => !docIds.has(e.source));
     const grouped = doc
       ? headers.map((h) => ({
           id: `hdr-edge:${h.status}`,
@@ -285,7 +287,7 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
         }))
       : [];
     return [...grouped, ...kept];
-  }, [headers, edges, view, focus]);
+  }, [headers, edges, view, focus, vertical]);
   const legend = useMemo(() => {
     const c = new Map<RefStatus, number>();
     for (const n of view.nodes) if (n.refStatus) c.set(n.refStatus, (c.get(n.refStatus) ?? 0) + 1);
