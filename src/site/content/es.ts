@@ -24,6 +24,9 @@ export const es: SiteContent = {
       'Los PDF se procesan en el navegador y nunca se suben',
     ],
     ogImageAlt: 'Fontexto: cada cita vinculada al pasaje exacto de la fuente',
+    documentTypes: "TFG, TFM, tesina, tesis o artículo",
+    audience: ["Estudiantes de grado", "Estudiantes de máster", "Doctorandos", "Directores y tutores de tesis", "Miembros de tribunal o jurado", "Investigadores", "Revisores", "Editores de revistas"],
+    keywords: ["verificador de citas", "comprobar referencias", "revisar citas del TFG", "revisar citas del TFM", "citas de la tesis", "verificar fuentes", "bibliografía", "APA", "Harvard", "IEEE", "Vancouver", "PDF de acceso abierto"],
   },
   pages: {
     'how-it-works': {
@@ -141,8 +144,8 @@ export const es: SiteContent = {
         {
           h2: 'Para quién es',
           ul: [
-            'Estudiantes que escriben una tesis o disertación y quieren revisar sus citas antes de entregarla.',
-            'Directores y miembros de tribunal que necesitan comprobar fuentes con rapidez.',
+            'Estudiantes que escriben un TFG, TFM, tesina, tesis o artículo y quieren revisar sus citas antes de entregarlo.',
+            'Directores y tutores de tesis, y miembros de tribunal o jurado, que necesitan comprobar fuentes con rapidez.',
             'Investigadores, revisores y editores que leen un manuscrito con una bibliografía extensa.',
           ],
         },

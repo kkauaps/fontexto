@@ -5,7 +5,7 @@ const pl = (n: number, one: string, many: string) => (n === 1 ? one : many);
 export const zhCN: Messages = {
   metaTitle: '每个引用都链接到源摘录｜Fontexto',
   metaDescription:
-    'Fontexto 将文档中的每个引文链接到来源的确切摘录。发送 PDF，检查匹配项并将文件保留在浏览器中。',
+    'Fontexto 将毕业论文、学位论文或期刊论文中的每条引用链接到原文的对应段落。上传 PDF、核对匹配结果，文件始终留在浏览器中。',
   boot: '正在加载 Fontexto…',
   heroSample: {
     kicker: '示例大学',

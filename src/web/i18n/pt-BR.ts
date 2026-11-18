@@ -5,7 +5,7 @@ const pl = (n: number, one: string, many: string) => (n === 1 ? one : many);
 export const ptBR: Messages = {
   metaTitle: 'Cada citação ligada ao trecho da fonte | Fontexto',
   metaDescription:
-    'O Fontexto liga cada citação do seu documento ao trecho exato da fonte. Envie um PDF, confira as correspondências e mantenha os arquivos no navegador.',
+    'O Fontexto liga cada citação do seu TCC, dissertação, tese ou artigo ao trecho exato da fonte. Envie um PDF, confira as correspondências e mantenha os arquivos no navegador.',
   boot: 'Carregando o Fontexto…',
   heroSample: {
     kicker: "Universidade Exemplo",

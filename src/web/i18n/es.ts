@@ -5,7 +5,7 @@ const pl = (n: number, one: string, many: string) => (n === 1 ? one : many);
 export const es: Messages = {
   metaTitle: 'Cada cita ligada al pasaje de la fuente | Fontexto',
   metaDescription:
-    'Fontexto relaciona cada cita de tu documento con el pasaje exacto de la fuente. Sube un PDF, revisa las coincidencias y deja los archivos en el navegador.',
+    'Fontexto relaciona cada cita de tu TFG, TFM, tesis o artículo con el pasaje exacto de la fuente. Sube un PDF, revisa las coincidencias y deja los archivos en el navegador.',
   boot: 'Cargando Fontexto…',
   heroSample: {
     kicker: "Universidad de Ejemplo",

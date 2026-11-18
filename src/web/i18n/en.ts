@@ -4,7 +4,7 @@ const pl = (n: number, one: string, many: string) => (n === 1 ? one : many);
 export const en = {
   metaTitle: 'Each citation linked to the passage in the source | Fontexto',
   metaDescription:
-    'Fontexto links each citation in your document to the exact passage in the source. Upload a PDF, review the matches, and keep your files in the browser.',
+    'Fontexto links each citation in your thesis, dissertation or paper to the exact passage in the source. Upload a PDF, review the matches, and keep your files in the browser.',
   boot: 'Loading Fontexto…',
   heroSample: {
     kicker: "Sample University",

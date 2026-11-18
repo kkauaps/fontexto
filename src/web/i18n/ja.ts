@@ -5,7 +5,7 @@ const pl = (n: number, one: string, many: string) => (n === 1 ? one : many);
 export const ja: Messages = {
   metaTitle: '出典の該当箇所にリンクされた各引用｜Fontexto',
   metaDescription:
-    'Fontextoは、文書内の各引用を出典の該当箇所に正確にリンクします。PDFを送信し、一致を確認し、ファイルをブラウザに保存します。',
+    'Fontextoは、卒業論文・修士論文・博士論文や投稿論文の各引用を、出典の該当箇所に正確にリンクします。PDFを送信して一致を確認でき、ファイルはブラウザ内に残ります。',
   boot: 'Fontextoを読み込み中…',
   heroSample: {
     kicker: 'サンプル大学',

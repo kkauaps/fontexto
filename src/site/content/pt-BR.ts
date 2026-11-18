@@ -24,6 +24,9 @@ export const ptBR: SiteContent = {
       'Os PDFs são processados no navegador e nunca enviados',
     ],
     ogImageAlt: 'Fontexto: cada citação ligada ao trecho exato da fonte',
+    documentTypes: "TCC, monografia, dissertação, tese ou artigo",
+    audience: ["Estudantes de graduação", "Mestrandos", "Doutorandos", "Orientadores", "Membros de banca", "Pesquisadores", "Pareceristas", "Editores de periódicos"],
+    keywords: ["verificador de citações", "conferir referências", "citações do TCC", "revisar TCC", "monografia", "dissertação", "tese", "verificar fontes", "ABNT", "APA", "PDF em acesso aberto"],
   },
   pages: {
     'how-it-works': {
@@ -141,7 +144,7 @@ export const ptBR: SiteContent = {
         {
           h2: 'Para quem é',
           ul: [
-            'Estudantes escrevendo TCC, dissertação ou tese que querem revisar as citações antes da entrega.',
+            'Estudantes escrevendo TCC, monografia, dissertação, tese ou artigo que querem revisar as citações antes da entrega.',
             'Orientadores e membros de banca que precisam conferir fontes rapidamente.',
             'Pesquisadores, pareceristas e editores lendo um manuscrito com bibliografia longa.',
           ],
