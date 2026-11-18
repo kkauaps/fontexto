@@ -133,6 +133,7 @@ function PublicationDetails({ g, pub, props }: { g: CitationGraph; pub: Publicat
         </dd>
         <dt>{t.category}</dt>
         <dd>
+          <div className="cat-pick">
           <select
             value={pub.category?.value ?? UNCATEGORIZED}
             onChange={(e) => props.onCategory(pub.id, e.target.value === UNCATEGORIZED ? null : e.target.value)}
@@ -154,6 +155,7 @@ function PublicationDetails({ g, pub, props }: { g: CitationGraph; pub: Publicat
               {t.restoreSuggestion}
             </button>
           )}
+          </div>
           <div className="row">
             <input placeholder={t.newCategory} value={custom} onChange={(e) => setCustom(e.target.value)} />
             <button disabled={!custom.trim()} onClick={() => props.onCategory(pub.id, custom.trim()).then(() => setCustom(''))}>
