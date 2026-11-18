@@ -51,12 +51,14 @@ export async function layoutGraph(view: ViewGraph): Promise<Map<string, Position
  * When only "document -> source" edges are shown, a layered layout is one very tall column. This places the
  * sources in columns grouped by verification status (same order as the legend), the document on the left.
  */
-export function statusGridLayout(view: ViewGraph, opts: { narrow?: boolean } = {}): Map<string, Positioned> {
+export function statusGridLayout(view: ViewGraph, opts: { narrow?: boolean; weights?: Map<string, number> } = {}): Map<string, Positioned> {
   const out = new Map<string, Positioned>();
   const docs = view.nodes.filter((n) => n.kind === 'document');
   const rest = view.nodes.filter((n) => n.kind !== 'document');
   const rank = (n: ViewNode) => (n.refStatus ? REF_STATUS_ORDER.indexOf(n.refStatus) : REF_STATUS_ORDER.length);
-  rest.sort((a, b) => rank(a) - rank(b) || a.label.localeCompare(b.label));
+  // within a status: most cited in the text first (when known), then alphabetical
+  const w = (n: ViewNode) => opts.weights?.get(n.id) ?? 0;
+  rest.sort((a, b) => rank(a) - rank(b) || w(b) - w(a) || a.label.localeCompare(b.label));
   if (opts.narrow) return narrowStarLayout(docs, rest);
   const sizes = new Map<number, number>();
   for (const n of rest) sizes.set(rank(n), (sizes.get(rank(n)) ?? 0) + 1);
@@ -64,7 +66,7 @@ export function statusGridLayout(view: ViewGraph, opts: { narrow?: boolean } = {
   const ROWS = Math.min(16, Math.max(8, ...sizes.values()));
   const colW = 280;
   const rowH = 50;
-  let x = 360;
+  let x = 0;
   let tallest = 0;
   let i = 0;
   while (i < rest.length) {
@@ -82,9 +84,11 @@ export function statusGridLayout(view: ViewGraph, opts: { narrow?: boolean } = {
     }
     x += 40;
   }
+  // the document on top, centred over the status groups: its links go down to each group's header without crossing
+  const totalW = Math.max(0, x - 40 - colW + Math.max(...[...out.values()].map((p) => p.width), 0));
   docs.forEach((n, k) => {
     const { width, height } = nodeSize(n);
-    out.set(n.id, { id: n.id, x: 0, y: Math.max(0, tallest / 2 - height / 2) + k * (height + 20), width, height });
+    out.set(n.id, { id: n.id, x: Math.max(0, totalW / 2 - width / 2) + k * (width + 20), y: -(height + 190), width, height });
   });
   return out;
 }
@@ -116,4 +120,34 @@ function narrowStarLayout(docs: ViewNode[], rest: ViewNode[]): Map<string, Posit
     out.set(n.id, { id: n.id, x: c * colW + (colW - 24 - width) / 2, y: top + k * rowH, width, height });
   });
   return out;
+}
+
+/** One header per status group of the wide star layout: above its columns, spanning them. */
+export interface StatusHeader {
+  status: NonNullable<ViewNode['refStatus']>;
+  count: number;
+  x: number;
+  y: number;
+  width: number;
+}
+
+export const STATUS_HEADER_HEIGHT = 44;
+
+export function statusGroupHeaders(view: ViewGraph, pos: Map<string, Positioned>): StatusHeader[] {
+  const groups = new Map<NonNullable<ViewNode['refStatus']>, Positioned[]>();
+  for (const n of view.nodes) {
+    if (n.kind === 'document' || !n.refStatus) continue;
+    const p = pos.get(n.id);
+    if (!p) continue;
+    const g = groups.get(n.refStatus) ?? [];
+    g.push(p);
+    groups.set(n.refStatus, g);
+  }
+  return REF_STATUS_ORDER.filter((s) => groups.has(s)).map((status) => {
+    const ps = groups.get(status)!;
+    const minX = Math.min(...ps.map((p) => p.x));
+    const maxX = Math.max(...ps.map((p) => p.x + p.width));
+    const minY = Math.min(...ps.map((p) => p.y));
+    return { status, count: ps.length, x: minX, y: minY - STATUS_HEADER_HEIGHT - 26, width: Math.max(200, maxX - minX) };
+  });
 }

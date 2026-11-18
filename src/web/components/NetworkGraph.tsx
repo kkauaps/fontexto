@@ -230,9 +230,18 @@ export function NetworkGraph({ projectId, graph, view, filters, onFilters, years
       if (!pts.length) return;
       const b = boundsOf(pts, 30);
       const pad = size.w < 600 ? 12 : 24;
-      const k = Math.min((size.w - pad * 2) / (b.maxX - b.minX), (size.h - pad * 2) / (b.maxY - b.minY), only ? 2.2 : 1.6);
+      // the controls float over the top of the canvas (and the topic legend over the bottom on phones): fit the
+      // picture in the free area between them, not under them
+      const box = c.getBoundingClientRect();
+      const host = c.parentElement;
+      const topBar = host?.querySelector<HTMLElement>('.net-top')?.getBoundingClientRect();
+      const legend = host?.querySelector<HTMLElement>('.net-legend')?.getBoundingClientRect();
+      const top = topBar && topBar.height ? Math.max(0, topBar.bottom - box.top) + 8 : 0;
+      const bottom = legend && legend.height && size.w < 600 ? Math.max(0, box.bottom - legend.top) + 8 : 0;
+      const availH = Math.max(80, size.h - top - bottom);
+      const k = Math.min((size.w - pad * 2) / (b.maxX - b.minX), (availH - pad * 2) / (b.maxY - b.minY), only ? 2.2 : 1.6);
       const tr = zoomIdentity
-        .translate(size.w / 2, size.h / 2)
+        .translate(size.w / 2, top + availH / 2)
         .scale(k)
         .translate(-(b.minX + b.maxX) / 2, -(b.minY + b.maxY) / 2);
       select(c).call(z.transform, tr);

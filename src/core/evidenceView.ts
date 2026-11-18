@@ -1,5 +1,6 @@
 /** Grouping and filtering of citation occurrences for the document view (pure, unit-tested). */
 import type { CitationOccurrence, EvidenceReport, EvidenceStatus } from './evidence.js';
+import type { CitationGraph, PublicationNode } from './model.js';
 
 export type GroupStatus = EvidenceStatus | 'unresolved' | 'sem_pdf';
 export type StatusFilter = 'all' | GroupStatus;
@@ -162,3 +163,51 @@ export const REASON_TEXT: Record<string, string> = {
   so_resumo: 'só o resumo parece tratar do tema',
   fonte_sem_trecho: 'nota de fonte de quadro: o apoio está nas linhas do próprio quadro',
 };
+
+/** What needs the writer's attention in a project, for the "Checkup" panel. */
+export interface ProjectCheckup {
+  counts: StatusCounts;
+  /** Markers that match no entry of the reference list (e.g. "Yin (2001)"), unique, in reading order. */
+  unresolved: { marker: string; page: number; count: number }[];
+  /** Citations whose year differs from the listed one, per reference: "Araújo e Sartori (2004)" vs 2003. */
+  yearMismatch: { publicationId: string; cited: string; listed: string; count: number }[];
+  /** Citations whose author name is spelled differently from the list. */
+  nameMismatch: { publicationId: string; cited: string; listed: string; count: number }[];
+  /** Cited references without the source PDF, most cited first (never-cited ones are in `uncited`). */
+  noPdf: string[];
+  /** Listed references never cited in the text. */
+  uncited: string[];
+}
+
+export function projectCheckup(graph: Pick<CitationGraph, 'nodes'>, report: Pick<EvidenceReport, 'occurrences'>): ProjectCheckup {
+  const counts = countByStatus(report);
+  const unresolved = new Map<string, { marker: string; page: number; count: number }>();
+  const approx = { year: new Map<string, ProjectCheckup['yearMismatch'][number]>(), name: new Map<string, ProjectCheckup['nameMismatch'][number]>() };
+  const cited = new Map<string, number>();
+  for (const o of report.occurrences) {
+    if (o.publicationId) cited.set(o.publicationId, (cited.get(o.publicationId) ?? 0) + 1);
+    if (o.resolution === 'unresolved') {
+      const key = o.marker.replace(/^(?:segundo|conforme|de acordo com|according to|según)\s+/i, '').trim();
+      const u = unresolved.get(key) ?? { marker: key, page: o.page, count: 0 };
+      u.count++;
+      unresolved.set(key, u);
+    }
+    if (o.approx && o.publicationId && (o.approx.kind === 'year' || o.approx.kind === 'name')) {
+      const bucket = approx[o.approx.kind];
+      const key = `${o.publicationId}|${o.approx.cited}|${o.approx.listed}`;
+      const e = bucket.get(key) ?? { publicationId: o.publicationId, cited: o.approx.cited, listed: o.approx.listed, count: 0 };
+      e.count++;
+      bucket.set(key, e);
+    }
+  }
+  const pubs = Object.values(graph.nodes).filter((n): n is PublicationNode => n.kind === 'publication' && Boolean(n.inMainBibliography));
+  const byCount = (a: string, b: string) => (cited.get(b) ?? 0) - (cited.get(a) ?? 0);
+  return {
+    counts,
+    unresolved: [...unresolved.values()],
+    yearMismatch: [...approx.year.values()].sort((a, b) => b.count - a.count),
+    nameMismatch: [...approx.name.values()].sort((a, b) => b.count - a.count),
+    noPdf: pubs.filter((p) => p.fileIds.length === 0 && cited.has(p.id)).map((p) => p.id).sort(byCount),
+    uncited: pubs.filter((p) => !cited.has(p.id)).map((p) => p.id),
+  };
+}
