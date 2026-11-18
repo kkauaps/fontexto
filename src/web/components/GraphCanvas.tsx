@@ -23,7 +23,7 @@ import { neighbourhood, type ViewEdge, type ViewGraph, type ViewNode } from '../
 import { REF_STATUS_COLOR, REF_STATUS_ORDER, type RefStatus } from '../../core/refStatus';
 import { categoryColor } from '../labels';
 import { categoryLabel, refStatusText, useI18n } from '../i18n';
-import { layoutGraph, nodeSize, statusGridLayout, type Positioned } from '../layout';
+import { layoutGraph, nodeSize, STATUS_HEADER_HEIGHT, statusGridLayout, statusGroupHeaders, type Positioned } from '../layout';
 import { isPhoneWidth, phoneViewport } from '../fit';
 
 export type Selection = { type: 'node'; id: string } | { type: 'edge'; id: string } | undefined;
@@ -36,7 +36,30 @@ interface NodeData extends Record<string, unknown> {
   onToggleGroup?: (category: string) => void;
   /** Phone star layout: edges leave the bottom of the document and enter the top of each source. */
   vertical?: boolean;
+  /** Citations of this work in the text (diagram badge). */
+  cites?: number;
 }
+
+interface HeaderData extends Record<string, unknown> {
+  status: RefStatus;
+  count: number;
+  width: number;
+  dim: boolean;
+}
+
+/** Title of a status group in the diagram: colour, name and how many references it holds. */
+const StatusHeaderView = memo(({ data }: NodeProps<Node<HeaderData>>) => {
+  const { t } = useI18n();
+  const color = REF_STATUS_COLOR[data.status];
+  return (
+    <div className={`node-status-header${data.dim ? ' dim' : ''}`} style={{ width: data.width, height: STATUS_HEADER_HEIGHT, ['--st' as string]: color }}>
+      <Handle type="target" position={Position.Top} style={handleStyle} />
+      <i aria-hidden="true" />
+      <span className="node-status-name">{refStatusText(t, data.status)}</span>
+      <b className="node-status-count">{data.count}</b>
+    </div>
+  );
+});
 
 const handleStyle = { opacity: 0, width: 6, height: 6, border: 'none' };
 
@@ -52,7 +75,13 @@ const PublicationNodeView = memo(({ data }: NodeProps<Node<NodeData>>) => {
     >
       <Handle type="target" position={vertical ? Position.Top : Position.Left} style={handleStyle} />
       <span className="node-label">{vn.label}</span>
-      {vn.inDegree > 1 && <span className="node-badge" title={t.citedByVisible(vn.inDegree)}>{vn.inDegree}</span>}
+      {data.cites ? (
+        <span className="node-cites" title={t.tabCitations(data.cites)}>
+          {data.cites}
+        </span>
+      ) : (
+        vn.inDegree > 1 && <span className="node-badge" title={t.citedByVisible(vn.inDegree)}>{vn.inDegree}</span>
+      )}
       <Handle type="source" position={vertical ? Position.Bottom : Position.Right} style={handleStyle} />
     </div>
   );
@@ -89,7 +118,7 @@ const GroupNodeView = memo(({ data }: NodeProps<Node<NodeData>>) => {
   );
 });
 
-const nodeTypes = { publication: PublicationNodeView, document: DocumentNodeView, group: GroupNodeView, claim: PublicationNodeView, evidence: PublicationNodeView };
+const nodeTypes = { publication: PublicationNodeView, document: DocumentNodeView, group: GroupNodeView, claim: PublicationNodeView, evidence: PublicationNodeView, statusHeader: StatusHeaderView };
 
 const EDGE_STYLE: Record<string, { stroke: string; dash?: string; width: number; arrow: boolean }> = {
   'cites:confirmed': { stroke: '#3c4657', width: 1.4, arrow: true },
@@ -114,14 +143,17 @@ interface Props {
   search: string;
   exportName: string;
   colorBy?: 'status' | 'category';
+  /** Citations per publication in the text: badge on each reference and order within a status group. */
+  docCitations?: Map<string, number>;
 }
 
-export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, layoutNonce, search, exportName, colorBy = 'category' }: Props) {
+export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, layoutNonce, search, exportName, colorBy = 'category', docCitations }: Props) {
   const { t } = useI18n();
   const rf = useReactFlow();
   const store = useStoreApi();
   const frame = useCallback(() => {
-    if (!isPhoneWidth()) return void rf.fitView({ padding: 0.12, duration: 300 });
+    // desktop: room above for the view switch and the action buttons
+    if (!isPhoneWidth()) return void rf.fitView({ padding: { top: '84px', bottom: '48px', left: '48px', right: '48px' }, duration: 300 });
     const nodes = rf.getNodes();
     const { width, height } = store.getState();
     if (!nodes.length || !width || !height) return void rf.fitView({ padding: 0.2, duration: 300 });
@@ -130,6 +162,10 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
   const [positions, setPositions] = useState<Map<string, Positioned>>(new Map());
   const [layingOut, setLayingOut] = useState(false);
   const [vertical, setVertical] = useState(false);
+  /** Wide star diagram (the document and its references only): grouped by status under titled headers. */
+  const [star, setStar] = useState(false);
+  const citesRef = useRef(docCitations);
+  citesRef.current = docCitations;
   const structureKey = useMemo(() => view.nodes.map((n) => n.id).join('|') + '#' + view.edges.map((e) => e.id).join('|'), [view]);
   // Latest view, read by the layout effect, which only re-runs when the structure changes
   // (not on search/selection), so the user's viewport and drags are preserved.
@@ -143,10 +179,11 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
     const docIds = new Set(v.nodes.filter((n) => n.kind === 'document').map((n) => n.id));
     const starOnly = v.edges.every((e) => docIds.has(e.source) && e.kind !== 'related_to');
     const narrow = starOnly && isPhoneWidth();
-    (starOnly ? Promise.resolve(statusGridLayout(v, { narrow })) : layoutGraph(v))
+    (starOnly ? Promise.resolve(statusGridLayout(v, { narrow, weights: citesRef.current })) : layoutGraph(v))
       .then((pos) => {
         if (cancelled) return;
         setVertical(narrow);
+        setStar(starOnly);
         setPositions(pos);
         requestAnimationFrame(frame);
       })
@@ -180,12 +217,34 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
             dim: Boolean(focus && !focus.nodes.has(vn.id)),
             selected: selection?.type === 'node' && selection.id === vn.id,
             onToggleGroup,
-            vertical,
+            // wide star diagram: the document sits above the groups, so its links leave from the bottom
+            vertical: vertical || (star && vn.kind === 'document'),
+            cites: docCitations?.get(vn.id),
           },
           hidden: !p,
         };
       }),
-    [view, positions, rules, focus, selection, onToggleGroup, colorBy, vertical],
+    [view, positions, rules, focus, selection, onToggleGroup, colorBy, vertical, docCitations, star],
+  );
+  const headers = useMemo(() => (star && colorBy === 'status' ? statusGroupHeaders(view, positions) : []), [star, colorBy, view, positions]);
+  const allNodes = useMemo(
+    () => [
+      ...nodes,
+      ...headers.map(
+        (h) =>
+          ({
+            id: `hdr:${h.status}`,
+            type: 'statusHeader',
+            position: { x: h.x, y: h.y },
+            width: h.width,
+            height: STATUS_HEADER_HEIGHT,
+            selectable: false,
+            draggable: false,
+            data: { status: h.status, count: h.count, width: h.width, dim: Boolean(focus) },
+          }) as unknown as Node<NodeData>,
+      ),
+    ],
+    [nodes, headers, focus],
   );
 
   const edges: Edge[] = useMemo(
@@ -209,6 +268,26 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
       }),
     [view, focus, selection, colorBy],
   );
+  const allEdges: Edge[] = useMemo(() => {
+    if (!headers.length) return edges;
+    const docIds = new Set(view.nodes.filter((n) => n.kind === 'document').map((n) => n.id));
+    // keep the selected/focused reference's own edge so a selection still shows its link to the document
+    const kept = edges.filter((e) => !docIds.has(e.source) || (focus && focus.edges.has(e.id)));
+    const doc = [...docIds][0];
+    // phone outline: sections stacked under the document; links would cross them, so none are drawn
+    if (vertical) return edges.filter((e) => !docIds.has(e.source));
+    const grouped = doc
+      ? headers.map((h) => ({
+          id: `hdr-edge:${h.status}`,
+          source: doc,
+          target: `hdr:${h.status}`,
+          type: 'default',
+          selectable: false,
+          style: { stroke: REF_STATUS_COLOR[h.status], strokeWidth: 2.6, opacity: focus ? 0.25 : 0.9 },
+        }))
+      : [];
+    return [...grouped, ...kept];
+  }, [headers, edges, view, focus, vertical]);
   const legend = useMemo(() => {
     const c = new Map<RefStatus, number>();
     for (const n of view.nodes) if (n.refStatus) c.set(n.refStatus, (c.get(n.refStatus) ?? 0) + 1);
@@ -262,11 +341,11 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
 
   return (
     <ReactFlow
-      nodes={nodes}
-      edges={edges}
+      nodes={allNodes}
+      edges={allEdges}
       nodeTypes={nodeTypes}
       onNodesChange={onNodesChange}
-      onNodeClick={(_, n) => onSelect({ type: 'node', id: n.id })}
+      onNodeClick={(_, n) => !n.id.startsWith('hdr:') && onSelect({ type: 'node', id: n.id })}
       onEdgeClick={(_, e) => onSelect({ type: 'edge', id: e.id })}
       onPaneClick={() => onSelect(undefined)}
       nodesConnectable={false}
@@ -278,8 +357,8 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
     >
       <Background gap={24} size={1} color="#e0ece6" />
       <Controls showInteractive={false} position="bottom-left" />
-      <MiniMap pannable zoomable nodeColor={(n) => (n.data as NodeData).color} position="bottom-right" />
-      {colorBy === 'status' && legend.length > 0 && (
+      {!star && <MiniMap pannable zoomable nodeColor={(n) => (n.data as NodeData).color} position="bottom-right" />}
+      {colorBy === 'status' && legend.length > 0 && !star && (
         <Panel position="top-left" className="graph-legend" aria-label={t.legend}>
           {legend.map(({ s, n }) => (
             <span key={s}>

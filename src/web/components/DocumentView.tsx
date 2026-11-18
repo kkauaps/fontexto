@@ -7,6 +7,7 @@ import { countByStatus, filterGroups, groupOccurrences, neighbourGroup, occurren
 import { api } from '../api';
 import { locatePhraseBoxes, openPdf, renderPage, type BoxRect, type PdfDoc } from '../pdfRender';
 import { CitationList, CitationPanel } from './CitationPanel';
+import { ProjectCheckup } from './ProjectCheckup';
 import { SetupChecklist, UploadButton } from './SetupChecklist';
 import type { OpenRequest } from './SidePanel';
 import { evidenceStatusText, translateRuntime, useI18n } from '../i18n';
@@ -499,7 +500,10 @@ export function DocumentView({ projectId, graph, evidence, focus, onOpenReferenc
             onLabel={async (occId, status) => onEvidence(await api.evidenceLabel(projectId, occId, status))}
           />
         ) : (
-          <CitationList groups={filtered} graph={graph} onSelect={(id) => select(id, true)} method={evidence.method} />
+          <>
+            <ProjectCheckup graph={graph} evidence={evidence} onStatus={setStatus} onFindPdfs={onOpenFiles} />
+            <CitationList groups={filtered} graph={graph} onSelect={(id) => select(id, true)} method={evidence.method} />
+          </>
         )}
       </aside>
       {phone && (
