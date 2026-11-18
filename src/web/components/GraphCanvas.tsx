@@ -20,9 +20,9 @@ import { toPng, toSvg } from 'html-to-image';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CategoryRule } from '../../core/categories';
 import { neighbourhood, type ViewEdge, type ViewGraph, type ViewNode } from '../../core/view';
-import { REF_STATUS_COLOR, REF_STATUS_ORDER, type RefStatus } from '../../core/refStatus';
+import { REF_STATUS_COLOR, REF_STATUS_ORDER, type RefRow, type RefStatus } from '../../core/refStatus';
 import { categoryColor } from '../labels';
-import { categoryLabel, refStatusText, useI18n } from '../i18n';
+import { categoryLabel, evidenceStatusText, refStatusText, useI18n } from '../i18n';
 import { layoutGraph, nodeSize, STATUS_HEADER_HEIGHT, statusGridLayout, statusGroupHeaders, type Positioned } from '../layout';
 import { isPhoneWidth, phoneViewport } from '../fit';
 
@@ -38,7 +38,11 @@ interface NodeData extends Record<string, unknown> {
   vertical?: boolean;
   /** Citations of this work in the text (diagram badge). */
   cites?: number;
+  /** Citations of this reference per check result (shown when only some were located). */
+  checks?: CiteChecks;
 }
+
+type CiteChecks = RefRow['counts'];
 
 interface HeaderData extends Record<string, unknown> {
   status: RefStatus;
@@ -52,7 +56,7 @@ const StatusHeaderView = memo(({ data }: NodeProps<Node<HeaderData>>) => {
   const { t } = useI18n();
   const color = REF_STATUS_COLOR[data.status];
   return (
-    <div className={`node-status-header${data.dim ? ' dim' : ''}`} style={{ width: data.width, height: STATUS_HEADER_HEIGHT, ['--st' as string]: color }}>
+    <div className={`node-status-header${data.dim ? ' dim' : ''}`} style={{ minWidth: data.width, height: STATUS_HEADER_HEIGHT, ['--st' as string]: color }}>
       <Handle type="target" position={Position.Top} style={handleStyle} />
       <i aria-hidden="true" />
       <span className="node-status-name">{refStatusText(t, data.status)}</span>
@@ -65,19 +69,25 @@ const handleStyle = { opacity: 0, width: 6, height: 6, border: 'none' };
 
 const PublicationNodeView = memo(({ data }: NodeProps<Node<NodeData>>) => {
   const { t } = useI18n();
-  const { vn, color, dim, selected, vertical } = data;
+  const { vn, color, dim, selected, vertical, checks } = data;
   const { width, height } = nodeSize(vn);
+  // "Worst wins" puts a reference with one doubtful citation in that group; say how many of its citations were located.
+  const partial = !!checks && checks.localizado > 0 && (vn.refStatus === 'ressalva' || vn.refStatus === 'nao_localizado');
+  const breakdown = checks
+    ? (['localizado', 'ressalva', 'nao_localizado'] as const).filter((k) => checks[k] > 0).map((k) => `${evidenceStatusText(t, k)}: ${checks[k]}`)
+    : [];
+  const citesTitle = [t.tabCitations(data.cites ?? 0), ...breakdown].join('\n');
   return (
     <div
       className={`node-pub${dim ? ' dim' : ''}${selected ? ' selected' : ''}${vn.matchesSearch ? ' match' : ''}${vn.hasPdf ? '' : ' no-pdf'}`}
       style={{ width, height, borderColor: color, ['--cat' as string]: color }}
-      title={`${vn.title ?? vn.label}${vn.refStatus ? `\n${t.situationPrefix}${refStatusText(t, vn.refStatus)}` : ''}${vn.hasPdf ? '' : `\n${t.pdfNotSent}`}\n${t.clickForDetails}`}
+      title={`${vn.title ?? vn.label}${vn.refStatus ? `\n${t.situationPrefix}${refStatusText(t, vn.refStatus)}` : ''}${breakdown.length ? `\n${breakdown.join(' · ')}` : ''}${vn.hasPdf ? '' : `\n${t.pdfNotSent}`}\n${t.clickForDetails}`}
     >
       <Handle type="target" position={vertical ? Position.Top : Position.Left} style={handleStyle} />
       <span className="node-label">{vn.label}</span>
       {data.cites ? (
-        <span className="node-cites" title={t.tabCitations(data.cites)}>
-          {data.cites}
+        <span className={`node-cites${partial ? ' partial' : ''}`} title={citesTitle}>
+          {partial ? `${data.checks!.localizado}/${data.cites}` : data.cites}
         </span>
       ) : (
         vn.inDegree > 1 && <span className="node-badge" title={t.citedByVisible(vn.inDegree)}>{vn.inDegree}</span>
@@ -145,9 +155,10 @@ interface Props {
   colorBy?: 'status' | 'category';
   /** Citations per publication in the text: badge on each reference and order within a status group. */
   docCitations?: Map<string, number>;
+  citeBreakdown?: Map<string, CiteChecks>;
 }
 
-export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, layoutNonce, search, exportName, colorBy = 'category', docCitations }: Props) {
+export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, layoutNonce, search, exportName, colorBy = 'category', docCitations, citeBreakdown }: Props) {
   const { t } = useI18n();
   const rf = useReactFlow();
   const store = useStoreApi();
@@ -220,11 +231,12 @@ export function GraphCanvas({ view, rules, selection, onSelect, onToggleGroup, l
             // wide star diagram: the document sits above the groups, so its links leave from the bottom
             vertical: vertical || (star && vn.kind === 'document'),
             cites: docCitations?.get(vn.id),
+            checks: citeBreakdown?.get(vn.id),
           },
           hidden: !p,
         };
       }),
-    [view, positions, rules, focus, selection, onToggleGroup, colorBy, vertical, docCitations, star],
+    [view, positions, rules, focus, selection, onToggleGroup, colorBy, vertical, docCitations, citeBreakdown, star],
   );
   const headers = useMemo(() => (star && colorBy === 'status' ? statusGroupHeaders(view, positions) : []), [star, colorBy, view, positions]);
   const allNodes = useMemo(

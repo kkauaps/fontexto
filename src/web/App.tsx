@@ -11,7 +11,6 @@ import { MobileBottomNav, type MobileAppTab } from './components/MobileBottomNav
 import { isPhoneWidth } from './fit';
 import { BrandMark } from './components/BrandMark';
 import { SetupChecklist } from './components/SetupChecklist';
-import { occurrencesByPublication } from '../core/evidenceView';
 import type { EvidenceReport } from '../core/evidence';
 import { DocumentView, type DocumentFocus } from './components/DocumentView';
 import { FiltersPanel } from './components/FiltersPanel';
@@ -125,7 +124,6 @@ export function App() {
     };
   }, [projectId, graph?.builtAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const docCitations = useMemo(() => (evidence ? occurrencesByPublication(evidence) : undefined), [evidence]);
   const showInDocument = useCallback((pubId?: string) => {
     setDocFocus((f) => ({ pubId, nonce: (f?.nonce ?? 0) + 1 }));
     setDocMode(true);
@@ -138,6 +136,9 @@ export function App() {
   }, [projectId, projects, t, locale]);
 
   const rows = useMemo(() => (graph ? refRows(graph, evidence) : []), [graph, evidence]);
+  /** Citations of each reference in the main text, with the per-status breakdown (same numbers as the References table). */
+  const docCitations = useMemo(() => (evidence ? new Map(rows.filter((r) => r.citations > 0).map((r) => [r.pub.id, r.citations])) : undefined), [rows, evidence]);
+  const citeBreakdown = useMemo(() => new Map(rows.map((r) => [r.pub.id, r.counts])), [rows]);
   const statusMap = useMemo(() => refStatusMap(rows), [rows]);
   const rowsById = useMemo(() => new Map(rows.map((r) => [r.pub.id, r])), [rows]);
   const refCounts = useMemo(() => Object.fromEntries(REF_STATUS_ORDER.map((s) => [s, rows.filter((r) => r.status === s).length])) as Record<RefStatus, number>, [rows]);
@@ -391,6 +392,7 @@ export function App() {
                   exportName={projectId}
                   colorBy={filters.colorBy}
                   docCitations={docCitations}
+                  citeBreakdown={citeBreakdown}
                 />
               </ReactFlowProvider>
             ) : (

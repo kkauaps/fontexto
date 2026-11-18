@@ -3875,7 +3875,7 @@ html:has(body.sp) { height: auto; }
   font-size: 14px; font-weight: 700; letter-spacing: -0.01em; transition: opacity 0.15s;
 }
 .node-status-header i { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--st); box-shadow: 0 0 0 4px color-mix(in srgb, var(--st) 22%, transparent); }
-.node-status-header .node-status-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.node-status-header .node-status-name { flex: 1; white-space: nowrap; }
 .node-status-count { flex: none; min-width: 28px; padding: 2px 9px; border-radius: 999px; background: var(--st); color: #fff; text-align: center; font-size: 13px; }
 .node-status-header.dim { opacity: 0.35; }
 .node-cites {
@@ -3893,3 +3893,9 @@ html:has(body.sp) { height: auto; }
 .ref-cites-bar .nl { background: #6b7385; }
 .ref-cites-bar .none { background: color-mix(in srgb, var(--muted) 45%, transparent); }
 .ref-cites-n { color: var(--text); font-weight: 600; font-size: 13px; white-space: nowrap; }
+
+/* Category picker: select, then the "suggested" badge or "restore suggestion" link, spaced and wrapping. */
+.cat-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.cat-pick select { flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.cat-pick .linklike { padding: 2px 0; }
+.node-cites.partial { background: color-mix(in srgb, var(--accent) 22%, var(--surface)); color: var(--text); box-shadow: 0 0 0 2px var(--bg), inset 0 0 0 1.5px var(--accent); }
