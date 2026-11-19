@@ -3899,3 +3899,4 @@ html:has(body.sp) { height: auto; }
 .cat-pick select { flex: 0 1 auto; min-width: 0; max-width: 100%; }
 .cat-pick .linklike { padding: 2px 0; }
 .node-cites.partial { background: color-mix(in srgb, var(--accent) 22%, var(--surface)); color: var(--text); box-shadow: 0 0 0 2px var(--bg), inset 0 0 0 1.5px var(--accent); }
+.oa-warn { margin-bottom: 4px; padding: 6px 9px; border-radius: 8px; font-size: 12.5px; line-height: 1.4; color: var(--text); background: color-mix(in srgb, #d9a21f 16%, var(--surface)); border: 1px solid color-mix(in srgb, #d9a21f 45%, transparent); }

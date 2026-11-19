@@ -52,6 +52,15 @@ export function oaQueryFromPub(pub: PublicationNode) {
   return { doi: pub.doi, title: pub.title, year: pub.year, author: pub.authors[0]?.family, ...(arxiv ? { arxiv } : {}), ...(thesis ? { kind: 'thesis' as const } : {}) };
 }
 
+/**
+ * A web page cited as such (documentation, project site, a repository commit): no scholarly catalogue has it, so it is
+ * not looked up; the reference shows a link to the page instead of "not found".
+ */
+export function isWebSource(pub: Pick<PublicationNode, 'doi' | 'url' | 'entryType'>): boolean {
+  if (pub.doi || !pub.url || arxivFromPub(pub)) return false;
+  return /^(manual|misc|online|electronic|www|webpage|software|dataset)$/i.test(pub.entryType ?? '');
+}
+
 export function oaEligible(pub: Pick<PublicationNode, 'doi' | 'title' | 'url'>) {
   return Boolean(pub.doi || arxivFromPub(pub) || (pub.title && pub.title.length >= 8));
 }

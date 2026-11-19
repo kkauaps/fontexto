@@ -10,15 +10,16 @@ import { libraryLink, saveLibraryPrefix, useLibraryPrefix } from '../library';
 import { ProjectCheckup } from './ProjectCheckup';
 import { extensionAvailable, fetchWithMyAccess, MY_ACCESS_SOURCE, useExtensionAvailable } from '../extension';
 import { askAuthorMailto } from '../askAuthor';
-import { makePacer, OA_DEFAULT_CONCURRENCY, OA_MIN_GAP_MS, OA_REQUEST_TIMEOUT_MS, OaDeadline, oaBatchLookup, oaEligible, oaQueryFromPub, runOaQueue, timeoutSignal, withRetry } from '../../core/oaClient';
+import { makePacer, OA_DEFAULT_CONCURRENCY, OA_MIN_GAP_MS, OA_REQUEST_TIMEOUT_MS, OaDeadline, oaBatchLookup, oaEligible, oaQueryFromPub, isWebSource, runOaQueue, timeoutSignal, withRetry } from '../../core/oaClient';
 
 /** Outcome of the free-PDF search for one reference (kept for the session only). */
 export type OaState =
   | { kind: 'busy' }
-  | { kind: 'got'; source: string; host?: OaHost; version?: OaVersion }
+  | { kind: 'got'; source: string; host?: OaHost; version?: OaVersion; doiMismatch?: OaResult['doiMismatch'] }
   | { kind: 'blocked'; result: OaResult }
   | { kind: 'closed'; result: OaResult }
   | { kind: 'not_found'; result?: OaResult }
+  | { kind: 'web'; url: string }
   | { kind: 'error'; message: string };
 
 export { arxivFromPub, makePacer, withRetry } from '../../core/oaClient';
@@ -36,7 +37,7 @@ export async function fetchOpenAccess(
   onState: (pubId: string, s: OaState) => void,
   onGraph?: (g: CitationGraph) => void,
 ): Promise<{ got: number; graph?: CitationGraph }> {
-  const queue = pubs.filter(oaEligible);
+  const queue = pubs.filter((p) => oaEligible(p) && !isWebSource(p));
   // last state of each reference, to retry the ones without a PDF through the reader's own access afterwards
   const last = new Map<string, OaState>();
   const report = onState;
@@ -44,7 +45,7 @@ export async function fetchOpenAccess(
     last.set(pubId, s);
     report(pubId, s);
   };
-  for (const p of pubs) if (!queue.includes(p)) onState(p.id, { kind: 'not_found' });
+  for (const p of pubs) if (!queue.includes(p)) onState(p.id, isWebSource(p) ? { kind: 'web', url: p.url! } : { kind: 'not_found' });
   const files: { file: File; publicationId: string }[] = [];
   try {
     // metadata batch is an optimisation with its own short budget and no retries; /api/oa/pdf still resolves each ref
@@ -65,7 +66,7 @@ export async function fetchOpenAccess(
     onDone: (pub, r) => {
       if (r.file) {
         files.push({ file: r.file, publicationId: pub.id });
-        onState(pub.id, { kind: 'got', source: r.source, host: r.host, version: r.version });
+        onState(pub.id, { kind: 'got', source: r.source, host: r.host, version: r.version, doiMismatch: r.doiMismatch });
       } else if (r.result.status === 'oa') onState(pub.id, { kind: 'blocked', result: r.result });
       else if (r.result.status === 'closed') onState(pub.id, { kind: 'closed', result: r.result });
       // "not found" while catalogues were throttled or down is not an answer: say so instead of "not identified"
@@ -80,8 +81,10 @@ export async function fetchOpenAccess(
   if (extensionAvailable()) {
     for (const pub of pubs) {
       const prev = last.get(pub.id);
-      if (prev?.kind === 'got') continue;
-      const doi = (prev && 'result' in prev ? prev.result?.doi : undefined) ?? pub.doi;
+      if (prev?.kind === 'got' || prev?.kind === 'web') continue;
+      const known = prev && 'result' in prev ? prev.result : undefined;
+      // a DOI that belongs to another work is never sent to the publisher
+      const doi = known?.doi ?? (known?.doiMismatch ? undefined : pub.doi);
       if (!doi) continue;
       onState(pub.id, { kind: 'busy' });
       const file = await fetchWithMyAccess(doi, safeName(pub));
@@ -187,8 +190,10 @@ function NoFreeCopyActions({ result, pub }: { result?: OaResult; pub: Publicatio
 export function OaCell({ state, pub }: { state?: OaState; pub: PublicationNode }) {
   const { t } = useI18n();
   if (!state) return null;
+  const mismatch = state.kind === 'got' ? state.doiMismatch : 'result' in state ? state.result?.doiMismatch : undefined;
   const cell = (info: React.ReactNode, actions?: React.ReactNode, title?: string) => (
     <div className="oa-cell">
+      {mismatch && <div className="oa-warn">⚠ {t.oaDoiMismatch(mismatch.doi, mismatch.title)}</div>}
       <div className="oa-src" title={title}>
         {info}
       </div>
@@ -254,6 +259,13 @@ export function OaCell({ state, pub }: { state?: OaState; pub: PublicationNode }
     }
     case 'not_found':
       return cell(t.notFoundInOpen, <NoFreeCopyActions result={state.result} pub={pub} />);
+    case 'web':
+      return cell(
+        t.webSourceInfo,
+        <a className="oa-btn" href={state.url} target="_blank" rel="noreferrer noopener">
+          ↗ {t.openPage}
+        </a>,
+      );
     case 'error':
       return cell(<span className="oa-bad">{t.lookupFailed(translateRuntime(t, state.message))}</span>);
   }

@@ -44,7 +44,7 @@ const base = (p: string) => `/api/projects/${encodeURIComponent(p)}`;
 
 /** What the open-access proxy said about one reference (same-origin: /api/oa/*). */
 export type { OaCandidate, OaHost, OaResult, OaVersion } from '../core/openAccess';
-export type OaFetch = { file: File; source: string; host?: OaHost; version?: OaVersion } | { file?: undefined; result: OaResult; error?: string };
+export type OaFetch = { file: File; source: string; host?: OaHost; version?: OaVersion; doiMismatch?: OaResult['doiMismatch'] } | { file?: undefined; result: OaResult; error?: string };
 
 /** Asks the proxy for a free PDF of one reference. Only DOI/title/year/first author/arXiv id leave the browser. */
 async function oaFetchPdf(q: { doi?: string; title?: string; year?: number; author?: string; arxiv?: string; kind?: 'thesis' }, name: string, signal?: AbortSignal): Promise<OaFetch> {
@@ -65,7 +65,14 @@ async function oaFetchPdf(q: { doi?: string; title?: string; year?: number; auth
     const blob = await res.blob();
     const host = res.headers.get('x-fontexto-host') as OaHost | null;
     const version = res.headers.get('x-fontexto-version') as OaVersion | null;
-    return { file: new File([blob], name, { type: 'application/pdf' }), source: decodeURIComponent(res.headers.get('x-fontexto-source') ?? ''), host: host ?? undefined, version: version ?? undefined };
+    let doiMismatch: OaResult['doiMismatch'];
+    try {
+      const raw = res.headers.get('x-fontexto-doi-mismatch');
+      if (raw) doiMismatch = JSON.parse(decodeURIComponent(raw)) as OaResult['doiMismatch'];
+    } catch {
+      /* ignore a malformed header */
+    }
+    return { file: new File([blob], name, { type: 'application/pdf' }), source: decodeURIComponent(res.headers.get('x-fontexto-source') ?? ''), host: host ?? undefined, version: version ?? undefined, doiMismatch };
   }
   if (type.includes('json')) {
     const body = (await res.json()) as { error?: string; result?: OaResult };
