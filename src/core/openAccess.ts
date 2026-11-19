@@ -62,6 +62,11 @@ export interface OaResult {
   /** What each catalogue answered (diagnostics; no query data). */
   sources?: { name: OaSourceName; status: OaSourceStatus; detail?: string }[];
   cached?: boolean;
+  /**
+   * The reference's DOI belongs to another work (a typo in the bibliography): the DOI and that work's title. The rest
+   * of the result then comes from the reference's own title, not from the DOI.
+   */
+  doiMismatch?: { doi: string; title: string };
 }
 
 /** Optional settings (environment variables on the Pages project / local server). */
@@ -981,6 +986,34 @@ async function step(statuses: Map<OaSourceName, OaSourceStatus>, name: OaSourceN
 
 /** Looks the work up and gathers its free legal copies (cached, coalesced per isolate). */
 export async function lookupOpenAccess(q: OaQuery, f: Fetch = fetch, opts: OaOptions = {}): Promise<OaResult> {
+  const r = await lookupCached(q, f, opts);
+  if (!doiTitleConflict(q, r)) return r;
+  // The DOI is someone else's paper: find the work by its title, and tell the writer the DOI is wrong.
+  const byTitle = await lookupCached({ title: q.title, year: q.year, author: q.author, ...(q.kind ? { kind: q.kind } : {}) }, f, opts);
+  const sameDoi = byTitle.doi?.toLowerCase() === q.doi;
+  return { ...byTitle, doiMismatch: sameDoi ? undefined : { doi: q.doi!, title: r.title! } };
+}
+
+/**
+ * True when the DOI given with a reference resolves to a clearly different work than the reference's title (same
+ * language, almost no words in common), e.g. a DOI copied from the neighbouring entry. Translated titles never count.
+ */
+export function doiTitleConflict(q: Pick<OaQuery, 'doi' | 'title'>, r: Pick<OaResult, 'doi' | 'title' | 'status'>): boolean {
+  if (!q.doi || !q.title || !r.title || r.status === 'not_found') return false;
+  if ((r.doi ?? '').toLowerCase() !== q.doi.toLowerCase()) return false;
+  const la = titleLanguage(q.title);
+  const lb = titleLanguage(r.title);
+  if (la !== 'other' && lb !== 'other' && la !== lb) return false;
+  const nonLatin = (t: string) => /[^\u0000-\u024f\u1e00-\u1eff\u2000-\u206f]/.test(t);
+  if (nonLatin(q.title) !== nonLatin(r.title)) return false;
+  // a title cited without its subtitle ("Matplotlib" for "Matplotlib: A 2D graphics environment") is the same work
+  const a = fold(normalizeBibliographicTitle(q.title));
+  const b = fold(normalizeBibliographicTitle(r.title));
+  if (a && b && (a.startsWith(b) || b.startsWith(a))) return false;
+  return titleSimilarity(normalizeBibliographicTitle(q.title), normalizeBibliographicTitle(r.title)) < 0.4;
+}
+
+async function lookupCached(q: OaQuery, f: Fetch, opts: OaOptions): Promise<OaResult> {
   const cache = opts.cache ?? defaultCache;
   const key = oaCacheKey(q);
   const hit = await cache.get(key);
@@ -1401,6 +1434,7 @@ export async function handleOaRequest(url: URL, f: Fetch = fetch, opts: OaOption
         'X-Fontexto-Url': encodeURIComponent(opened.url),
         'X-Fontexto-Host': opened.candidate.host,
         'X-Fontexto-Version': opened.candidate.version,
+        ...(result.doiMismatch ? { 'X-Fontexto-Doi-Mismatch': encodeURIComponent(JSON.stringify(result.doiMismatch)) } : {}),
       },
     });
   }

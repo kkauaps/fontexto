@@ -81,14 +81,40 @@ function urlFromEprint(f: Record<string, string>): string | undefined {
   return undefined;
 }
 
+/** First web address in a free-text field: `\\url{...}`, `\\href{...}{...}` or a bare http(s) link. */
+function urlInText(v: string | undefined): string | undefined {
+  if (!v) return undefined;
+  const m = /\\(?:url|href)\s*\{([^}]+)\}/.exec(v) ?? /(https?:\/\/[^\s{}<>"]+)/.exec(v);
+  return m?.[1]?.trim().replace(/[.,;)]+$/, '');
+}
+
+/** arXiv id written in a note or a "journal" field ("arXiv preprint arXiv:2005.12873v3", "arXiv:2603.03705"). */
+function arxivInText(...vs: (string | undefined)[]): string | undefined {
+  for (const v of vs) {
+    const m = v && /arxiv[:\s]*(\d{4}\.\d{4,5})(?:v\d+)?/i.exec(v);
+    if (m) return `https://arxiv.org/abs/${m[1]}`;
+  }
+  return undefined;
+}
+
+/** DOI written in a note or in howpublished ("DOI: 10.1145/3209950.3209955", "https://doi.org/..."). */
+function doiInText(...vs: (string | undefined)[]): string | undefined {
+  for (const v of vs) {
+    const m = v && /\b(10\.\d{4,9}\/[^\s{}"<>,;]+)/.exec(v);
+    const d = m ? normalizeDoi(m[1].replace(/[.)\]]+$/, '')) : undefined;
+    if (d) return d;
+  }
+  return undefined;
+}
+
 function bibToRecord(entry: BibEntry, fileId: string): PubRecord {
   const f = entry.fields;
   const title = f.title ? decodeLatex(f.title) : undefined;
   const authors = parseAuthorList(f.author ?? f.editor);
   const y = parseYear(f.year ?? f.date);
-  const doi = normalizeDoi(f.doi) ?? (f.url ? normalizeDoi(f.url) : undefined);
+  const doi = normalizeDoi(f.doi) ?? (f.url ? normalizeDoi(f.url) : undefined) ?? doiInText(f.note, f.howpublished, f.addendum);
   const venueRaw = f.journal ?? f.journaltitle ?? f.booktitle ?? f.publisher ?? f.institution ?? f.school;
-  const url = f.url || urlFromEprint(f);
+  const url = f.url || urlInText(f.howpublished) || urlFromEprint(f) || arxivInText(f.note, f.journal, f.howpublished) || urlInText(f.note);
   const fields = Object.entries({ title, authors: authors.length ? 1 : undefined, year: y.year, doi, venue: venueRaw, abstract: f.abstract, url })
     .filter(([, v]) => v !== undefined)
     .map(([k]) => k);
