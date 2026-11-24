@@ -367,6 +367,8 @@ function skipSubordinateBodies<T extends { title?: string; authors: ParsedRefere
 
 export function parseReferenceText(text: string, index = 0, label?: string): Omit<ParsedReference, 'key'> {
   const original = text;
+  // a surname with a letter-spaced capital at the start ("K ATZ, James" from kerning in the PDF)
+  text = text.replace(/^(\p{Lu}) (\p{Lu}{2,}[\p{Lu}'’\-]*,\s)/u, '$1$2');
   const norm = abntNormalize(joinBrokenWords(text));
   const r = skipSubordinateBodies(parseReferenceCore(norm, index, label), norm);
   return { ...r, text: original };
@@ -422,9 +424,9 @@ function parseReferenceCore(text: string, index: number, label?: string): Omit<P
     return { index, text, style: 'apa', authors, etAl: /et\s+al\./.test(fr[1]), year: Number(fr[2]), title: usableTitle(titleAfter(text, fr[0].length)), doi, arxiv, label };
   }
   // Organisation in capitals with the year in parentheses: "UNITED NATIONS CHILDREN'S FUND (2016), « Titre », …"
-  const capsOrgYear = /^(\p{Lu}[\p{Lu}'’&\-]+(?:\s+[\p{Lu}'’&\-]{2,}){1,8})\s*\(\s*((?:1[5-9]|20)\d{2})[a-z]?\s*\)[,.:]?\s*/u.exec(text);
+  const capsOrgYear = /^(\p{Lu}[\p{Lu}'’&\-]+(?:\s+[\p{Lu}'’&\-]{2,}){1,8})\s*\(\s*((?:1[5-9]|20)\d{2}|s\.?\s?d\.?|s\/a|n\.?\s?d\.?)[a-z]?\s*\)[,.:]?\s*/iu.exec(text);
   if (capsOrgYear) {
-    return { index, text, style: 'apa', authors: [{ family: capsOrgYear[1].trim(), organization: true }], etAl: false, year: Number(capsOrgYear[2]), title: usableTitle(titleAfter(text, capsOrgYear[0].length)), doi, arxiv, label };
+    return { index, text, style: 'apa', authors: [{ family: capsOrgYear[1].trim(), organization: true }], etAl: false, year: /^\d/.test(capsOrgYear[2]) ? Number(capsOrgYear[2]) : undefined, title: usableTitle(titleAfter(text, capsOrgYear[0].length)), doi, arxiv, label };
   }
   // Chinese names in ABNT/APA order without a GB/T type mark: "倪序南. 标题. 期刊, v. 7, 2025." / "夏巧刚,阮同江, 俞. 标题. …"
   const hanAbnt = /^([\p{Script=Han}·]{2,4}(?:\s*[,，、]\s*[\p{Script=Han}·]{1,4}){0,9})\s*[.．。]\s*([^.．。]{2,200}?)\s*[.．。]/u.exec(stripLeadingRefLabel(text));
@@ -470,10 +472,23 @@ function parseReferenceCore(text: string, index: number, label?: string): Omit<P
   let year: number | undefined;
   if (style === 'abnt') {
     const a = abntAuthors(text);
-    authors = a.authors;
+    // author-year ABNT: "BAYM, Nancy (2015). Title." — the year in parentheses after the names is the year, never a
+    // number further on (a URL like ".../view/2139/1946" or ".../uploads/2019/04/...")
+    const NAME_YEAR = /\s*\(\s*(?:((?:1[5-9]|20)\d{2})[a-z]?|s\.?\s?d\.?|s\/a|n\.?\s?d\.?)\s*\)\.?$/iu;
+    let namedYear: number | undefined;
+    authors = a.authors.map((x) => {
+      const m = x.given ? NAME_YEAR.exec(x.given) : undefined;
+      if (!m) return x;
+      if (m[1]) namedYear = Number(m[1]);
+      return { ...x, given: x.given!.slice(0, m.index).trim() || undefined };
+    });
+    const headYear = /^[^.]*?\(\s*((?:1[5-9]|20)\d{2})[a-z]?\s*\)/u.exec(text.slice(a.end, a.end + 40));
     etAl = a.etAl;
-    title = titleAfter(text, a.end);
-    year = pickYear(text, a.end + (title?.length ?? 0));
+    // what sits between the names and the title in author-year ABNT: "(Ed.)", "(Org.).", a stray initial ("James. E."),
+    // and the "(1992)." year itself
+    const lead = /^[\s.,;]*(?:(?:\((?:Eds?|Orgs?|Coords?|Comps?|Dir|Hrsg)\.?\)|\p{Lu}\.)[\s.,]*)*\(\s*(?:1[5-9]|20)\d{2}[a-z]?\s*\)[\s.,:]*/u.exec(text.slice(a.end));
+    title = titleAfter(text, a.end + (lead?.[0].length ?? 0))?.replace(/[”"]?\s+In:\s.*$/su, '').replace(/[”"]$/u, '');
+    year = namedYear ?? (headYear && headYear.index === 0 ? Number(headYear[1]) : undefined) ?? pickYear(text, a.end + (title?.length ?? 0));
   } else if (style === 'apa') {
     const m = /^(.*?)\(\s*(\d{4})[a-z]?\s*\)[.,:]?\s*/su.exec(text);
     const fb = familyInitialsBlock(text);
