@@ -119,6 +119,8 @@ export function isReferenceHeading(text: string): boolean {
 export function isSectionStop(text: string): boolean {
   const t = collapseLetterSpacing(text.normalize('NFKC').trim());
   if (t.length >= 110 || /^\p{Ll}/u.test(t)) return false;
+  // journal footer after the list: "Recebido: 01/05/2023 | Aprovado: 01/05/2023", "Received: … Accepted: …"
+  if (/^(?:Recebido|Received|Recibido|Submetido|Submitted|Data de (?:recebimento|submissão)|Aceito|Aprovado|Accepted)\s*(?:em|en|on)?\s*:?\s*\d{1,2}[/.\-\s]/iu.test(t)) return true;
   const m = STOP_RE.exec(t);
   if (!m) return false;
   // "ANEXO A – Relatório de 2013" is a heading; "Annex to Regulation 12, 2010." (mixed case, ending like an entry) is not
@@ -460,7 +462,8 @@ function sectionLayout(lines: SectionLine[]): { bigStep?: number; hanging: boole
     const limit = pitch * 1.4 + 1;
     const big = steps.filter((d) => d > limit).length;
     // a few big steps (2+) but not most of them: that is a blank line between entries
-    if (pitch > 0 && big >= 2 && big <= steps.length * 0.7) bigStep = limit;
+    // …and enough of them: two stray steps (a page break under a running-header fragment) are not a blank-line layout
+    if (pitch > 0 && big >= Math.max(2, steps.length * 0.08) && big <= steps.length * 0.7) bigStep = limit;
   }
   // hanging indent: per page/column, lines sit on two x positions 5–40 pt apart, the inner one being continuation
   let indented = 0;
@@ -485,7 +488,9 @@ const ENTRY_END_RE = /(?:\b(?:1[5-9]|20)\d{2}[a-z]?\)?|https?:\/\/\S+|\b10\.\d{4
 const CONTINUATION_START_RE = /^(?:Dispon[ií]vel|Available|Acesso|Acessado|Accessed|Retrieved|Consultado|Recuperado|In:|In\s|En:|DOI|ISBN|ISSN|URL|https?:|www\.|Tese|Disserta|Thesis|Dissertation|Monografia|Trabalho de Conclus|\[|\(|Дата|Режим|URL:)/iu;
 
 /** Splits the lines of a bibliography section into entries. */
-function segmentEntries(lines: SectionLine[]): { lines: SectionLine[]; label?: string }[] {
+function segmentEntries(all: SectionLine[]): { lines: SectionLine[]; label?: string }[] {
+  // lone letters from a running header or a drop cap ("A", "f") are not part of any entry, and would skew the layout
+  const lines = all.filter((l) => !/^\p{L}$/u.test(l.text.trim()));
   if (lines.length === 0) return [];
   const numbered = detectNumbering(lines);
   const layout = numbered ? { hanging: false } : sectionLayout(lines);
