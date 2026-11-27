@@ -23,7 +23,7 @@ import { DEFAULT_GLOSSARY } from './glossary.js';
 import { buildQuery, indexV2, lexicalCandidates, MATCH_PARAMS, windowText, type Candidate, type ClaimParts, type MatchParams } from './matching.js';
 import { claimSpanFor, isLeadingNarrative, numbersAttributedTo } from './attribution.js';
 import { authorsFromMarker, bestPassageFocus } from './passageFocus.js';
-import { extractMarkersFromText, isSelfCitation, resolveMarker, type Approximation, type MarkerReference } from './citations.js';
+import { extractMarkersFromText, isSelfCitation, resolveMarker, splitSeparateAuthors, type Approximation, type MarkerReference } from './citations.js';
 import type { CitationGraph, FileRecord, PublicationNode, Rect } from './model.js';
 import { foldCjk, stripDiacritics } from './normalize.js';
 import { extractReferenceEntries, isPageNumber, matchReference, referenceRanges, repeatedLines } from './references.js';
@@ -646,7 +646,10 @@ export function computeEvidence(input: ComputeEvidenceInput): EvidenceReport {
     };
 
     for (const start of [...bySpan.keys()].sort((a, b) => a - b)) {
-      const group = bySpan.get(start)!.filter((m) => !isSelfCitation(m));
+      const group = bySpan
+        .get(start)!
+        .filter((m) => !isSelfCitation(m))
+        .flatMap((m) => (m.numericPub !== undefined ? [m] : splitSeparateAuthors(m, bibPubs)));
       if (group.length === 0) continue;
       const first = group[0];
       const page = pageAt(flow, first.start);
@@ -699,7 +702,7 @@ export function computeEvidence(input: ComputeEvidenceInput): EvidenceReport {
         const occ: CitationOccurrence = {
           id: `o${first.start}-${k++}`,
           spanId: `s${first.start}`,
-          marker: first.raw,
+          marker: group.length === 1 && first.narrative && res.status === 'resolved' ? trimNarrativeMarker(first.raw, graph.nodes[res.publicationId] as PublicationNode) : first.raw,
           page,
           nthOnPage,
           rects,
@@ -1161,4 +1164,29 @@ export function redactEvidenceForSharing(report: EvidenceReport, files: Record<s
       passages: o.passages.map((p) => ({ ...p, text: isPrivate(p.fileId) ? REDACTED_TEXT : p.text, focus: isPrivate(p.fileId) ? undefined : p.focus, focusApproximate: isPrivate(p.fileId) ? undefined : p.focusApproximate })),
     })),
   };
+}
+
+/**
+ * A narrative marker may have caught the words before the name ("Nele, V Nasser e Egler (2023)", "Marres. Bragato,
+ * Nicolas e Sampaio (2012)"): shown from the cited surname on. Spelling slips keep working ("Bragato" for "Bragatto").
+ */
+export function trimNarrativeMarker(raw: string, pub: PublicationNode | undefined): string {
+  const fold = (x: string) => stripDiacritics(x).toLowerCase();
+  const PARTICLE = /^(?:de|da|do|dos|das|van|von|der|den|del|di|le|la)$/;
+  // any author of the work counts: a text may list them in another order ("Almada, Jesus e Amaral" for JESUS; ALMADA)
+  const names = (pub?.authors ?? []).flatMap((a) => fold(`${a.family} ${a.given ?? ''}`).split(/[\s.\-]+/)).filter((w) => w.length >= 3 && !PARTICLE.test(w));
+  if (!names.length) return raw;
+  const words = [...raw.matchAll(/\p{L}[\p{L}'’\-]*/gu)];
+  for (let k = 0; k < words.length; k++) {
+    const f = fold(words[k][0]);
+    const hit = names.some((n) => {
+      let c = 0;
+      while (c < f.length && c < n.length && f[c] === n[c]) c++;
+      return f === n || c >= Math.min(5, n.length);
+    });
+    if (!hit) continue;
+    const at = k > 0 && PARTICLE.test(fold(words[k - 1][0])) ? words[k - 1].index! : words[k].index!;
+    return at ? raw.slice(at) : raw;
+  }
+  return raw;
 }

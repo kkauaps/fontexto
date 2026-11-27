@@ -25,6 +25,10 @@ export interface ParsedReference {
   doi?: string;
   /** arXiv id (e.g. "1809.10486"), when the entry cites a preprint. */
   arxiv?: string;
+  /** Web address printed in the entry (not a DOI link): the PDF, the article page or the cited web page. */
+  url?: string;
+  /** Cited as a web page (a link, an access date, nothing of a journal, book or proceedings). */
+  web?: boolean;
   key: string;
   /** Printed numeric label ("[3]"), when the list is numbered. */
   label?: string;
@@ -365,13 +369,46 @@ function skipSubordinateBodies<T extends { title?: string; authors: ParsedRefere
   return title && !SUBORDINATE_BODY_RE.test(title) ? { ...r, title: usableTitle(title) } : r;
 }
 
+/** Marks of a journal article, chapter, book or proceedings before the link ("v. 13, n. 3", "In:", "Press"). */
+const WORK_MARK_RE = /(?:\b(?:v|vol|n|no|nº|p|pp|ed)\.\s?\d|\bIn:|\bEn:|\bAnais\b|\bProceedings\b|\bRevista\b|\bJournal\b|\bPress\b|\bEditora\b|\bUniversity\b|\bUniversidade\b|\bTese\b|\bDisserta)/iu;
+
+/**
+ * The first web address of an entry, joined again where the PDF broke it across lines ("https://www. example.org/a-
+ * b-c", "http://site.unb. br/x.pdf"). DOI links are left to the DOI. Trailing punctuation and "(acesso em …)" are cut.
+ */
+export function urlInReference(text: string): string | undefined {
+  const m = /(?:https?:\/\/|\bwww\.)\S+/iu.exec(text);
+  if (!m) return undefined;
+  let url = m[0];
+  let rest = text.slice(m.index + m[0].length);
+  // continuation pieces: no spaces inside, start with a lower-case letter or a digit, and look like a URL part
+  for (;;) {
+    const c = /^\s+([a-z0-9][^\s()]*)/u.exec(rest);
+    if (!c || !(/[./\-#_=]/.test(c[1]) || /[.\-/]$/.test(url))) break;
+    if (!/[./\-#_=]$/.test(url) && !/^[a-z0-9.\-]+\.[a-z]{2,}(?:[/#?]|$)/i.test(c[1])) break;
+    url += c[1];
+    rest = rest.slice(c[0].length);
+  }
+  url = url.replace(/[.,;:)\]]+$/u, '');
+  if (/^www\./i.test(url)) url = `http://${url}`;
+  if (/(?:^|\/\/)(?:dx\.)?doi\.org\//i.test(url)) return undefined;
+  try {
+    return new URL(url).toString();
+  } catch {
+    return undefined;
+  }
+}
+
 export function parseReferenceText(text: string, index = 0, label?: string): Omit<ParsedReference, 'key'> {
   const original = text;
   // a surname with a letter-spaced capital at the start ("K ATZ, James" from kerning in the PDF)
   text = text.replace(/^(\p{Lu}) (\p{Lu}{2,}[\p{Lu}'’\-]*,\s)/u, '$1$2');
   const norm = abntNormalize(joinBrokenWords(text));
   const r = skipSubordinateBodies(parseReferenceCore(norm, index, label), norm);
-  return { ...r, text: original };
+  const url = urlInReference(original);
+  const beforeLink = original.slice(0, Math.max(0, original.search(/https?:\/\/|\bwww\./i)));
+  const web = Boolean(url && !r.doi && !r.arxiv && !/\.pdf$/i.test(url) && !WORK_MARK_RE.test(beforeLink));
+  return { ...r, text: original, ...(url ? { url } : {}), ...(web ? { web } : {}) };
 }
 
 function parseReferenceCore(text: string, index: number, label?: string): Omit<ParsedReference, 'key'> {
@@ -625,8 +662,11 @@ export function toBibtex(refs: ParsedReference[]): string {
       fields.push(`archivePrefix = {arXiv}`);
       fields.push(`url = {https://arxiv.org/abs/${r.arxiv}}`);
     }
+    if (r.url && !r.arxiv) fields.push(`url = {${r.url.replace(/[{}\s]/g, '')}}`);
     fields.push(`note = {Extraído da lista de referências do artigo}`);
-    out.push(`@${r.thesis ? 'phdthesis' : 'misc'}{${r.key},\n  ${fields.join(',\n  ')}\n}`);
+    // a link alone makes a @misc a web page (isWebSource): only entries cited as web pages are typed so
+    const type = r.thesis ? 'phdthesis' : r.web ? 'online' : r.url ? 'article' : 'misc';
+    out.push(`@${type}{${r.key},\n  ${fields.join(',\n  ')}\n}`);
   }
   return out.join('\n\n') + '\n';
 }
