@@ -48,7 +48,8 @@ export function joinLines(lines: string[]): string {
     // back, keeping its hyphen
     const firstTok = line.split(/\s/, 1)[0];
     const urlBreak =
-      /^(?:<?https?:\/\/|<?www\.)\S*[^\s.,;>)]$/i.test(tail) &&
+      // (the link may be glued to the word before it: "Anthropology.https://…")
+      /(?:^|[^\p{L}\d])(?:<?https?:\/\/|<?www\.)\S*[^\s.,;>)]$/iu.test(tail) &&
       /^[\p{Ll}\d_~%/.\-]/u.test(line) &&
       (/[/_\-=?&#%.]$/.test(tail) || /[/_=?&#%.\d]/.test(firstTok));
     if (urlBreak) out += line;

@@ -258,7 +258,17 @@ export function OaCell({ state, pub }: { state?: OaState; pub: PublicationNode }
       );
     }
     case 'not_found':
-      return cell(t.notFoundInOpen, <NoFreeCopyActions result={state.result} pub={pub} />);
+      return cell(
+        t.notFoundInOpen,
+        <>
+          {pub.url && (
+            <a className="oa-btn" href={pub.url} target="_blank" rel="noreferrer noopener">
+              ↗ {t.openPage}
+            </a>
+          )}
+          <NoFreeCopyActions result={state.result} pub={pub} />
+        </>,
+      );
     case 'web':
       return cell(
         t.webSourceInfo,

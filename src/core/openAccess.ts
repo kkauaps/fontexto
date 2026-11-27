@@ -21,6 +21,8 @@ export interface OaQuery {
   arxiv?: string;
   /** "thesis": title searches look among dissertations, with a wider year window (defence vs. deposit year). */
   kind?: 'thesis';
+  /** Link printed in the reference itself (the cited PDF or page). Tried for the PDF; not part of the cache key. */
+  link?: string;
 }
 
 export type OaStatus = 'oa' | 'closed' | 'not_found';
@@ -224,9 +226,11 @@ export function parseOaQuery(params: URLSearchParams): OaQuery | undefined {
   const author = params.get('author')?.trim().slice(0, 80);
   const kind = params.get('kind') === 'thesis' ? ('thesis' as const) : undefined;
   const arxiv = parseArxivId(params.get('arxiv'));
-  const extra = { ...(kind ? { kind } : {}), ...(arxiv ? { arxiv } : {}) };
+  const linkRaw = params.get('link')?.trim().slice(0, 600);
+  const link = linkRaw && isFetchableUrl(linkRaw) ? linkRaw : undefined;
+  const extra = { ...(kind ? { kind } : {}), ...(arxiv ? { arxiv } : {}), ...(link ? { link } : {}) };
   if (doi && DOI_RE.test(doi)) return { doi, title, year, author, ...extra };
-  if (arxiv) return { arxiv, title, year: year && year > 1500 && year < 2100 ? year : undefined, author, ...(kind ? { kind } : {}) };
+  if (arxiv) return { arxiv, title, year: year && year > 1500 && year < 2100 ? year : undefined, author, ...(kind ? { kind } : {}), ...(link ? { link } : {}) };
   if (title && title.length >= 8) return { title, year: year && year > 1500 && year < 2100 ? year : undefined, author, ...extra };
   return undefined;
 }
@@ -1402,7 +1406,15 @@ export async function handleOaRequest(url: URL, f: Fetch = fetch, opts: OaOption
   if (!q) return json({ error: 'Informe um DOI ou um título.' }, 400);
   const result = await lookupOpenAccess(q, f, opts);
   if (url.pathname.endsWith('/pdf')) {
-    let opened = result.pdfUrls.length ? await openPdfResponse(result.pdfUrls, f) : undefined;
+    // the PDF the reference itself links to is exactly the cited version: tried first
+    const own: OaCandidate | undefined = q.link && /\.pdf(?:$|[?#])/i.test(q.link) ? { url: q.link, source: hostLabel(q.link), host: hostFromUrl(q.link), version: 'unknown', via: [] } : undefined;
+    let opened = own ? await openPdfResponse([own], f) : undefined;
+    if (!opened && result.pdfUrls.length) opened = await openPdfResponse(result.pdfUrls, f);
+    // a page the reference links to (an OJS article page, a repository record) may declare its PDF
+    if (!opened && q.link && !own) {
+      const fromLink = await pdfUrlFromLanding(q.link, f);
+      if (fromLink) opened = await openPdfResponse([{ url: fromLink, source: hostLabel(fromLink), host: hostFromUrl(fromLink), version: 'unknown', via: [] }], f);
+    }
     if (!opened && result.landingUrl && isFetchableUrl(result.landingUrl)) {
       const fromLanding = await pdfUrlFromLanding(result.landingUrl, f);
       if (fromLanding) {

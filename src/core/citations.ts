@@ -35,6 +35,9 @@ const NARRATIVE_RE = new RegExp(String.raw`(?<![\p{L}])(${AUTHORS})\s*[（(]((?:
 const HAN_NARRATIVE_RE = /([\p{Script=Han}]{1,4})(等)?\s*[（(]((?:1[5-9]|20)\d{2}[a-z]?)(?:[,，]\s*(?:p+\.\s*[\d\-–]+|第\s*\d{1,4}\s*页))?[）)]/gu;
 const PAREN_RE = /[（(]([^()（）]{2,400})[）)]/g;
 const YEAR_IN_SEGMENT = /(?<![\d])((?:1[5-9]|20)\d{2})([a-z])?(?![\d])/g;
+/** "No date" in place of the year: "(Pew Research Center, n/a)", "(SILVA, s.d.)", "(Smith, n.d.)". */
+const NO_DATE = /(?<![\p{L}\d])(?:s\.\s?d\.?|s\/d|s\/a|n\.\s?d\.?|n\/a|sem data|no date|sin fecha)(?![\p{L}\d])/iu;
+export const NO_DATE_LABEL = 's.d.';
 const LEADING_NOISE = /^(?:e\.g\.,?|i\.e\.,?|see(?:\s+also)?|cf\.|ver|veja|conforme|segundo)\s+/i;
 
 const HAN_AUTHOR = /^[\p{Script=Han}]{1,4}(?:·[\p{Script=Han}]{1,4})?$/u;
@@ -73,7 +76,7 @@ export function parseParenthetical(content: string): MarkerReference[] {
   let carry = '';
   for (const seg of rawSegments) {
     const merged = carry ? `${carry}; ${seg}` : seg;
-    if (/(?<![\d])(?:1[5-9]|20)\d{2}[a-z]?(?![\d])/.test(seg)) {
+    if (/(?<![\d])(?:1[5-9]|20)\d{2}[a-z]?(?![\d])/.test(seg) || NO_DATE.test(seg)) {
       segments.push(merged);
       carry = '';
     } else carry = merged;
@@ -81,7 +84,13 @@ export function parseParenthetical(content: string): MarkerReference[] {
   for (const seg0 of segments) {
     const seg = seg0.replace(/[,，]\s*(?:(?:p|pp|s)\.\s*[\d\-–, ]+|第\s*\d{1,4}(?:\s*[-–]\s*\d{1,4})?\s*页)$/i, '');
     const years = [...seg.matchAll(YEAR_IN_SEGMENT)];
-    if (years.length === 0) continue;
+    if (years.length === 0) {
+      // a work without date: the year is 0 and only matches an entry that has no year either
+      const nd = NO_DATE.exec(seg);
+      const parsed = nd ? parseAuthorPart(seg.slice(0, nd.index)) : undefined;
+      if (parsed) out.push({ ...parsed, year: 0, yearLabel: NO_DATE_LABEL });
+      continue;
+    }
     const authorPart = seg.slice(0, years[0].index);
     const parsed = parseAuthorPart(authorPart);
     if (!parsed) continue;
@@ -181,9 +190,13 @@ export function resolveMarker(marker: MarkerReference, pubs: PublicationNode[]):
   // Parenthetical markers are never shifted: "(Silva; Souza, 2020)" must not resolve to Souza 2020.
   const variants: MarkerReference[] = [marker];
   if (marker.narrative) {
-    const words = (marker.authors[0] ?? '').split(/\s+/).filter(Boolean);
-    for (let i = 1; i < words.length; i++) variants.push({ ...marker, authors: [words.slice(i).join(' '), ...marker.authors.slice(1)] });
-    for (let k = 1; k < marker.authors.length; k++) variants.push({ ...marker, authors: marker.authors.slice(k) });
+    // drop leading names ("Nele, V Nasser e Egler" -> "Nasser e Egler"), and leading words of the first one left
+    for (let k = 0; k < marker.authors.length; k++) {
+      const rest = marker.authors.slice(k);
+      if (k > 0) variants.push({ ...marker, authors: rest });
+      const words = (rest[0] ?? '').split(/\s+/).filter(Boolean);
+      for (let i = 1; i < words.length; i++) variants.push({ ...marker, authors: [words.slice(i).join(' '), ...rest.slice(1)] });
+    }
     const first = marker.authors[0] ?? '';
     if (/^\p{Script=Han}+$/u.test(first) && first.length > 1) {
       for (let i = 1; i < first.length; i++) variants.push({ ...marker, authors: [first.slice(i), ...marker.authors.slice(1)] });
@@ -249,7 +262,7 @@ function resolveApproximate(marker: MarkerReference, pubs: PublicationNode[]): M
   const authorsMatch = (p: PublicationNode) =>
     marker.authors.every((a, k) => p.authors[k] && sameFamilyName(p.authors[k].family, a)) && (marker.etAl || marker.authors.length > 1 || p.authors.length <= 2);
   const byAuthors = pubs.filter(authorsMatch);
-  if (byAuthors.length > 0 && !byAuthors.some((p) => p.year === marker.year)) {
+  if (marker.year !== 0 && byAuthors.length > 0 && !byAuthors.some((p) => p.year === marker.year)) {
     const near = byAuthors.filter((p) => p.year === undefined || nearYear(p.year, marker.year));
     const res = pick(near, 'year', label);
     if (res) return res;
@@ -280,12 +293,56 @@ function resolveApproximate(marker: MarkerReference, pubs: PublicationNode[]): M
     const res = pick(near, 'title', (p) => p.title ?? '');
     if (res) return res;
   }
+
+  // the authors cited out of order, by a co-author alone, or by a middle name ("Marambio-Tapia (2023)" for
+  // VILLEGAS; MARAMBIO-TAPIA, "Benichio e Leite Jr." for LEITE JUNIOR; BARBOSA, Bruno Henrique Benichio): same year,
+  // every cited name is one of the work's names, and only one work fits
+  if (marker.year !== 0) {
+    // words of a name, "Jr." read as "Junior"
+    const tokens = (x: string) =>
+      x
+        .replace(/\bJr\.?(?=\s|$)/gu, 'Junior')
+        .split(/[\s\-]+/)
+        .map(foldName)
+        .filter((w) => w.length >= 3);
+    const cited = marker.authors.map(tokens).filter((t) => t.length);
+    if (cited.length) {
+      const near = pubs.filter((p) => {
+        if (p.year !== marker.year || p.authors.length < 2) return false;
+        const fam = new Set(p.authors.flatMap((a) => tokens(a.family)));
+        const all = new Set([...fam, ...p.authors.flatMap((a) => tokens(a.given ?? ''))]);
+        // at least one cited name is a surname; each other cited word is a name of the work
+        return cited.some((c) => c.every((w) => fam.has(w))) && cited.every((c) => c.every((w) => all.has(w)));
+      });
+      const res = pick(near, 'name', label);
+      if (res) return res;
+    }
+  }
   return undefined;
+}
+
+/** Same year; a citation without date ("s.d.", "n/a") matches an entry without year. */
+const sameYear = (p: Pick<PublicationNode, 'year'>, m: Pick<MarkerReference, 'year'>) => (m.year === 0 ? p.year === undefined : p.year === m.year);
+
+/**
+ * "(Beer, Seaver, 2017)" in a list that has "Beer (2017)" and "Seaver (2017)" but no joint work: two references sharing
+ * the year, not co-authors. Split it into one marker per author, so both are linked; joint works stay one marker.
+ */
+export function splitSeparateAuthors<M extends MarkerReference>(marker: M, pubs: PublicationNode[]): M[] {
+  if (marker.narrative || marker.etAl || marker.authors.length < 2 || marker.year === 0) return [marker];
+  const joint = pubs.some((p) => sameYear(p, marker) && marker.authors.every((a, k) => p.authors[k] && sameFamilyName(p.authors[k].family, a)));
+  if (joint) return [marker];
+  const singles = marker.authors.map((a) => ({ ...marker, authors: [a] }));
+  const ids = singles.map((m) => {
+    const r = resolveVariant(m, pubs);
+    return r.status === 'resolved' ? r.publicationId : undefined;
+  });
+  return ids.every(Boolean) && new Set(ids).size === ids.length ? singles : [marker];
 }
 
 function resolveVariant(marker: MarkerReference, pubs: PublicationNode[]): MarkerResolution {
   const first = marker.authors[0];
-  let candidates = pubs.filter((p) => p.year === marker.year && p.authors[0] && sameFamilyName(p.authors[0].family, first));
+  let candidates = pubs.filter((p) => sameYear(p, marker) && p.authors[0] && sameFamilyName(p.authors[0].family, first));
   if (candidates.length === 0) return { status: 'unresolved', candidates: [] };
 
   // Year suffix ("2025a") only disambiguates when the bibliography uses suffixes too.

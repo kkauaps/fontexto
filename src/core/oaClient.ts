@@ -49,7 +49,8 @@ export function arxivFromPub(pub: Pick<PublicationNode, 'url'>): string | undefi
 export function oaQueryFromPub(pub: PublicationNode) {
   const thesis = /thesis|dissertation/i.test(pub.entryType ?? '');
   const arxiv = arxivFromPub(pub);
-  return { doi: pub.doi, title: pub.title, year: pub.year, author: pub.authors[0]?.family, ...(arxiv ? { arxiv } : {}), ...(thesis ? { kind: 'thesis' as const } : {}) };
+  const link = pub.url && !arxiv && !/(?:^|\/\/)(?:dx\.)?doi\.org\//i.test(pub.url) ? pub.url : undefined;
+  return { doi: pub.doi, title: pub.title, year: pub.year, author: pub.authors[0]?.family, ...(arxiv ? { arxiv } : {}), ...(thesis ? { kind: 'thesis' as const } : {}), ...(link ? { link } : {}) };
 }
 
 /**
@@ -57,7 +58,7 @@ export function oaQueryFromPub(pub: PublicationNode) {
  * not looked up; the reference shows a link to the page instead of "not found".
  */
 export function isWebSource(pub: Pick<PublicationNode, 'doi' | 'url' | 'entryType'>): boolean {
-  if (pub.doi || !pub.url || arxivFromPub(pub)) return false;
+  if (pub.doi || !pub.url || arxivFromPub(pub) || /\.pdf(?:$|[?#])/i.test(pub.url)) return false;
   return /^(manual|misc|online|electronic|www|webpage|software|dataset)$/i.test(pub.entryType ?? '');
 }
 

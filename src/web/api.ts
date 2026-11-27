@@ -47,7 +47,7 @@ export type { OaCandidate, OaHost, OaResult, OaVersion } from '../core/openAcces
 export type OaFetch = { file: File; source: string; host?: OaHost; version?: OaVersion; doiMismatch?: OaResult['doiMismatch'] } | { file?: undefined; result: OaResult; error?: string };
 
 /** Asks the proxy for a free PDF of one reference. Only DOI/title/year/first author/arXiv id leave the browser. */
-async function oaFetchPdf(q: { doi?: string; title?: string; year?: number; author?: string; arxiv?: string; kind?: 'thesis' }, name: string, signal?: AbortSignal): Promise<OaFetch> {
+async function oaFetchPdf(q: { doi?: string; title?: string; year?: number; author?: string; arxiv?: string; kind?: 'thesis'; link?: string }, name: string, signal?: AbortSignal): Promise<OaFetch> {
   const u = new URLSearchParams();
   if (q.doi) u.set('doi', q.doi);
   if (q.title) u.set('title', q.title);
@@ -55,6 +55,7 @@ async function oaFetchPdf(q: { doi?: string; title?: string; year?: number; auth
   if (q.author) u.set('author', q.author);
   if (q.arxiv) u.set('arxiv', q.arxiv);
   if (q.kind) u.set('kind', q.kind);
+  if (q.link) u.set('link', q.link);
   const res = await fetch(`/api/oa/pdf?${u}`, { signal, credentials: 'omit' });
   if (res.status === 429 || res.status >= 500) {
     const ra = res.headers.get('retry-after');

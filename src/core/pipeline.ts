@@ -7,7 +7,7 @@
  */
 import type { BibEntry } from './bibtex.js';
 import { suggestCategory, type CategoryRule } from './categories.js';
-import { extractCitationMarkers, resolveMarker } from './citations.js';
+import { extractCitationMarkers, resolveMarker, splitSeparateAuthors } from './citations.js';
 import { checkAnchor } from './anchors.js';
 import { resolveIdentities, type IdentityRecord } from './identity.js';
 import {
@@ -414,7 +414,7 @@ export function buildGraph(input: BuildInput): CitationGraph {
   if (mainFile && mainText) {
     const bibPubs = pubs.filter((p) => p.inMainBibliography);
     const anchorsByPub = new Map<string, Anchor[]>();
-    for (const m of extractCitationMarkers(mainText)) {
+    for (const m of extractCitationMarkers(mainText).flatMap((x) => splitSeparateAuthors(x, bibPubs))) {
       const res = resolveMarker(m, bibPubs);
       if (res.status === 'resolved') {
         const list = anchorsByPub.get(res.publicationId) ?? [];
